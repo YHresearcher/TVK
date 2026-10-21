@@ -29,8 +29,12 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isLoginPage = request.nextUrl.pathname.startsWith("/login");
-  if (!user && !isLoginPage) {
+  const pathname = request.nextUrl.pathname;
+  const isLoginPage = pathname.startsWith("/login");
+  // /auth/* pages (set-password from invitation / reset email links) must be
+  // reachable without a session — the session arrives via the email link.
+  const isPublicPage = isLoginPage || pathname.startsWith("/auth/");
+  if (!user && !isPublicPage) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     return NextResponse.redirect(redirectUrl);

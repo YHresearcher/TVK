@@ -10,8 +10,48 @@ export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"login" | "forgot">("login");
   const configured = isSupabaseConfigured();
+
+  /** Emails are the auth identity; a bare username is resolved first. */
+  async function resolveEmail(
+    supabase: NonNullable<ReturnType<typeof createClient>>,
+    rawId: string
+  ): Promise<string | null> {
+    const raw = rawId.trim();
+    if (raw.includes("@")) return raw;
+    const { data, error: rpcError } = await supabase.rpc("resolve_login_email", {
+      p_username: raw.toLowerCase(),
+    });
+    if (rpcError || !data) return null;
+    return String(data);
+  }
+
+  async function onForgot(e: React.FormEvent) {
+    e.preventDefault();
+    const supabase = createClient();
+    if (!supabase) return;
+    setLoading(true);
+    setError("");
+    setNotice("");
+    const email = await resolveEmail(supabase, identifier);
+    if (!email) {
+      setLoading(false);
+      setError("No account found for that email or username.");
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/set-password`,
+    });
+    setLoading(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setNotice("Password reset link sent — check your email.");
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,19 +59,12 @@ export default function LoginPage() {
     if (!supabase) return;
     setLoading(true);
     setError("");
-    const raw = identifier.trim();
-    let loginEmail = raw;
-    if (!raw.includes("@")) {
-      // Username sign-in: resolve the account email first (RPC from migration 0004).
-      const { data, error: rpcError } = await supabase.rpc("resolve_login_email", {
-        p_username: raw.toLowerCase(),
-      });
-      if (rpcError || !data) {
-        setLoading(false);
-        setError("Invalid username or password.");
-        return;
-      }
-      loginEmail = String(data);
+    // Username sign-in: resolve the account email first (RPC from migration 0004).
+    const loginEmail = await resolveEmail(supabase, identifier);
+    if (!loginEmail) {
+      setLoading(false);
+      setError("Invalid username or password.");
+      return;
     }
     const { error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
@@ -61,7 +94,10 @@ export default function LoginPage() {
             <code>.env.local</code> first (see <code>supabase/README.md</code>).
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
+          <form
+            onSubmit={mode === "login" ? onSubmit : onForgot}
+            className="mt-6 space-y-4"
+          >
             <div>
               <label className={labelCls}>Email or username</label>
               <input
@@ -74,25 +110,65 @@ export default function LoginPage() {
                 placeholder="you@company.vn or username"
               />
             </div>
-            <div>
-              <label className={labelCls}>Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={inputCls}
-                placeholder="••••••••"
-              />
-            </div>
+            {mode === "login" && (
+              <div>
+                <label className={labelCls}>Password</label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={inputCls}
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
             {error && (
               <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
                 {error}
               </p>
             )}
+            {notice && (
+              <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                {notice}
+              </p>
+            )}
             <button type="submit" disabled={loading} className={`${btnCls} w-full`}>
-              {loading ? "Signing in…" : "Sign in"}
+              {loading
+                ? mode === "login"
+                  ? "Signing in…"
+                  : "Sending…"
+                : mode === "login"
+                  ? "Sign in"
+                  : "Send reset link"}
             </button>
+            <p className="text-center text-sm">
+              {mode === "login" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("forgot");
+                    setError("");
+                    setNotice("");
+                  }}
+                  className="text-slate-500 underline hover:text-slate-700"
+                >
+                  Forgot password?
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("login");
+                    setError("");
+                    setNotice("");
+                  }}
+                  className="text-slate-500 underline hover:text-slate-700"
+                >
+                  ← Back to sign in
+                </button>
+              )}
+            </p>
           </form>
         )}
       </div>
