@@ -7,7 +7,7 @@ import { btnCls, inputCls, labelCls } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,24 @@ export default function LoginPage() {
     if (!supabase) return;
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const raw = identifier.trim();
+    let loginEmail = raw;
+    if (!raw.includes("@")) {
+      // Username sign-in: resolve the account email first (RPC from migration 0004).
+      const { data, error: rpcError } = await supabase.rpc("resolve_login_email", {
+        p_username: raw.toLowerCase(),
+      });
+      if (rpcError || !data) {
+        setLoading(false);
+        setError("Invalid username or password.");
+        return;
+      }
+      loginEmail = String(data);
+    }
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password,
+    });
     setLoading(false);
     if (error) {
       setError(error.message);
@@ -46,14 +63,15 @@ export default function LoginPage() {
         ) : (
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <div>
-              <label className={labelCls}>Email</label>
+              <label className={labelCls}>Email or username</label>
               <input
-                type="email"
+                type="text"
+                autoComplete="username"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className={inputCls}
-                placeholder="you@company.vn"
+                placeholder="you@company.vn or username"
               />
             </div>
             <div>

@@ -9,6 +9,7 @@ export type BalanceStatus = "UNPAID" | "PARTIAL" | "PAID" | "CANCELLED";
 export interface Profile {
   id: string;
   email: string | null;
+  username: string | null;
   full_name: string;
   role: AppRole;
   is_active: boolean;
