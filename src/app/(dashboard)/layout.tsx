@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import { signOutAction } from "@/lib/actions";
 import { getCurrentProfile } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { ROLE_LABELS } from "@/lib/types";
@@ -16,7 +16,30 @@ export default async function DashboardLayout({
 
   if (isSupabaseConfigured()) {
     const { data: profile } = await getCurrentProfile();
-    if (!profile) redirect("/login");
+    if (!profile) {
+      // Signed in but no profile row: show a clear dead end instead of
+      // redirecting to /login, which would bounce straight back here.
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-xl">
+            <h1 className="text-xl font-bold text-slate-900">Account not ready</h1>
+            <p className="mt-2 text-sm text-slate-600">
+              You are signed in, but no TVK profile is linked to this account
+              yet. Ask the shop owner to create your profile (Settings → Users
+              &amp; roles), then sign in again.
+            </p>
+            <form action={signOutAction} className="mt-5">
+              <button
+                type="submit"
+                className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
     userName = profile.full_name;
     role = ROLE_LABELS[profile.role] ?? profile.role;
   }
