@@ -386,6 +386,40 @@ export async function importStockAction(formData: FormData) {
   );
 
   const items: { product_id: string; qty: number; unit_cost: number }[] = [];
+  // Kiểm soát phía máy chủ: kiểm tra TOÀN BỘ file trước khi ghi bất cứ thứ
+  // gì. Bất kỳ dòng nào không hợp lệ cũng từ chối cả import (không nhập
+  // một phần, không tạo sản phẩm dở dang), kể cả khi giao diện bị bỏ qua.
+  const invalid: string[] = [];
+  for (const r of rawRows) {
+    const code = String(r.code ?? "").trim();
+    const qty = Math.trunc(Number(r.qty) || 0);
+    const costVnd = Number(r.costVnd) || 0;
+    const usd = Number(r.usd) || 0;
+    const unitCost =
+      costVnd > 0 ? costVnd : usd > 0 ? Math.round(usd * tyGia * (1 + vatPct / 100)) : 0;
+    if (!code || qty <= 0 || unitCost <= 0) {
+      invalid.push(code || "(dòng thiếu mã)");
+      continue;
+    }
+    const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
+      .map((a) => String(a ?? "").trim())
+      .filter(Boolean);
+    let found = bySku.get(norm(code)) ?? byCode.get(norm(code));
+    if (!found) {
+      for (const alt of altCodes) {
+        found = bySku.get(norm(alt)) ?? byCode.get(norm(alt));
+        if (found) break;
+      }
+    }
+    if (!found && (!autoCreate || !String(r.name ?? "").trim()))
+      invalid.push(code);
+  }
+  if (invalid.length)
+    throw new Error(
+      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
+        .slice(0, 5)
+        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
+    );
 
   for (const r of rawRows) {
     const code = String(r.code ?? "").trim();
@@ -397,7 +431,7 @@ export async function importStockAction(formData: FormData) {
     const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
       .map((a) => String(a ?? "").trim())
       .filter(Boolean);
-    if (!code || qty <= 0 || unitCost <= 0) continue;
+    if (!code || qty <= 0 || unitCost <= 0) continue; // đã chặn ở vòng kiểm tra trước
 
     let productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
     if (!productId) {
@@ -408,7 +442,8 @@ export async function importStockAction(formData: FormData) {
     }
 
     if (!productId) {
-      if (!autoCreate) continue;
+      if (!autoCreate) continue; // đã chặn ở vòng kiểm tra trước
+      if (!String(r.name ?? "").trim()) continue; // đã chặn ở vòng kiểm tra trước
       const created = must(
         await supabase
           .from("products")

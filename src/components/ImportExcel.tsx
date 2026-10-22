@@ -108,6 +108,7 @@ export default function ImportExcel({
   const [fileName, setFileName] = useState("");
   const [rawRows, setRawRows] = useState<RawRow[] | null>(null);
   const [parseError, setParseError] = useState("");
+  const [formatProblems, setFormatProblems] = useState<string[]>([]);
 
   // Catalog lookup: any known code (SKU or registered code) → product.
   const catalog = useMemo(() => {
@@ -126,6 +127,7 @@ export default function ImportExcel({
   async function handleFile(file: File | undefined) {
     if (!file) return;
     setParseError("");
+    setFormatProblems([]);
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf);
@@ -136,16 +138,40 @@ export default function ImportExcel({
       });
       if (!aoa.length) throw new Error("File không có dữ liệu.");
       const fieldCol: Partial<Record<keyof RawRow, number>> = {};
+      const headerNorms: string[] = [];
       (aoa[0] as unknown[]).forEach((h, idx) => {
         const n = normalizeHeader(h);
+        headerNorms.push(n);
         (Object.keys(FIELD_ALIASES) as (keyof RawRow)[]).forEach((field) => {
           if (FIELD_ALIASES[field].includes(n) && fieldCol[field] === undefined) {
             fieldCol[field] = idx;
           }
         });
       });
-      if (fieldCol.code === undefined)
-        throw new Error("Không tìm thấy cột mã hàng (MaHang / SKU / Code) trong file.");
+      // Kiểm soát định dạng: thiếu cột bắt buộc, trùng tiêu đề, thiếu cột
+      // giá → từ chối file và hướng dẫn lại chuẩn (không xem trước).
+      const problems: string[] = [];
+      const seenH = new Set<string>();
+      const dupH = new Set<string>();
+      for (const n of headerNorms) {
+        if (!n) continue;
+        if (seenH.has(n)) dupH.add(n);
+        seenH.add(n);
+      }
+      if (dupH.size)
+        problems.push(
+          `Tiêu đề cột bị trùng lặp: ${Array.from(dupH).join(", ")}. Mỗi cột chỉ được xuất hiện một lần.`
+        );
+      const missing: string[] = [];
+      if (fieldCol.code === undefined) missing.push("MaHang");
+      if (fieldCol.name === undefined) missing.push("TenHang");
+      if (fieldCol.qty === undefined) missing.push("SoLuong");
+      if (missing.length)
+        problems.push(`Thiếu cột bắt buộc: ${missing.join(", ")}.`);
+      if (fieldCol.costVnd === undefined && fieldCol.usd === undefined)
+        problems.push(
+          "Thiếu cột giá: cần ít nhất một trong hai cột GiaVonVND hoặc GiaUSD."
+        );
       const val = (cells: unknown[], field: keyof RawRow) => {
         const i = fieldCol[field];
         return i === undefined ? "" : cells[i] ?? "";
@@ -170,6 +196,16 @@ export default function ImportExcel({
           salePrice: toNum(val(cells, "salePrice")),
           note: toStr(val(cells, "note")),
         });
+      }
+      if (rows.length === 0)
+        problems.push(
+          "File không có dòng hàng nào — chỉ có hàng tiêu đề hoặc toàn dòng trống."
+        );
+      if (problems.length) {
+        setFormatProblems(problems);
+        setRawRows(null);
+        setFileName(file.name);
+        return;
       }
       setRawRows(rows);
       setFileName(file.name);
@@ -223,10 +259,16 @@ export default function ImportExcel({
   }, [rawRows, catalog, tyGia, vatPct, autoCreate]);
 
   const importable = preview.filter((r) => r.status !== "error");
+  const errorCount = preview.length - importable.length;
   const totalQty = importable.reduce((a, r) => a + r.qty, 0);
   const totalAmount = importable.reduce((a, r) => a + r.qty * r.unitCost, 0);
+  // Kiểm soát chặt: còn bất kỳ dòng lỗi nào là không cho nhập (không nhập một phần).
   const canSubmit =
-    rawRows !== null && importable.length > 0 && !!supplierId && !!warehouseId;
+    rawRows !== null &&
+    importable.length > 0 &&
+    errorCount === 0 &&
+    !!supplierId &&
+    !!warehouseId;
 
   const payload = {
     kind,
@@ -367,8 +409,41 @@ export default function ImportExcel({
         </a>
       </div>
 
-      {parseError && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{parseError}</p>
+      {(formatProblems.length > 0 || parseError) && (
+        <div className="space-y-3 rounded-md border border-red-300 bg-red-50 px-4 py-3">
+          <p className="text-sm font-semibold text-red-800">
+            File bị từ chối — chưa đúng định dạng chuẩn
+          </p>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-red-700">
+            {(formatProblems.length > 0 ? formatProblems : [parseError]).map(
+              (p, i) => (
+                <li key={i}>{p}</li>
+              )
+            )}
+          </ul>
+          <div className="rounded-md bg-white/70 px-3 py-2 text-xs leading-relaxed text-slate-700">
+            <p className="font-semibold">Định dạng chuẩn của file nhập hàng:</p>
+            <p className="mt-1 font-mono text-[11px]">
+              MaHang* · MaThayThe · TenHang* · TenTiengAnh · ThuongHieu · DongXe ·
+              DonViTinh · SoLuong* · GiaVonVND · GiaUSD · GiaBanDeXuat · GhiChu
+            </p>
+            <p className="mt-1">
+              Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là bắt
+              buộc; về giá cần ít nhất một trong hai cột GiaVonVND / GiaUSD).
+              Mỗi dòng là một mặt hàng, không gộp ô (merge), không thêm hàng
+              tiêu đề phụ. Một file chỉ nhập cho một nhà cung cấp. File .csv
+              phải lưu ở mã hoá UTF-8. Dễ nhất: bấm "Tải file mẫu" ở trên, điền
+              vào file mẫu rồi tải lên.
+            </p>
+          </div>
+        </div>
+      )}
+      {rawRows !== null && errorCount > 0 && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Có {errorCount} dòng lỗi dữ liệu (đánh dấu đỏ trong bảng bên dưới).
+          Hệ thống không nhập một phần — hãy sửa các dòng lỗi ngay trong file
+          Excel rồi tải lại.
+        </p>
       )}
       {fileName && !parseError && (
         <p className="text-sm text-slate-600">
@@ -453,7 +528,9 @@ export default function ImportExcel({
       </button>
       {!canSubmit && rawRows !== null && (
         <p className="text-xs text-slate-500">
-          Cần chọn nhà cung cấp, kho nhập và có ít nhất một dòng hợp lệ để nhập.
+          {errorCount > 0
+            ? "Hãy sửa hết các dòng lỗi trong file Excel rồi tải lại."
+            : "Cần chọn nhà cung cấp, kho nhập và có ít nhất một dòng hợp lệ để nhập."}
         </p>
       )}
     </form>
