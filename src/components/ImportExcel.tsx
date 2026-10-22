@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import { TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { formatNumber, formatVND, todayISO } from "@/lib/format";
 import type { AnyRow } from "@/lib/types";
 
@@ -299,6 +299,25 @@ export default function ImportExcel({
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="payload" value={JSON.stringify(payload)} />
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <label className={labelCls}>File danh mục (.xlsx / .csv)</label>
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <input
+            type="file"
+            accept=".xlsx,.csv"
+            onChange={(e) => handleFile(e.target.files?.[0])}
+            className={`${inputCls} max-w-md flex-1`}
+          />
+          <a href="/mau-import-nhap-hang.xlsx" download className={btnCls}>
+            Tải file mẫu (.xlsx)
+          </a>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Chưa có file đúng chuẩn? Tải file mẫu về, điền hàng hoá theo mẫu rồi
+          chọn file tải lên — hệ thống sẽ kiểm tra định dạng và cho xem trước
+          ở bên dưới trước khi nhập.
+        </p>
+      </div>
       <div className="grid gap-3 md:grid-cols-4">
         <div>
           <label className={labelCls}>Loại phiếu *</label>
@@ -376,15 +395,6 @@ export default function ImportExcel({
             className={inputCls}
           />
         </div>
-        <div>
-          <label className={labelCls}>File danh mục (.xlsx / .csv)</label>
-          <input
-            type="file"
-            accept=".xlsx,.csv"
-            onChange={(e) => handleFile(e.target.files?.[0])}
-            className={inputCls}
-          />
-        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -404,9 +414,6 @@ export default function ImportExcel({
           />
           Xác nhận nhập kho ngay sau khi tạo phiếu
         </label>
-        <a href="/mau-import-nhap-hang.xlsx" download className={btnGhostCls}>
-          Tải file mẫu
-        </a>
       </div>
 
       {(formatProblems.length > 0 || parseError) && (
