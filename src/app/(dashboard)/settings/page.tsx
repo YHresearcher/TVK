@@ -55,7 +55,7 @@ export default async function SettingsPage() {
               </select>
             </div>
             <p className="text-xs text-slate-500">
-              Dù chọn cách nào, các chứng từ quản lý nội bộ (BH / KG) luôn tách riêng và mỗi
+              Đây là chế độ MẶC ĐỊNH khi mở form Phát hành hoá đơn — người xuất vẫn chọn lại Gộp/Tách ngay trên form cho từng lần xuất, nên đối tác nào cần cách riêng vẫn xử lý được. Dù chọn cách nào, các chứng từ quản lý nội bộ (BH / KG) luôn tách riêng và mỗi
               dòng hoá đơn luôn liên kết với đúng một chứng từ. Cài đặt này chỉ quyết định cách
               nhóm các dòng khi phát hành hoá đơn pháp lý.
             </p>

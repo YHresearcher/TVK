@@ -43,7 +43,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     roles: ["OWNER"],
     points: [
       "Chứng từ quản lý nội bộ BH (bán trực tiếp) và KG (ký gửi) LUÔN tách riêng, bất kể cài đặt này — để tiền bán trực tiếp và tiền ký gửi không bao giờ trộn lẫn, và khoản phải trả cho nhà cung cấp luôn tính đúng theo từng chứng từ KG.",
-      "Cài đặt ở Cài đặt → Chế độ hoá đơn GTGT chỉ quyết định cách phát hành HOÁ ĐƠN PHÁP LÝ: COMBINED = một hoá đơn GTGT cho cả hai tính chất (mỗi tính chất một dòng); SEPARATE = hai hoá đơn GTGT riêng, mỗi hoá đơn một tính chất.",
+      "Cài đặt ở Cài đặt → Chế độ hoá đơn GTGT là MẶC ĐỊNH cho cách phát hành HOÁ ĐƠN PHÁP LÝ: COMBINED = một hoá đơn GTGT cho cả hai tính chất (mỗi tính chất một dòng); SEPARATE = hai hoá đơn GTGT riêng, mỗi hoá đơn một tính chất. Khi phát hành, người xuất chọn lại Gộp/Tách ngay trên form Hoá đơn GTGT cho từng lần xuất.",
       "Hãy chốt lựa chọn này cùng kế toán và mô hình hợp đồng ký gửi trước khi vận hành thật. Đổi cài đặt chỉ ảnh hưởng các hoá đơn phát hành sau đó, không thay đổi hoá đơn đã phát hành.",
     ],
   },
@@ -146,7 +146,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     points: [
       "Vào Hoá đơn GTGT: chọn đối tác, nhập Số hoá đơn, Ký hiệu, Ngày hoá đơn và nhà cung cấp hoá đơn điện tử, tick các dòng chứng từ BH/KG cần đưa vào, rồi bấm “Phát hành hoá đơn”.",
       "Hoá đơn chỉ tạo được từ các dòng chứng từ ĐÃ XÁC NHẬN và chưa từng xuất hoá đơn; mỗi dòng trên hoá đơn luôn liên kết với đúng một chứng từ quản lý, nên tiền ký gửi và tiền bán trực tiếp không bao giờ trộn lẫn.",
-      "Việc các dòng được gộp trên một hoá đơn hay tách hai hoá đơn theo tính chất tuân theo Chế độ hoá đơn GTGT (COMBINED / SEPARATE) ở Cài đặt — chế độ này do Chủ cửa hàng chốt cùng bạn và chỉ ảnh hưởng hoá đơn phát hành sau khi đổi.",
+      "Gộp hay tách được chọn ngay trên form phát hành: tick ô “Gộp thành 1 hoá đơn GTGT” = một hoá đơn cho cả BH + KG; bỏ tick = tách hai hoá đơn — hoá đơn BH dùng Số hoá đơn/Ký hiệu chính, hoá đơn KG phải nhập thêm Số hoá đơn/Ký hiệu phần ký gửi. Ô tick được đặt sẵn theo mặc định (COMBINED / SEPARATE) ở Cài đặt.",
       "Bấm “Huỷ hoá đơn” ở danh sách khi cần huỷ: thao tác này chỉ mở lại đúng các dòng thuộc hoá đơn đó để xuất lại, các hoá đơn khác không bị ảnh hưởng.",
     ],
   },

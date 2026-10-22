@@ -171,6 +171,18 @@ export async function listUninvoicedLines(): Promise<QueryResult<AnyRow[]>> {
   return { configured: true, data };
 }
 
+/** Chế độ hoá đơn GTGT mặc định (Cài đặt): "COMBINED" | "SEPARATE". */
+export async function getVatInvoiceMode(): Promise<string> {
+  const supabase = await client();
+  if (!supabase) return "COMBINED";
+  const { data } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "vat_invoice_mode")
+    .maybeSingle();
+  return data?.value ? String(data.value) : "COMBINED";
+}
+
 export async function getDashboard() {
   const supabase = await client();
   if (!supabase) {

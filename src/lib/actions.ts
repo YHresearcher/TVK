@@ -913,15 +913,73 @@ export async function createVatInvoiceAction(formData: FormData) {
   const supabase = await db();
   const lineIds = formData.getAll("line_id").map((v) => String(v));
   if (!lineIds.length) throw new Error("Chọn ít nhất một dòng chứng từ để xuất hoá đơn.");
-  const { error } = await supabase.rpc("create_vat_invoice", {
-    p_partner_id: optStr(formData, "partner_id"),
-    p_invoice_no: str(formData, "invoice_no"),
-    p_symbol: str(formData, "symbol"),
-    p_invoice_date: str(formData, "invoice_date"),
-    p_provider: optStr(formData, "provider"),
-    p_line_ids: lineIds,
-  });
-  if (error) throw new Error(error.message);
+  const partnerId = optStr(formData, "partner_id");
+  const invoiceDate = str(formData, "invoice_date");
+  const provider = optStr(formData, "provider");
+  // Ô chọn trên form: có chọn = GỘP 1 hoá đơn; bỏ chọn = TÁCH 2 hoá đơn.
+  const combine = str(formData, "combine") === "1";
+
+  const issue = async (ids: string[], invoiceNo: string, symbol: string) => {
+    const { error } = await supabase.rpc("create_vat_invoice", {
+      p_partner_id: partnerId,
+      p_invoice_no: invoiceNo,
+      p_symbol: symbol,
+      p_invoice_date: invoiceDate,
+      p_provider: provider,
+      p_line_ids: ids,
+    });
+    if (error) throw new Error(error.message);
+  };
+
+  if (combine) {
+    await issue(lineIds, str(formData, "invoice_no"), str(formData, "symbol"));
+  } else {
+    // Tách theo tính chất: tra doc_kind (BH/KG) của từng dòng qua chứng từ cha.
+    const { data: lineRows } = await supabase
+      .from("sales_document_lines")
+      .select("id, document_id")
+      .in("id", lineIds);
+    const docIds = Array.from(
+      new Set(((lineRows ?? []) as AnyRow[]).map((l) => l.document_id as string))
+    );
+    const { data: docRows } = await supabase
+      .from("sales_documents")
+      .select("id, doc_kind")
+      .in("id", docIds);
+    const kindOf = new Map(
+      ((docRows ?? []) as AnyRow[]).map(
+        (d): [string, string] => [d.id as string, d.doc_kind as string]
+      )
+    );
+    const docOf = new Map(
+      ((lineRows ?? []) as AnyRow[]).map(
+        (l): [string, string] => [l.id as string, l.document_id as string]
+      )
+    );
+    const bhIds = lineIds.filter((id) => kindOf.get(docOf.get(id) ?? "") === "BH");
+    const kgIds = lineIds.filter((id) => kindOf.get(docOf.get(id) ?? "") === "KG");
+    if (!bhIds.length || !kgIds.length) {
+      // Các dòng đã chọn chỉ có một tính chất — xuất một hoá đơn như bình thường.
+      await issue(lineIds, str(formData, "invoice_no"), str(formData, "symbol"));
+    } else {
+      const invoiceNoKg = str(formData, "invoice_no_kg");
+      const symbolKg = str(formData, "symbol_kg");
+      if (!invoiceNoKg || !symbolKg)
+        throw new Error(
+          "Bạn đã chọn tách hoá đơn: hãy nhập Số hoá đơn và Ký hiệu cho phần ký gửi (KG)."
+        );
+      await issue(bhIds, str(formData, "invoice_no"), str(formData, "symbol"));
+      try {
+        await issue(kgIds, invoiceNoKg, symbolKg);
+      } catch (e) {
+        throw new Error(
+          `Đã tạo hoá đơn phần bán thẳng (BH), nhưng phần ký gửi (KG) chưa tạo được: ${
+            e instanceof Error ? e.message : String(e)
+          }. Các dòng KG vẫn còn ở danh sách chưa xuất hoá đơn — hãy xuất riêng cho chúng.`
+        );
+      }
+    }
+  }
   revalidatePath("/invoices");
   revalidatePath("/partner-consumption");
   redirect("/invoices?ok=1");

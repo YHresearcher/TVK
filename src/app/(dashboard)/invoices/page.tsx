@@ -1,6 +1,6 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { cancelVatInvoiceAction, createVatInvoiceAction } from "@/lib/actions";
-import { getCurrentProfile, listPartners, listUninvoicedLines, listVatInvoices } from "@/lib/queries";
+import { getCurrentProfile, getVatInvoiceMode, listPartners, listUninvoicedLines, listVatInvoices } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
 
@@ -11,12 +11,14 @@ export default async function InvoicesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [invoices, uninvoiced, partners, profile] = await Promise.all([
+  const [invoices, uninvoiced, partners, profile, vatMode] = await Promise.all([
     listVatInvoices(),
     listUninvoicedLines(),
     listPartners(),
     getCurrentProfile(),
+    getVatInvoiceMode(),
   ]);
+  const defaultCombine = vatMode !== "SEPARATE";
   const configured = invoices.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
@@ -26,7 +28,7 @@ export default async function InvoicesPage({
     <>
       <PageHeader
         title="Hoá đơn GTGT"
-        description="Lớp hoá đơn pháp lý. Hoá đơn được tạo từ các dòng chứng từ BH/KG đã xác nhận — mỗi dòng chỉ xuất hoá đơn đúng một lần, và mỗi dòng trên hoá đơn luôn liên kết với chứng từ quản lý của nó, nên tiền ký gửi và tiền bán trực tiếp không bao giờ trộn lẫn. Tuỳ quyết định của kế toán (Cài đặt: Chế độ hoá đơn GTGT), cùng các dòng có thể nằm trên một hoá đơn gộp (mỗi tính chất một dòng) hoặc các hoá đơn riêng."
+        description="Lớp hoá đơn pháp lý. Hoá đơn được tạo từ các dòng chứng từ BH/KG đã xác nhận — mỗi dòng chỉ xuất hoá đơn đúng một lần, và mỗi dòng trên hoá đơn luôn liên kết với chứng từ quản lý của nó, nên tiền ký gửi và tiền bán trực tiếp không bao giờ trộn lẫn. Ngay trên form phát hành, bạn chọn Gộp (1 hoá đơn) hoặc Tách (2 hoá đơn: BH riêng, KG riêng) cho từng lần xuất; ô chọn được đặt sẵn theo mặc định ở Cài đặt."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã tạo hoá đơn.</p>}
@@ -44,6 +46,19 @@ export default async function InvoicesPage({
                 <div><label className={labelCls}>Ký hiệu *</label><input name="symbol" required className={inputCls} placeholder="1C25T…" /></div>
                 <div><label className={labelCls}>Ngày hoá đơn *</label><input name="invoice_date" type="date" required className={inputCls} /></div>
                 <div><label className={labelCls}>Nhà cung cấp hoá đơn điện tử</label><input name="provider" className={inputCls} placeholder="MISA / Viettel…" /></div>
+              </div>
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
+                <input type="checkbox" name="combine" value="1" defaultChecked={defaultCombine} className="mt-0.5 h-4 w-4" />
+                <span>
+                  <strong>Gộp thành 1 hoá đơn GTGT</strong> cho cả phần bán thẳng (BH) và phần ký gửi (KG).
+                  Bỏ chọn = <strong>tách thành 2 hoá đơn</strong>: hoá đơn BH dùng Số hoá đơn / Ký hiệu ở trên,
+                  hoá đơn KG dùng hai ô phần ký gửi bên dưới.
+                  <span className="block text-xs text-slate-500">Ô này đang đặt theo mặc định ở Cài đặt ({defaultCombine ? "Gộp" : "Tách"}) — đổi tại đây chỉ áp dụng cho lần xuất này.</span>
+                </span>
+              </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div><label className={labelCls}>Số hoá đơn phần ký gửi (chỉ khi tách)</label><input name="invoice_no_kg" className={inputCls} /></div>
+                <div><label className={labelCls}>Ký hiệu phần ký gửi (chỉ khi tách)</label><input name="symbol_kg" className={inputCls} placeholder="1C25T…" /></div>
               </div>
               <div className="space-y-2">
                 <p className={labelCls}>Các dòng chứng từ đưa vào hoá đơn (mỗi dòng chỉ xuất được một lần)</p>
