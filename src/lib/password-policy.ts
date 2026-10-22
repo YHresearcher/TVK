@@ -11,7 +11,7 @@ export interface PasswordRule {
 }
 
 export const PASSWORD_RULES: PasswordRule[] = [
-  { id: "length", label: "Ít nhất 12 ký tự", test: (pw) => pw.length >= 12 },
+  { id: "length", label: "Ít nhất 8 ký tự", test: (pw) => pw.length >= 8 },
   { id: "lower", label: "Có ít nhất 1 chữ thường (a–z)", test: (pw) => /[a-z]/.test(pw) },
   { id: "upper", label: "Có ít nhất 1 chữ HOA (A–Z)", test: (pw) => /[A-Z]/.test(pw) },
   { id: "digit", label: "Có ít nhất 1 chữ số (0–9)", test: (pw) => /[0-9]/.test(pw) },

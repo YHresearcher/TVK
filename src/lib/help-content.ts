@@ -22,7 +22,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       "Quét mã vạch: các form có ô “Quét mã vạch / nhập mã hàng” (Nhập kho, Tiêu thụ của đối tác) nhận mã từ máy quét mã vạch hoặc gõ tay rồi Enter — hệ thống khớp theo SKU hoặc bất kỳ mã tra cứu nào đã đăng ký cho sản phẩm; quét lại cùng một mã sẽ cộng thêm 1 số lượng.",
       "Tồn kho không bao giờ sửa trực tiếp: mọi thay đổi đều đi qua chứng từ (PN, NK, GK, BT, PB, BH, KG, TH) và được ghi vào sổ cái biến động không thể sửa/xoá, nên số liệu luôn truy vết được.",
       "Nút Trợ giúp ở góc trên bên phải luôn hiển thị hướng dẫn đúng với vai trò của bạn.",
-      "Đổi mật khẩu bắt buộc: nếu bạn đăng nhập lần đầu bằng mật khẩu tạm do Chủ cửa hàng cấp, hoặc sau khi yêu cầu đặt lại mật khẩu, hệ thống sẽ đưa bạn tới trang đổi mật khẩu và chưa cho vào làm việc cho đến khi đổi xong. Mật khẩu mới phải đạt chuẩn: ít nhất 12 ký tự, có chữ thường, chữ HOA, chữ số và ký tự đặc biệt.",
+      "Đổi mật khẩu bắt buộc: nếu bạn đăng nhập lần đầu bằng mật khẩu tạm do Chủ cửa hàng cấp, hoặc sau khi yêu cầu đặt lại mật khẩu, hệ thống sẽ đưa bạn tới trang đổi mật khẩu và chưa cho vào làm việc cho đến khi đổi xong. Mật khẩu mới phải đạt chuẩn: ít nhất 8 ký tự, có chữ thường, chữ HOA, chữ số và ký tự đặc biệt.",
     ],
   },
 
@@ -35,7 +35,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       "Vào Cài đặt → Quản lý tài khoản để tạo tài khoản: chọn “Gửi email mời” (người dùng tự đặt mật khẩu qua email) hoặc “Đặt mật khẩu tạm ngay” (mật khẩu tối thiểu 8 ký tự), điền họ tên, tên đăng nhập (tuỳ chọn) và vai trò.",
       "Trong danh sách tài khoản: đổi vai trò bằng cách chọn lại vai trò (áp dụng ngay); “Khoá / Mở khoá” để tạm ngưng hoặc khôi phục quyền đăng nhập mà không xoá dữ liệu; “Đặt lại mật khẩu” gửi email khôi phục cho nhân viên; “Xoá” gỡ hẳn tài khoản và không khôi phục được.",
       "Các chốt an toàn: bạn không thể tự đổi vai trò, tự khoá hay tự xoá chính mình, và hệ thống luôn giữ ít nhất một Chủ cửa hàng (kể cả một Chủ cửa hàng đang hoạt động khi khoá tài khoản).",
-      "Mật khẩu: tài khoản tạo bằng “Đặt mật khẩu tạm ngay” sẽ bị bắt buộc đổi mật khẩu ở lần đăng nhập đầu tiên; bấm “Đặt lại mật khẩu” cho nhân viên cũng gắn cờ tương tự. Mật khẩu người dùng tự đặt phải đạt chuẩn mạnh (ít nhất 12 ký tự, đủ chữ thường, chữ HOA, chữ số và ký tự đặc biệt) — trang đặt/đổi mật khẩu có checklist hiển thị từng yêu cầu.",
+      "Mật khẩu: tài khoản tạo bằng “Đặt mật khẩu tạm ngay” sẽ bị bắt buộc đổi mật khẩu ở lần đăng nhập đầu tiên; bấm “Đặt lại mật khẩu” cho nhân viên cũng gắn cờ tương tự. Mật khẩu người dùng tự đặt phải đạt chuẩn mạnh (ít nhất 8 ký tự, đủ chữ thường, chữ HOA, chữ số và ký tự đặc biệt) — trang đặt/đổi mật khẩu có checklist hiển thị từng yêu cầu.",
       "Khi phân vai trò hãy nhớ nguyên tắc tối thiểu: Bán hàng không thấy giá vốn, giá ký gửi và công nợ; Kho không thấy dữ liệu tiền; Kế toán không sửa được kho; CEO chỉ xem được mọi số liệu mà không thao tác được gì.",
     ],
   },

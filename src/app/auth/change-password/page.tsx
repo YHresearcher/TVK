@@ -133,7 +133,7 @@ export default function ChangePasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={inputCls}
-                  placeholder="Ít nhất 12 ký tự, đủ chữ thường / HOA / số / ký tự đặc biệt"
+                  placeholder="Ít nhất 8 ký tự, đủ chữ thường / HOA / số / ký tự đặc biệt"
                 />
                 <div className="mt-2">
                   <PasswordRules password={password} />
