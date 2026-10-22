@@ -18,7 +18,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     roles: ["ALL"],
     points: [
       "Đăng nhập bằng tên đăng nhập hoặc email và mật khẩu. Quên mật khẩu: nhờ Chủ cửa hàng (OWNER) bấm “Đặt lại mật khẩu” cho bạn trong Cài đặt → Quản lý tài khoản — email đặt lại mật khẩu sẽ gửi về hộp thư của bạn.",
-      "Menu bên trái được gộp theo nhóm công việc: Hàng hoá & Kho (Sản phẩm, Tồn kho theo lô, Nhập kho, Nhập từ Excel) · Ký gửi (Gửi ký gửi, Tiêu thụ của đối tác) · Bán hàng & Hoá đơn (Bán hàng, Hoá đơn GTGT, Trả hàng & bảo hành) · Công nợ & Báo cáo (Phải trả, Phải thu, Báo cáo) · Danh mục (Nhà cung cấp, Đối tác). Bấm vào tên nhóm để mở/thu gọn; nhóm chứa trang bạn đang xem sẽ tự mở, và hệ thống nhớ trạng thái mở/thu gọn của riêng bạn.",
+      "Menu bên trái được gộp theo nhóm công việc: Hàng hoá & Kho (Sản phẩm, Tồn kho theo lô, Nhập kho) · Ký gửi (Gửi ký gửi, Tiêu thụ của đối tác) · Bán hàng & Hoá đơn (Bán hàng, Hoá đơn GTGT, Trả hàng & bảo hành) · Công nợ & Báo cáo (Phải trả, Phải thu, Báo cáo) · Danh mục (Nhà cung cấp, Đối tác). Bấm vào tên nhóm để mở/thu gọn; nhóm chứa trang bạn đang xem sẽ tự mở, và hệ thống nhớ trạng thái mở/thu gọn của riêng bạn. Nhập hàng từ Excel nằm ngay trong trang Nhập kho (nút “Nhập từ Excel”).",
       "Nguyên tắc cốt lõi: mọi hàng hoá thuộc một trong hai loại — Hàng của mình (mua đứt, lô OWN) và Hàng ký gửi (giữ hộ nhà cung cấp, lô CONS). Cùng một sản phẩm có thể có cả hai loại lô, nên hãy luôn chọn đúng lô khi bán, gửi đi hoặc trả hàng.",
       "Quét mã vạch: các form có ô “Quét mã vạch / nhập mã hàng” (Nhập kho, Tiêu thụ của đối tác) nhận mã từ máy quét mã vạch hoặc gõ tay rồi Enter — hệ thống khớp theo SKU hoặc bất kỳ mã tra cứu nào đã đăng ký cho sản phẩm; quét lại cùng một mã sẽ cộng thêm 1 số lượng.",
       "Tồn kho không bao giờ sửa trực tiếp: mọi thay đổi đều đi qua chứng từ (PN, NK, GK, BT, PB, BH, KG, TH) và được ghi vào sổ cái biến động không thể sửa/xoá, nên số liệu luôn truy vết được.",
@@ -113,10 +113,10 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Nhập từ Excel đúng chuẩn",
     roles: ["WAREHOUSE"],
     points: [
-      "Vào Nhập từ Excel → bấm “Tải file mẫu” và điền đúng file mẫu: các cột bắt buộc là MaHang, TenHang, SoLuong và ít nhất một cột giá (GiaVonVND hoặc GiaUSD); cột MaThayThe liệt kê các mã tương đương, cách nhau bằng dấu “;”.",
+      "Vào Nhập kho → bấm nút “Nhập từ Excel” → bấm “Tải file mẫu” và điền đúng file mẫu: các cột bắt buộc là MaHang, TenHang, SoLuong và ít nhất một cột giá (GiaVonVND hoặc GiaUSD); cột MaThayThe liệt kê các mã tương đương, cách nhau bằng dấu “;”.",
       "Chọn loại phiếu (PN / NK), nhà cung cấp, kho, tỷ giá và VAT% trước khi tải file lên. Giá vốn mỗi dòng ưu tiên GiaVonVND; nếu để trống, hệ thống tính GiaUSD × tỷ giá × (1 + VAT%).",
       "Luôn kiểm tra bảng xem trước: dòng “Đã có” khớp vào sản phẩm hiện hữu, dòng “Hàng mới” sẽ được tự tạo kèm mã thay thế và dòng xe (khi bật tuỳ chọn tự tạo), dòng báo “Lỗi” hoặc file sai định dạng sẽ bị TỪ CHỐI TOÀN BỘ — hãy sửa file rồi tải lại, hệ thống không nhập một phần.",
-      "Một file chỉ tương ứng một phiếu của một nhà cung cấp. Nhập xong, kiểm tra lại phiếu vừa tạo ở menu Nhập kho; cần xác nhận ngay thì bật “Xác nhận nhập kho ngay sau khi tạo phiếu” trước khi bấm “Xác nhận nhập”.",
+      "Một file chỉ tương ứng một phiếu của một nhà cung cấp. Nhập xong, hệ thống tự chuyển về danh sách phiếu ở trang Nhập kho — phiếu vừa tạo nằm ngay bên dưới để kiểm tra; cần xác nhận ngay thì bật “Xác nhận nhập kho ngay sau khi tạo phiếu” trước khi bấm “Xác nhận nhập”.",
     ],
   },
   {

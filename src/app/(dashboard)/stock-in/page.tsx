@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import ItemsRows from "@/components/ItemsRows";
+import ImportExcel from "@/components/ImportExcel";
 import {
   confirmConsignmentReceiptAction,
   confirmPurchaseReceiptAction,
   createConsignmentReceiptAction,
   createPurchaseReceiptAction,
+  importStockAction,
 } from "@/lib/actions";
 import { buildProductCodeMap, getCurrentProfile, listConsignmentReceipts, listLocations, listProductCodes, listProducts, listPurchaseReceipts, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
@@ -18,7 +20,12 @@ export default async function StockInPage({
 }: {
   searchParams: { tab?: string; ok?: string };
 }) {
-  const tab = searchParams.tab === "consignment" ? "consignment" : "purchase";
+  const tab =
+    searchParams.tab === "consignment"
+      ? "consignment"
+      : searchParams.tab === "import"
+        ? "import"
+        : "purchase";
   const [suppliers, locations, products, purchases, consignments, productCodes, profile] = await Promise.all([
     listSuppliers(),
     listLocations(),
@@ -48,9 +55,68 @@ export default async function StockInPage({
       <div className="mb-6 flex gap-2">
         <Link href="/stock-in?tab=purchase" className={tabCls(tab === "purchase")}>Phiếu nhập mua (PN)</Link>
         <Link href="/stock-in?tab=consignment" className={tabCls(tab === "consignment")}>Phiếu nhận ký gửi (NK)</Link>
+        <Link href="/stock-in?tab=import" className={tabCls(tab === "import")}>Nhập từ Excel</Link>
       </div>
 
-      {tab === "purchase" ? (
+      {tab === "import" ? (
+        <div className="space-y-6">
+          {readOnly ? (
+            <Card title="Nhập từ Excel">
+              <p className="text-sm leading-relaxed text-slate-600">
+                Vai trò của bạn chỉ có quyền xem, không nhập dữ liệu. Khi cần
+                nhập hàng từ Excel, hãy nhờ vai trò Kho hoặc Chủ cửa hàng
+                thực hiện tại mục này bằng tài khoản của họ.
+              </p>
+            </Card>
+          ) : (
+            <>
+              <Card title="Import phiếu nhập kho">
+                <ImportExcel
+                  suppliers={suppliers.data}
+                  warehouses={warehouses}
+                  products={products.data.map((p) => ({
+                    id: p.id,
+                    sku: p.sku,
+                    name: p.name,
+                  }))}
+                  codes={productCodes.data.map((c) => ({
+                    code: c.code,
+                    product_id: c.product_id,
+                  }))}
+                  action={importStockAction}
+                />
+              </Card>
+              <Card title="Cấu trúc file chuẩn">
+                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
+                  <li>
+                    Các cột: <b>MaHang</b> (bắt buộc), MaThayThe (nhiều mã cách
+                    nhau bằng dấu “;”), TenHang, TenTiengAnh, ThuongHieu,
+                    DongXe, DonViTinh, <b>SoLuong</b>, GiaVonVND, GiaUSD,
+                    GiaBanDeXuat, GhiChu. Tên cột không phân biệt hoa thường
+                    và dấu.
+                  </li>
+                  <li>
+                    Giá vốn mỗi dòng: ưu tiên GiaVonVND; nếu để trống sẽ tính
+                    từ GiaUSD × tỷ giá × (1 + VAT%) theo thông số ở trên.
+                  </li>
+                  <li>
+                    Mã hàng khớp với SKU hoặc bất kỳ mã thay thế nào đã đăng
+                    ký thì vào sản phẩm đã có; mã chưa có sẽ được tự tạo (kèm
+                    mã thay thế và dòng xe) khi bật tuỳ chọn tự tạo.
+                  </li>
+                  <li>
+                    Hãy dùng nút “Tải file mẫu” để lấy đúng định dạng, và kiểm
+                    tra bảng xem trước (trạng thái từng dòng, tổng số lượng,
+                    tổng tiền) trước khi bấm “Xác nhận nhập”. Nhập xong, hệ
+                    thống tự chuyển về danh sách phiếu tương ứng ở trang này
+                    để bạn kiểm tra phiếu vừa tạo.
+                  </li>
+                </ul>
+              </Card>
+            </>
+          )}
+        </div>
+      ) : tab === "purchase" ? (
         <div className="space-y-6">
           {!readOnly && (
           <Card title="Phiếu nhập mua mới">
