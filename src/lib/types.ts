@@ -13,6 +13,8 @@ export interface Profile {
   full_name: string;
   role: AppRole;
   is_active: boolean;
+  /** TRUE = đang dùng mật khẩu tạm / vừa reset: phải đổi mật khẩu mới vào được hệ thống. */
+  must_change_password?: boolean;
 }
 
 export const ROLE_LABELS: Record<AppRole, string> = {

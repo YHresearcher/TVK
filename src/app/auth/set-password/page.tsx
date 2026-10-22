@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { btnCls, inputCls, labelCls } from "@/components/ui";
+import PasswordRules from "@/components/PasswordRules";
+import { validatePassword } from "@/lib/password-policy";
 
 type Phase = "checking" | "ready" | "invalid" | "saving" | "done";
 
@@ -70,8 +72,9 @@ export default function SetPasswordPage() {
     e.preventDefault();
     const supabase = createClient();
     if (!supabase) return;
-    if (password.length < 8) {
-      setError("Mật khẩu phải có ít nhất 8 ký tự.");
+    const problems = validatePassword(password);
+    if (problems.length) {
+      setError(`Mật khẩu chưa đạt chuẩn: ${problems.join("; ")}.`);
       return;
     }
     if (password !== confirm) {
@@ -85,6 +88,14 @@ export default function SetPasswordPage() {
       setPhase("ready");
       setError(error.message);
       return;
+    }
+    // Vừa tự đặt mật khẩu mới đạt chuẩn: gỡ cờ "phải đổi mật khẩu" nếu có.
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData.user) {
+      await supabase
+        .from("profiles")
+        .update({ must_change_password: false })
+        .eq("id", userData.user.id);
     }
     setPhase("done");
     router.push("/dashboard");
@@ -119,8 +130,11 @@ export default function SetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={inputCls}
-                placeholder="Ít nhất 8 ký tự"
+                placeholder="Ít nhất 12 ký tự, đủ chữ thường / HOA / số / ký tự đặc biệt"
               />
+              <div className="mt-2">
+                <PasswordRules password={password} />
+              </div>
             </div>
             <div>
               <label className={labelCls}>Xác nhận mật khẩu</label>

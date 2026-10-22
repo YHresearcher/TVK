@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import HelpButton from "@/components/HelpButton";
 import Sidebar from "@/components/Sidebar";
 import { signOutAction } from "@/lib/actions";
@@ -41,6 +42,11 @@ export default async function DashboardLayout({
           </div>
         </div>
       );
+    }
+    if (profile.must_change_password) {
+      // Đang dùng mật khẩu tạm hoặc vừa yêu cầu đặt lại: bắt buộc đổi
+      // mật khẩu đạt chuẩn trước khi vào bất kỳ trang nào của hệ thống.
+      redirect("/auth/change-password");
     }
     userName = profile.full_name;
     role = ROLE_LABELS[profile.role] ?? profile.role;

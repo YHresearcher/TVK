@@ -1260,9 +1260,15 @@ export async function inviteUserAction(formData: FormData) {
   }
   if (!newUserId) throw new Error("Không tạo được tài khoản.");
 
-  const ins = await admin
-    .from("profiles")
-    .insert({ id: newUserId, email, full_name: fullName, role, username });
+  const ins = await admin.from("profiles").insert({
+    id: newUserId,
+    email,
+    full_name: fullName,
+    role,
+    username,
+    // Tạo bằng mật khẩu tạm: bắt buộc đổi mật khẩu ở lần đăng nhập đầu.
+    must_change_password: mode === "password",
+  });
   if (ins.error) {
     // Gỡ tài khoản auth vừa tạo để không bỏ lại tài khoản mồ côi.
     await admin.auth.admin.deleteUser(newUserId);
@@ -1313,7 +1319,7 @@ export async function setUserActiveAction(formData: FormData) {
 }
 
 export async function resetUserPasswordAction(formData: FormData) {
-  await requireOwnerAdmin();
+  const { admin } = await requireOwnerAdmin();
   const email = str(formData, "email").toLowerCase();
   if (!email) throw new Error("Tài khoản không có email.");
   const supabase = await db();
@@ -1324,7 +1330,33 @@ export async function resetUserPasswordAction(formData: FormData) {
   );
   if (res.error)
     throw new Error(`Gửi email đặt lại mật khẩu: ${res.error.message}`);
+  // Sau reset, lần đăng nhập kế tiếp bắt buộc qua trang đổi mật khẩu.
+  await admin
+    .from("profiles")
+    .update({ must_change_password: true })
+    .eq("email", email);
   revalidatePath("/settings");
+}
+
+/**
+ * Gắn cờ "phải đổi mật khẩu" khi người dùng TỰ yêu cầu đặt lại mật khẩu
+ * (trang đăng nhập → Quên mật khẩu). Người yêu cầu chưa đăng nhập nên
+ * phải ghi bằng service-role; mọi lỗi đều được bỏ qua để không bao giờ
+ * làm hỏng luồng gửi email đặt lại.
+ */
+export async function flagPasswordResetRequestedAction(emailRaw: string) {
+  try {
+    const admin = createAdminClient();
+    if (!admin) return;
+    const email = emailRaw.trim().toLowerCase();
+    if (!email) return;
+    await admin
+      .from("profiles")
+      .update({ must_change_password: true })
+      .eq("email", email);
+  } catch {
+    // Bỏ qua: gắn cờ là việc phụ, không chặn luồng quên mật khẩu.
+  }
 }
 
 export async function deleteUserAction(formData: FormData) {

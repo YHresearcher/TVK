@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { flagPasswordResetRequestedAction } from "@/lib/actions";
 import { btnCls, inputCls, labelCls } from "@/components/ui";
 
 export default function LoginPage() {
@@ -45,11 +46,14 @@ export default function LoginPage() {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/set-password`,
     });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
+    // Gắn cờ bắt buộc đổi mật khẩu cho lần đăng nhập sau khi đặt lại.
+    await flagPasswordResetRequestedAction(email);
+    setLoading(false);
     setNotice("Đã gửi liên kết đặt lại mật khẩu — hãy kiểm tra email của bạn.");
   }
 
