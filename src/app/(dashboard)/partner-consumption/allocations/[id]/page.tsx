@@ -1,8 +1,8 @@
 import { BackLink, Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, tdCls, thCls } from "@/components/ui";
 import { confirmAllocationAction, createAllocationDocumentsAction } from "@/lib/actions";
-import { getAllocationDetail, listProducts } from "@/lib/queries";
+import { getAllocationDetail, getCurrentProfile, listProducts } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
-import { NATURE_LABELS } from "@/lib/types";
+import { NATURE_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +13,11 @@ export default async function AllocationDetailPage({
   params: { id: string };
   searchParams: { ok?: string };
 }) {
-  const [detail, products] = await Promise.all([getAllocationDetail(params.id), listProducts()]);
+  const [detail, products, profile] = await Promise.all([getAllocationDetail(params.id), listProducts(), getCurrentProfile()]);
   if (!detail.configured) return (<><PageHeader title="Phân bổ" /><NotConfigured /></>);
   if (!detail.slip) return (<><BackLink href="/partner-consumption" label="Quay lại" /><EmptyState message="Không tìm thấy phiếu phân bổ." /></>);
   const slip = detail.slip;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const productName = new Map(products.data.map((p) => [p.id, `${p.sku} — ${p.name}`]));
   const documented = new Set(detail.documentedLineIds);
   const pendingCount = detail.lines.filter((l) => !documented.has(l.id)).length;
@@ -50,13 +51,13 @@ export default async function AllocationDetailPage({
           </TableWrap>
         )}
         <div className="mt-4 flex flex-wrap gap-3">
-          {slip.status === "DRAFT" && (
+          {!readOnly && slip.status === "DRAFT" && (
             <form action={confirmAllocationAction}>
               <input type="hidden" name="id" value={slip.id} />
               <button type="submit" className={btnCls}>Xác nhận phân bổ (kiểm tra 3 chốt)</button>
             </form>
           )}
-          {slip.status === "CONFIRMED" && pendingCount > 0 && (
+          {!readOnly && slip.status === "CONFIRMED" && pendingCount > 0 && (
             <form action={createAllocationDocumentsAction}>
               <input type="hidden" name="id" value={slip.id} />
               <button type="submit" className={btnCls}>

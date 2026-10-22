@@ -1118,7 +1118,7 @@ export async function createStockAdjustmentAction(formData: FormData) {
 // khoản) đi qua service-role client phía máy chủ; mọi action đều tự kiểm
 // tra lại vai trò của người gọi, không dựa vào giao diện.
 
-const APP_ROLES = ["OWNER", "SALES", "WAREHOUSE", "ACCOUNTING"];
+const APP_ROLES = ["OWNER", "SALES", "WAREHOUSE", "ACCOUNTING", "CEO"];
 
 async function requireOwnerAdmin() {
   const supabase = await db();

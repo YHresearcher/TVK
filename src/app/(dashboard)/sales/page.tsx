@@ -1,9 +1,9 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import ItemsRows from "@/components/ItemsRows";
 import { createCounterSaleAction } from "@/lib/actions";
-import { listBatchStock, listPartners, listSalesDocuments, listSalesOrders } from "@/lib/queries";
+import { getCurrentProfile, listBatchStock, listPartners, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
-import { OWNERSHIP_LABELS } from "@/lib/types";
+import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +12,15 @@ export default async function SalesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [orders, documents, partners, batchStock] = await Promise.all([
+  const [orders, documents, partners, batchStock, profile] = await Promise.all([
     listSalesOrders(),
     listSalesDocuments(),
     listPartners(),
     listBatchStock(),
+    getCurrentProfile(),
   ]);
   const configured = orders.configured;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
   const ownBatches = Array.from(
     new Map(
@@ -41,6 +43,7 @@ export default async function SalesPage({
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã bán xong — chứng từ đã xác nhận, tồn kho và công nợ đã cập nhật.</p>}
       <div className="space-y-6">
+        {!readOnly && (
         <Card title="Bán hàng mới">
           <form action={createCounterSaleAction} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-4">
@@ -62,6 +65,7 @@ export default async function SalesPage({
             <button type="submit" className={btnCls}>Hoàn tất bán hàng</button>
           </form>
         </Card>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           <div>

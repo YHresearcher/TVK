@@ -7,9 +7,9 @@ import {
   createConsignmentReceiptAction,
   createPurchaseReceiptAction,
 } from "@/lib/actions";
-import { buildProductCodeMap, listConsignmentReceipts, listLocations, listProductCodes, listProducts, listPurchaseReceipts, listSuppliers } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, listConsignmentReceipts, listLocations, listProductCodes, listProducts, listPurchaseReceipts, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
-import type { AnyRow } from "@/lib/types";
+import { isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +19,16 @@ export default async function StockInPage({
   searchParams: { tab?: string; ok?: string };
 }) {
   const tab = searchParams.tab === "consignment" ? "consignment" : "purchase";
-  const [suppliers, locations, products, purchases, consignments, productCodes] = await Promise.all([
+  const [suppliers, locations, products, purchases, consignments, productCodes, profile] = await Promise.all([
     listSuppliers(),
     listLocations(),
     listProducts(),
     listPurchaseReceipts(),
     listConsignmentReceipts(),
     listProductCodes(),
+    getCurrentProfile(),
   ]);
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const codeMap = buildProductCodeMap(products.data, productCodes.data);
   const configured = suppliers.configured;
   const warehouses = locations.data.filter((l) => l.location_kind === "OWN_WAREHOUSE");
@@ -50,6 +52,7 @@ export default async function StockInPage({
 
       {tab === "purchase" ? (
         <div className="space-y-6">
+          {!readOnly && (
           <Card title="Phiếu nhập mua mới">
             <form action={createPurchaseReceiptAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-4">
@@ -68,14 +71,17 @@ export default async function StockInPage({
               <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
             </form>
           </Card>
+          )}
           <ReceiptTable
             rows={purchases.data}
             supplierName={supplierName}
             confirmAction={confirmPurchaseReceiptAction}
+            readOnly={readOnly}
           />
         </div>
       ) : (
         <div className="space-y-6">
+          {!readOnly && (
           <Card title="Phiếu nhận ký gửi mới">
             <form action={createConsignmentReceiptAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-4">
@@ -94,10 +100,12 @@ export default async function StockInPage({
               <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
             </form>
           </Card>
+          )}
           <ReceiptTable
             rows={consignments.data}
             supplierName={supplierName}
             confirmAction={confirmConsignmentReceiptAction}
+            readOnly={readOnly}
           />
         </div>
       )}
@@ -109,10 +117,12 @@ function ReceiptTable({
   rows,
   supplierName,
   confirmAction,
+  readOnly,
 }: {
   rows: AnyRow[];
   supplierName: Map<string, string>;
   confirmAction: (formData: FormData) => Promise<void>;
+  readOnly?: boolean;
 }) {
   if (rows.length === 0) return <EmptyState message="Chưa có phiếu nhập." />;
   return (
@@ -126,7 +136,7 @@ function ReceiptTable({
             <td className={tdCls}>{formatDate(r.receipt_date)}</td>
             <td className={tdCls}><StatusBadge status={r.status} /></td>
             <td className={tdCls}>
-              {r.status === "DRAFT" && (
+              {r.status === "DRAFT" && !readOnly && (
                 <form action={confirmAction}>
                   <input type="hidden" name="id" value={r.id} />
                   <button type="submit" className={btnGhostCls}>Xác nhận → tạo lô</button>

@@ -1,8 +1,8 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { createStockAdjustmentAction } from "@/lib/actions";
-import { listBatchStock, listLocations } from "@/lib/queries";
+import { getCurrentProfile, listBatchStock, listLocations } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
-import { OWNERSHIP_LABELS } from "@/lib/types";
+import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +11,9 @@ export default async function InventoryPage({
 }: {
   searchParams: { ownership?: string; location_kind?: string; ok?: string };
 }) {
-  const [stock, locations] = await Promise.all([listBatchStock(), listLocations()]);
+  const [stock, locations, profile] = await Promise.all([listBatchStock(), listLocations(), getCurrentProfile()]);
   const configured = stock.configured;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   let rows = stock.data;
   if (searchParams.ownership) rows = rows.filter((r) => r.ownership === searchParams.ownership);
   if (searchParams.location_kind) rows = rows.filter((r) => r.location_kind === searchParams.location_kind);
@@ -70,6 +71,7 @@ export default async function InventoryPage({
         </TableWrap>
       )}
 
+      {!readOnly && (
       <div className="mt-6 max-w-xl">
         <Card title="Điều chỉnh kiểm kê (ghi vào sổ cái)">
           <form action={createStockAdjustmentAction} className="space-y-3">
@@ -99,6 +101,7 @@ export default async function InventoryPage({
           </form>
         </Card>
       </div>
+      )}
     </>
   );
 }

@@ -1,16 +1,17 @@
 import { BackLink, Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, tdCls, thCls } from "@/components/ui";
 import { createFitmentAction, createProductCodeAction } from "@/lib/actions";
-import { getProductDetail } from "@/lib/queries";
+import { getCurrentProfile, getProductDetail } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
-import { CODE_KINDS, CODE_KIND_LABELS, OWNERSHIP_LABELS } from "@/lib/types";
+import { CODE_KINDS, CODE_KIND_LABELS, OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProductDetailPage({ params }: { params: { id: string } }) {
-  const detail = await getProductDetail(params.id);
+  const [detail, profile] = await Promise.all([getProductDetail(params.id), getCurrentProfile()]);
   if (!detail.configured) return (<><PageHeader title="Sản phẩm" /><NotConfigured /></>);
   if (!detail.product) return (<><BackLink href="/products" label="Quay lại danh sách sản phẩm" /><EmptyState message="Không tìm thấy sản phẩm." /></>);
   const p = detail.product;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const addCode = createProductCodeAction.bind(null, p.id);
   const addFitment = createFitmentAction.bind(null, p.id);
 
@@ -35,6 +36,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
               ))}
             </ul>
           )}
+          {!readOnly && (
           <form action={addCode} className="mt-4 space-y-2 border-t border-slate-100 pt-3">
             <div className="flex gap-2">
               <input name="code" required placeholder="Mã" className={inputCls} />
@@ -44,6 +46,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
             </div>
             <button type="submit" className={`${btnCls} w-full`}>Thêm mã</button>
           </form>
+          )}
         </Card>
 
         <Card title="Xe tương thích">
@@ -56,6 +59,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
               ))}
             </ul>
           )}
+          {!readOnly && (
           <form action={addFitment} className="mt-4 space-y-2 border-t border-slate-100 pt-3">
             <div className="grid grid-cols-2 gap-2">
               <input name="make" required placeholder="Hãng (Toyota)" className={inputCls} />
@@ -66,6 +70,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
             <input name="engine" placeholder="Động cơ (1.5)" className={inputCls} />
             <button type="submit" className={`${btnCls} w-full`}>Thêm xe</button>
           </form>
+          )}
         </Card>
       </div>
 

@@ -432,7 +432,7 @@ export default function ImportExcel({
               buộc; về giá cần ít nhất một trong hai cột GiaVonVND / GiaUSD).
               Mỗi dòng là một mặt hàng, không gộp ô (merge), không thêm hàng
               tiêu đề phụ. Một file chỉ nhập cho một nhà cung cấp. File .csv
-              phải lưu ở mã hoá UTF-8. Dễ nhất: bấm "Tải file mẫu" ở trên, điền
+              phải lưu ở mã hoá UTF-8. Dễ nhất: bấm “Tải file mẫu” ở trên, điền
               vào file mẫu rồi tải lên.
             </p>
           </div>

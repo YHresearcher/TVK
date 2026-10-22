@@ -1,3 +1,4 @@
+import HelpButton from "@/components/HelpButton";
 import Sidebar from "@/components/Sidebar";
 import { signOutAction } from "@/lib/actions";
 import { getCurrentProfile } from "@/lib/queries";
@@ -13,6 +14,7 @@ export default async function DashboardLayout({
 }) {
   let userName = "Chế độ cài đặt";
   let role = "Chưa cấu hình Supabase";
+  let rawRole = "";
 
   if (isSupabaseConfigured()) {
     const { data: profile } = await getCurrentProfile();
@@ -42,12 +44,18 @@ export default async function DashboardLayout({
     }
     userName = profile.full_name;
     role = ROLE_LABELS[profile.role] ?? profile.role;
+    rawRole = profile.role;
   }
 
   return (
     <div className="flex min-h-screen">
       <Sidebar userName={userName} role={role} />
-      <main className="min-w-0 flex-1 px-6 py-6">{children}</main>
+      <main className="min-w-0 flex-1 px-6 py-6">
+        <div className="mb-4 flex items-center justify-end">
+          <HelpButton role={rawRole} />
+        </div>
+        {children}
+      </main>
     </div>
   );
 }

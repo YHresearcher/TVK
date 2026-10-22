@@ -5,7 +5,7 @@ import { createWarehouseAction, updateVatModeAction } from "@/lib/actions";
 import { getCurrentProfile, listLocations } from "@/lib/queries";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { ROLE_LABELS, type AnyRow } from "@/lib/types";
+import { ROLE_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,18 @@ export default async function SettingsPage() {
     <>
       <PageHeader title="Cài đặt" description="Các tuỳ chọn toàn hệ thống. Chế độ hoá đơn GTGT phải khớp với quyết định của kế toán cùng với mô hình hợp đồng ký gửi." />
       {!locations.configured && <NotConfigured />}
+      {isReadOnlyRole(me?.role) ? (
+        <Card title="Vai trò chỉ xem">
+          <p className="text-sm leading-relaxed text-slate-600">
+            Tài khoản của bạn mang vai trò <strong>CEO (chỉ xem)</strong>: bạn
+            xem được toàn bộ số liệu kho và tài chính ở Tổng quan, Báo cáo và
+            các danh sách, nhưng không thay đổi được dữ liệu. Các mục cài đặt
+            hệ thống, quản lý kho và quản lý tài khoản chỉ dành cho Chủ cửa
+            hàng (OWNER) nên không hiển thị ở đây — và cơ sở dữ liệu cũng
+            không cấp quyền ghi cho vai trò của bạn.
+          </p>
+        </Card>
+      ) : (
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Chế độ hoá đơn GTGT">
           <form action={updateVatModeAction} className="space-y-3">
@@ -104,6 +116,7 @@ export default async function SettingsPage() {
             <li>Bán hàng (SALES) — bán hàng và xuất hoá đơn; không xem được giá ký gửi, giá vốn hay lợi nhuận (bảng tài chính bị chặn bởi RLS; giao diện bán hàng dùng khung nhìn lô không có giá vốn).</li>
             <li>Kho (WAREHOUSE) — nhập/xuất kho, kiểm kê, trả hàng; không có dữ liệu tiền.</li>
             <li>Kế toán (ACCOUNTING) — phải trả, phải thu, đối soát, hoá đơn và báo cáo; không sửa kho trực tiếp.</li>
+            <li>CEO (chỉ xem) — xem được toàn bộ số liệu kho và tài chính (tổng quan, công nợ, báo cáo) nhưng không tạo/sửa/xoá được dữ liệu; phù hợp cho giám đốc điều hành theo dõi.</li>
           </ul>
         </Card>
 
@@ -123,6 +136,7 @@ export default async function SettingsPage() {
           </Card>
         )}
       </div>
+      )}
     </>
   );
 }

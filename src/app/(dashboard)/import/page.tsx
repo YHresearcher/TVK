@@ -2,22 +2,26 @@ import { Card, NotConfigured, PageHeader } from "@/components/ui";
 import ImportExcel from "@/components/ImportExcel";
 import { importStockAction } from "@/lib/actions";
 import {
+  getCurrentProfile,
   listLocations,
   listProductCodes,
   listProducts,
   listSuppliers,
 } from "@/lib/queries";
+import { isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
-  const [suppliers, locations, products, codes] = await Promise.all([
+  const [suppliers, locations, products, codes, profile] = await Promise.all([
     listSuppliers(),
     listLocations(),
     listProducts(),
     listProductCodes(),
+    getCurrentProfile(),
   ]);
   const configured = suppliers.configured;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const warehouses = locations.data.filter(
     (l) => l.location_kind === "OWN_WAREHOUSE"
   );
@@ -29,7 +33,17 @@ export default async function ImportPage() {
         description="Nạp cả một danh mục giao hàng vào một phiếu nhập mua (PN) hoặc phiếu nhận ký gửi (NK). Một file = một phiếu của một nhà cung cấp; chọn loại phiếu, nhà cung cấp và kho ở trên trước khi xác nhận nhập."
       />
       {!configured && <NotConfigured />}
-      {configured && (
+      {configured && readOnly && (
+        <Card title="Nhập từ Excel">
+          <p className="text-sm leading-relaxed text-slate-600">
+            Vai trò CEO chỉ có quyền xem, không nhập dữ liệu. Trang này chỉ để
+            theo dõi cấu trúc file chuẩn; khi cần nhập hàng, hãy nhờ vai trò
+            Kho hoặc Chủ cửa hàng thực hiện ở chính trang này bằng tài khoản
+            của họ.
+          </p>
+        </Card>
+      )}
+      {configured && !readOnly && (
         <div className="space-y-6">
           <Card title="Import phiếu nhập kho">
             <ImportExcel

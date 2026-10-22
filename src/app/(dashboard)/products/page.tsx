@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { createProductAction } from "@/lib/actions";
-import { listProductStock, listProducts } from "@/lib/queries";
+import { getCurrentProfile, listProductStock, listProducts } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
+import { isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,9 @@ export default async function ProductsPage({
 }: {
   searchParams: { q?: string; ok?: string };
 }) {
-  const [products, stock] = await Promise.all([listProducts(), listProductStock()]);
+  const [products, stock, profile] = await Promise.all([listProducts(), listProductStock(), getCurrentProfile()]);
   const configured = products.configured;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const stockMap = new Map(stock.data.map((s) => [s.product_id, s]));
   const q = (searchParams.q ?? "").toLowerCase();
   const rows = products.data.filter(
@@ -71,6 +73,7 @@ export default async function ProductsPage({
             </TableWrap>
           )}
         </div>
+        {!readOnly && (
         <Card title="Sản phẩm mới" className="h-fit">
           <form action={createProductAction} className="space-y-3">
             <div><label className={labelCls}>SKU *</label><input name="sku" required className={inputCls} /></div>
@@ -92,6 +95,7 @@ export default async function ProductsPage({
             <button type="submit" className={`${btnCls} w-full`}>Tạo sản phẩm</button>
           </form>
         </Card>
+        )}
       </div>
     </>
   );

@@ -1,8 +1,8 @@
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { createPartnerAction } from "@/lib/actions";
-import { listPartners } from "@/lib/queries";
+import { getCurrentProfile, listPartners } from "@/lib/queries";
 import { formatVND } from "@/lib/format";
-import { PARTNER_KIND_LABELS, PARTNER_KINDS } from "@/lib/types";
+import { PARTNER_KIND_LABELS, PARTNER_KINDS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,8 @@ export default async function PartnersPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const partners = await listPartners();
+  const [partners, profile] = await Promise.all([listPartners(), getCurrentProfile()]);
+  const readOnly = isReadOnlyRole(profile.data?.role);
   return (
     <>
       <PageHeader title="Đối tác" description="Khách hàng, gara, công ty vận tải và cửa hàng khác. Một đối tác vừa mua đứt vừa nhận ký gửi — hệ thống theo dõi hai tính chất riêng biệt theo từng lô và từng chứng từ." />
@@ -38,6 +39,7 @@ export default async function PartnersPage({
             </TableWrap>
           )}
         </div>
+        {!readOnly && (
         <Card title="Đối tác mới" className="h-fit">
           <form action={createPartnerAction} className="space-y-3">
             <div><label className={labelCls}>Tên *</label><input name="name" required className={inputCls} /></div>
@@ -63,6 +65,7 @@ export default async function PartnersPage({
             <button type="submit" className={`${btnCls} w-full`}>Tạo đối tác</button>
           </form>
         </Card>
+        )}
       </div>
     </>
   );

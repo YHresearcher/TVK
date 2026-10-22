@@ -6,8 +6,9 @@ import {
   createConsumptionReportAction,
   setConsumptionReportStatusAction,
 } from "@/lib/actions";
-import { buildProductCodeMap, listAllocations, listBatchStock, listConsumptionReports, listPartners, listProductCodes, listProducts } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, listAllocations, listBatchStock, listConsumptionReports, listPartners, listProductCodes, listProducts } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
+import { isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +17,16 @@ export default async function PartnerConsumptionPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [reports, allocations, partners, products, batchStock, productCodes] = await Promise.all([
+  const [reports, allocations, partners, products, batchStock, productCodes, profile] = await Promise.all([
     listConsumptionReports(),
     listAllocations(),
     listPartners(),
     listProducts(),
     listBatchStock(),
     listProductCodes(),
+    getCurrentProfile(),
   ]);
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const codeMap = buildProductCodeMap(products.data, productCodes.data);
   const configured = reports.configured;
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
@@ -55,6 +58,7 @@ export default async function PartnerConsumptionPage({
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="space-y-8">
         <section className="space-y-4">
+          {!readOnly && (
           <Card title="Báo cáo tiêu thụ mới (BT)">
             <form action={createConsumptionReportAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-3">
@@ -70,6 +74,7 @@ export default async function PartnerConsumptionPage({
               <button type="submit" className={btnCls}>Tạo báo cáo nháp</button>
             </form>
           </Card>
+          )}
           {reports.data.length === 0 ? <EmptyState message="Chưa có báo cáo tiêu thụ." /> : (
             <TableWrap>
               <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Kỳ</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
@@ -81,7 +86,7 @@ export default async function PartnerConsumptionPage({
                     <td className={tdCls}>{formatDate(r.period_from)} → {formatDate(r.period_to)}</td>
                     <td className={tdCls}><StatusBadge status={r.status} /></td>
                     <td className={tdCls}>
-                      {r.status === "DRAFT" && (
+                      {r.status === "DRAFT" && !readOnly && (
                         <form action={setConsumptionReportStatusAction}>
                           <input type="hidden" name="id" value={r.id} />
                           <input type="hidden" name="status" value="CONFIRMED" />
@@ -97,6 +102,7 @@ export default async function PartnerConsumptionPage({
         </section>
 
         <section className="space-y-4">
+          {!readOnly && (
           <Card title="Phiếu phân bổ mới (PB)">
             <form action={createAllocationAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
@@ -119,6 +125,7 @@ export default async function PartnerConsumptionPage({
               <button type="submit" className={btnCls}>Tạo phiếu phân bổ nháp</button>
             </form>
           </Card>
+          )}
           {allocations.data.length === 0 ? <EmptyState message="Chưa có phiếu phân bổ." /> : (
             <TableWrap>
               <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>

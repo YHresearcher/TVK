@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type AnyRow = Record<string, any>;
 
-export type AppRole = "OWNER" | "SALES" | "WAREHOUSE" | "ACCOUNTING";
+export type AppRole = "OWNER" | "SALES" | "WAREHOUSE" | "ACCOUNTING" | "CEO";
 export type Ownership = "OWNED" | "CONSIGNED";
 export type DocStatus = "DRAFT" | "CONFIRMED" | "CANCELLED";
 export type BalanceStatus = "UNPAID" | "PARTIAL" | "PAID" | "CANCELLED";
@@ -20,7 +20,15 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   SALES: "Bán hàng",
   WAREHOUSE: "Kho",
   ACCOUNTING: "Kế toán",
+  CEO: "CEO (chỉ xem)",
 };
+
+/**
+ * Vai trò chỉ xem (CEO): xem được toàn bộ số liệu kho và tài chính nhưng
+ * không tạo/sửa/xoá được gì — giao diện ẩn mọi form thao tác và RLS ở
+ * cơ sở dữ liệu cũng không cấp bất kỳ quyền ghi nào cho vai trò này.
+ */
+export const isReadOnlyRole = (role?: string | null): boolean => role === "CEO";
 
 export const DOC_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Nháp",

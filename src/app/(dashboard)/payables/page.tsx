@@ -1,7 +1,8 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { createSettlementAction, recordPayablePaymentAction } from "@/lib/actions";
-import { listPayables, listSettlements, listSuppliers } from "@/lib/queries";
+import { getCurrentProfile, listPayables, listSettlements, listSuppliers } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
+import { isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +11,14 @@ export default async function PayablesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [payables, settlements, suppliers] = await Promise.all([
+  const [payables, settlements, suppliers, profile] = await Promise.all([
     listPayables(),
     listSettlements(),
     listSuppliers(),
+    getCurrentProfile(),
   ]);
   const configured = payables.configured;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const supplierName = new Map(suppliers.data.map((s) => [s.id, s.name]));
   const open = payables.data.filter((p) => p.status === "UNPAID" || p.status === "PARTIAL");
   const totalOutstanding = open.reduce((a, p) => a + Number(p.amount) - Number(p.amount_paid), 0);
@@ -48,6 +51,7 @@ export default async function PayablesPage({
         </TableWrap>
       )}
 
+      {!readOnly && (
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title="Ghi nhận thanh toán cho nhà cung cấp (PC)">
           <form action={recordPayablePaymentAction} className="space-y-3">
@@ -95,6 +99,7 @@ export default async function PayablesPage({
           </form>
         </Card>
       </div>
+      )}
 
       {supplierSettlements.length > 0 && (
         <div className="mt-6">

@@ -1,6 +1,7 @@
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { createSupplierAction } from "@/lib/actions";
-import { listSuppliers } from "@/lib/queries";
+import { getCurrentProfile, listSuppliers } from "@/lib/queries";
+import { isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,8 @@ export default async function SuppliersPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const suppliers = await listSuppliers();
+  const [suppliers, profile] = await Promise.all([listSuppliers(), getCurrentProfile()]);
+  const readOnly = isReadOnlyRole(profile.data?.role);
   return (
     <>
       <PageHeader title="Nhà cung cấp" description="Điều khoản ký gửi nằm ở đây: sau khi bán phải thanh toán trong bao nhiêu ngày, hàng ký gửi chưa bán được giữ bao lâu, và nhà cung cấp này có cho phép ký gửi tiếp (ô D) hay không." />
@@ -35,6 +37,7 @@ export default async function SuppliersPage({
             </TableWrap>
           )}
         </div>
+        {!readOnly && (
         <Card title="Nhà cung cấp mới" className="h-fit">
           <form action={createSupplierAction} className="space-y-3">
             <div><label className={labelCls}>Tên *</label><input name="name" required className={inputCls} /></div>
@@ -59,6 +62,7 @@ export default async function SuppliersPage({
             <button type="submit" className={`${btnCls} w-full`}>Tạo nhà cung cấp</button>
           </form>
         </Card>
+        )}
       </div>
     </>
   );

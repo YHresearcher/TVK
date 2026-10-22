@@ -1,7 +1,8 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { createSettlementAction, recordReceivablePaymentAction } from "@/lib/actions";
-import { listPartners, listReceivables, listSettlements } from "@/lib/queries";
+import { getCurrentProfile, listPartners, listReceivables, listSettlements } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
+import { isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +11,14 @@ export default async function ReceivablesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [receivables, settlements, partners] = await Promise.all([
+  const [receivables, settlements, partners, profile] = await Promise.all([
     listReceivables(),
     listSettlements(),
     listPartners(),
+    getCurrentProfile(),
   ]);
   const configured = receivables.configured;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
   const open = receivables.data.filter((r) => r.status === "UNPAID" || r.status === "PARTIAL");
   const totalOutstanding = open.reduce((a, r) => a + Number(r.amount) - Number(r.amount_paid), 0);
@@ -50,6 +53,7 @@ export default async function ReceivablesPage({
         </TableWrap>
       )}
 
+      {!readOnly && (
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title="Ghi nhận tiền thu từ đối tác (PT)">
           <form action={recordReceivablePaymentAction} className="space-y-3">
@@ -97,6 +101,7 @@ export default async function ReceivablesPage({
           </form>
         </Card>
       </div>
+      )}
 
       {partnerSettlements.length > 0 && (
         <div className="mt-6">

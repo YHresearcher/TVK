@@ -1,9 +1,9 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import ItemsRows from "@/components/ItemsRows";
 import { confirmReturnAction, createReturnAction } from "@/lib/actions";
-import { listBatchStock, listPartners, listReturnDocuments, listSuppliers } from "@/lib/queries";
+import { getCurrentProfile, listBatchStock, listPartners, listReturnDocuments, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
-import { OWNERSHIP_LABELS, RETURN_KINDS, RETURN_KIND_LABELS, RETURN_REASONS, RETURN_REASON_LABELS } from "@/lib/types";
+import { OWNERSHIP_LABELS, RETURN_KINDS, RETURN_KIND_LABELS, RETURN_REASONS, RETURN_REASON_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +12,15 @@ export default async function ReturnsPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [docs, batchStock, partners, suppliers] = await Promise.all([
+  const [docs, batchStock, partners, suppliers, profile] = await Promise.all([
     listReturnDocuments(),
     listBatchStock(),
     listPartners(),
     listSuppliers(),
+    getCurrentProfile(),
   ]);
   const configured = docs.configured;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
   const supplierName = new Map(suppliers.data.map((s) => [s.id, s.name]));
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
@@ -38,6 +40,7 @@ export default async function ReturnsPage({
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="space-y-6">
+        {!readOnly && (
         <Card title="Phiếu trả hàng mới">
           <form action={createReturnAction} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
@@ -59,6 +62,7 @@ export default async function ReturnsPage({
             <button type="submit" className={btnCls}>Tạo phiếu trả nháp</button>
           </form>
         </Card>
+        )}
 
         {docs.data.length === 0 ? <EmptyState message="Chưa có phiếu trả hàng." /> : (
           <TableWrap>
@@ -72,7 +76,7 @@ export default async function ReturnsPage({
                   <td className={tdCls}>{formatDate(d.return_date)}</td>
                   <td className={tdCls}><StatusBadge status={d.status} /></td>
                   <td className={tdCls}>
-                    {d.status === "DRAFT" && (
+                    {d.status === "DRAFT" && !readOnly && (
                       <form action={confirmReturnAction}>
                         <input type="hidden" name="id" value={d.id} />
                         <button type="submit" className={btnGhostCls}>Xác nhận → di chuyển hàng</button>

@@ -10,6 +10,8 @@ Chạy lần lượt trong Supabase SQL Editor (hoặc `supabase db push`):
 4. `migrations/0004_username_login.sql` — cột `profiles.username` (unique không phân biệt hoa thường) + hàm `resolve_login_email` để đăng nhập bằng username hoặc email; đặt username trong Settings → Users & roles.
 5. `migrations/0005_grants.sql` — cấp quyền bảng cho role `authenticated` (bắt buộc: thiếu GRANT thì API bị Postgres từ chối 42501 trước cả RLS, app không đọc được dữ liệu sau đăng nhập).
 6. `migrations/0006_service_role_grants.sql` — cấp quyền bảng cho role `service_role`, phục vụ tính năng Quản lý tài khoản của OWNER (Cài đặt). Tính năng này cần thêm biến môi trường phía máy chủ `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API → service_role; chỉ đặt trên server/Vercel, tuyệt đối không dùng tiền tố NEXT_PUBLIC và không commit).
+7. `migrations/0007_ceo_enum.sql` — thêm giá trị `CEO` vào enum `app_role`. **Phải chạy riêng file này, một mình, trước 0008** (PostgreSQL không cho dùng giá trị enum mới trong cùng transaction vừa tạo ra nó).
+8. `migrations/0008_ceo_readonly.sql` — policy SELECT cho vai trò CEO (chỉ xem) trên các bảng nghiệp vụ và tài chính; CEO không có quyền ghi ở bất kỳ bảng nào, bị chặn ngay ở tầng cơ sở dữ liệu.
 
 ## Tạo tài khoản Chủ cửa hàng (OWNER) đầu tiên
 
@@ -20,7 +22,7 @@ insert into profiles (id, email, full_name, role)
 values ('<auth-user-uuid>', '<email>', '<Họ tên>', 'OWNER');
 ```
 
-Các nhân viên còn lại do OWNER tạo hồ sơ tương tự với role SALES / WAREHOUSE / ACCOUNTING.
+Các nhân viên còn lại do OWNER tạo hồ sơ tương tự với role SALES / WAREHOUSE / ACCOUNTING (hoặc CEO nếu chỉ cần quyền xem toàn bộ số liệu mà không thao tác).
 
 ## Nguyên tắc vận hành được ép ở tầng database
 

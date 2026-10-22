@@ -1,9 +1,9 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import ItemsRows from "@/components/ItemsRows";
 import { confirmConsignmentOutAction, createConsignmentOutAction } from "@/lib/actions";
-import { listBatchStock, listConsignmentOutSlips, listPartners } from "@/lib/queries";
+import { getCurrentProfile, listBatchStock, listConsignmentOutSlips, listPartners } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
-import { OWNERSHIP_LABELS } from "@/lib/types";
+import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +12,14 @@ export default async function ConsignmentOutPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [slips, partners, batchStock] = await Promise.all([
+  const [slips, partners, batchStock, profile] = await Promise.all([
     listConsignmentOutSlips(),
     listPartners(),
     listBatchStock(),
+    getCurrentProfile(),
   ]);
   const configured = slips.configured;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
   const ownBatches = Array.from(
@@ -41,6 +43,7 @@ export default async function ConsignmentOutPage({
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="space-y-6">
+        {!readOnly && (
         <Card title="Phiếu gửi ký gửi / giao hàng mới">
           <form action={createConsignmentOutAction} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-4">
@@ -63,6 +66,7 @@ export default async function ConsignmentOutPage({
             <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
           </form>
         </Card>
+        )}
 
         {slips.data.length === 0 ? <EmptyState message="Chưa có phiếu gửi." /> : (
           <TableWrap>
@@ -76,7 +80,7 @@ export default async function ConsignmentOutPage({
                   <td className={tdCls}>{formatDate(s.settlement_due_date)}</td>
                   <td className={tdCls}><StatusBadge status={s.status} /></td>
                   <td className={tdCls}>
-                    {s.status === "DRAFT" && (
+                    {s.status === "DRAFT" && !readOnly && (
                       <form action={confirmConsignmentOutAction}>
                         <input type="hidden" name="id" value={s.id} />
                         <button type="submit" className={btnGhostCls}>Xác nhận → chuyển hàng tới đối tác</button>

@@ -41,7 +41,7 @@ export default async function DashboardPage() {
 
       {(() => {
         const role = profile.data?.role;
-        const canSeeMoney = role === "OWNER" || role === "ACCOUNTING";
+        const canSeeMoney = role === "OWNER" || role === "ACCOUNTING" || role === "CEO";
         const comp = d.stockComposition;
         const compSegments = [
           { label: "Hàng của mình tại kho", seg: comp.ownedOwn, color: "#10b981" },

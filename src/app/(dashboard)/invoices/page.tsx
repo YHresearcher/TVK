@@ -1,7 +1,8 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { cancelVatInvoiceAction, createVatInvoiceAction } from "@/lib/actions";
-import { listPartners, listUninvoicedLines, listVatInvoices } from "@/lib/queries";
+import { getCurrentProfile, listPartners, listUninvoicedLines, listVatInvoices } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
+import { isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +11,14 @@ export default async function InvoicesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [invoices, uninvoiced, partners] = await Promise.all([
+  const [invoices, uninvoiced, partners, profile] = await Promise.all([
     listVatInvoices(),
     listUninvoicedLines(),
     listPartners(),
+    getCurrentProfile(),
   ]);
   const configured = invoices.configured;
+  const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
 
@@ -28,6 +31,7 @@ export default async function InvoicesPage({
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã tạo hoá đơn.</p>}
       <div className="space-y-6">
+        {!readOnly && (
         <Card title="Phát hành hoá đơn GTGT từ dòng chứng từ">
           {uninvoiced.data.length === 0 ? (
             <EmptyState message="Chưa có dòng chứng từ chưa xuất hoá đơn. Hãy xác nhận chứng từ bán hàng hoặc chứng từ phân bổ trước." />
@@ -57,6 +61,7 @@ export default async function InvoicesPage({
             </form>
           )}
         </Card>
+        )}
 
         {invoices.data.length === 0 ? <EmptyState message="Chưa có hoá đơn GTGT." /> : (
           <TableWrap>
@@ -71,7 +76,7 @@ export default async function InvoicesPage({
                   <td className={tdCls}>{formatVND(inv.total_amount)}</td>
                   <td className={tdCls}><StatusBadge status={inv.status} /></td>
                   <td className={tdCls}>
-                    {inv.status === "ISSUED" && (
+                    {inv.status === "ISSUED" && !readOnly && (
                       <form action={cancelVatInvoiceAction}>
                         <input type="hidden" name="id" value={inv.id} />
                         <button type="submit" className={btnGhostCls}>Huỷ hoá đơn</button>
