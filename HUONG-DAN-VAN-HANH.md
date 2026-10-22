@@ -47,6 +47,9 @@ Mỗi loại chứng từ có tiền tố riêng và số chạy liên tục, **
 | **BH** | Chứng từ bán hàng (nội bộ) | Phần hàng **của mình** trong một lần bán/tiêu thụ — **nơi duy nhất có giảm giá** |
 | **KG** | Chứng từ ký gửi (nội bộ) | Phần hàng **ký gửi** trong một lần bán/tiêu thụ — sinh khoản **phải trả nhà cung cấp** theo đúng giá ký gửi của lô |
 | **TH** | Phiếu trả hàng | Trả hàng: khách trả, trả đối tác, hoặc trả hàng ký gửi về nhà cung cấp |
+| **DS** | Đợt đối soát | Gom các khoản phải thu/phải trả với một nhà cung cấp hoặc một đối tác theo kỳ (có từ ngày–đến ngày) để hai bên chốt số liệu trước khi thanh toán |
+| **PT** | Phiếu thu | Ghi nhận tiền thu vào (từ đối tác/khách trả nợ) — mỗi lần thu sinh một mã PT riêng, không tái sử dụng |
+| **PC** | Phiếu chi | Ghi nhận tiền chi ra (trả nợ nhà cung cấp) — mỗi lần chi sinh một mã PC riêng, không tái sử dụng |
 
 ### A4. Nguyên tắc tiền — ba quy tắc không bao giờ phá
 
@@ -224,6 +227,7 @@ Vào **Bán hàng & Hoá đơn → Hoá đơn GTGT**: tick các dòng chứng t�
 ### D5. Công nợ
 - **Phải trả nhà cung cấp**: tự sinh từ chứng từ KG khi hàng ký gửi bán được, theo đúng giá ký gửi của lô. Ghi thanh toán từng phần/toàn bộ; trạng thái Chưa trả / Trả một phần / Đã trả theo số còn lại.
 - **Phải thu đối tác**: sinh từ phần bán cho đối tác/khách mua chịu. Ghi thu tiền tương tự; hoá đơn quá hạn được đánh dấu để đôn đốc.
+- **Đối soát theo kỳ (DS):** ở trang Phải thu đối tác có nút "Tạo đợt đối soát (DS) cho một đối tác" — gom toàn bộ các khoản chưa chốt với một đối tác (hoặc một nhà cung cấp ở phía phải trả) trong một kỳ thành một đợt để hai bên xác nhận số liệu. **Phiếu thu/chi (PT/PC):** mỗi lần ghi nhận tiền thực tế (thu tiền mặt/chuyển khoản từ đối tác, hoặc chi trả cho nhà cung cấp) hệ thống sinh một phiếu PT hoặc PC có mã riêng, ghi rõ phương thức (tiền mặt/ngân hàng) và có thể gắn vào đợt đối soát DS tương ứng — đây là chứng từ tiền đối ứng với công nợ, giúp truy vết "khoản nợ này đã thu/chi bằng phiếu nào".
 
 ### D6. Trả hàng & bảo hành (TH)
 Vào **Bán hàng & Hoá đơn → Trả hàng & bảo hành**: chọn loại trả (khách trả lại / trả hàng về đối tác / trả hàng ký gửi về nhà cung cấp), chọn dòng hàng theo lô. Hàng quay về đúng lô & vị trí tương ứng; các khoản tiền liên quan được đối ứng theo chứng từ gốc.
