@@ -8,6 +8,7 @@ Chạy lần lượt trong Supabase SQL Editor (hoặc `supabase db push`):
 2. `migrations/0002_business_functions.sql` — hàm nghiệp vụ: xác nhận phiếu nhập / nhận ký gửi / gửi ký gửi / phân bổ / chứng từ BH-KG, xuất & huỷ hoá đơn GTGT, xác nhận phiếu trả.
 3. `migrations/0003_rls_and_roles.sql` — RLS theo 4 vai trò, view an toàn cho Sales, hàm điều chỉnh kiểm kê.
 4. `migrations/0004_username_login.sql` — cột `profiles.username` (unique không phân biệt hoa thường) + hàm `resolve_login_email` để đăng nhập bằng username hoặc email; đặt username trong Settings → Users & roles.
+5. `migrations/0005_grants.sql` — cấp quyền bảng cho role `authenticated` (bắt buộc: thiếu GRANT thì API bị Postgres từ chối 42501 trước cả RLS, app không đọc được dữ liệu sau đăng nhập).
 
 ## Tạo tài khoản Chủ cửa hàng (OWNER) đầu tiên
 
