@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AnyRow } from "@/lib/types";
 
@@ -831,4 +833,176 @@ export async function createStockAdjustmentAction(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath("/inventory");
   redirect("/inventory?ok=1");
+}
+
+// ---------------------------------------------------- quản lý tài khoản
+// Chỉ OWNER. Các thao tác đụng tới Supabase Auth (mời/tạo/khoá/xoá tài
+// khoản) đi qua service-role client phía máy chủ; mọi action đều tự kiểm
+// tra lại vai trò của người gọi, không dựa vào giao diện.
+
+const APP_ROLES = ["OWNER", "SALES", "WAREHOUSE", "ACCOUNTING"];
+
+async function requireOwnerAdmin() {
+  const supabase = await db();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Bạn chưa đăng nhập.");
+  const { data: me } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!me || me.role !== "OWNER")
+    throw new Error("Chỉ Chủ cửa hàng mới quản lý được tài khoản.");
+  const admin = createAdminClient();
+  if (!admin)
+    throw new Error(
+      "Tính năng quản lý tài khoản chưa được bật (thiếu khoá quản trị phía máy chủ)."
+    );
+  return { admin, meId: user.id as string };
+}
+
+async function countOwners(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  activeOnly = false
+): Promise<number> {
+  let q = admin
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "OWNER");
+  if (activeOnly) q = q.eq("is_active", true);
+  const { count } = await q;
+  return count ?? 0;
+}
+
+async function getTargetProfile(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  id: string
+) {
+  const { data } = await admin
+    .from("profiles")
+    .select("id, email, full_name, role, is_active")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) throw new Error("Không tìm thấy tài khoản.");
+  return data as AnyRow;
+}
+
+export async function inviteUserAction(formData: FormData) {
+  const { admin } = await requireOwnerAdmin();
+  const email = str(formData, "email").toLowerCase();
+  const fullName = str(formData, "full_name");
+  const role = str(formData, "role") || "SALES";
+  const usernameRaw = optStr(formData, "username");
+  const username = usernameRaw ? usernameRaw.toLowerCase() : null;
+  const mode = str(formData, "mode"); // "invite" | "password"
+  if (!email || !fullName) throw new Error("Cần nhập email và họ tên.");
+  if (!APP_ROLES.includes(role)) throw new Error("Vai trò không hợp lệ.");
+
+  let newUserId: string | null = null;
+  if (mode === "password") {
+    const password = str(formData, "password");
+    if (password.length < 8)
+      throw new Error("Mật khẩu tạm phải có ít nhất 8 ký tự.");
+    const res = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: fullName },
+    });
+    if (res.error) throw new Error(`Tạo tài khoản: ${res.error.message}`);
+    newUserId = res.data.user?.id ?? null;
+  } else {
+    // Không truyền redirectTo: link mời dùng Site URL đã cấu hình sẵn
+    // (trỏ về trang đặt mật khẩu trên production).
+    const res = await admin.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: fullName },
+    });
+    if (res.error) throw new Error(`Mời tài khoản: ${res.error.message}`);
+    newUserId = res.data.user?.id ?? null;
+  }
+  if (!newUserId) throw new Error("Không tạo được tài khoản.");
+
+  const ins = await admin
+    .from("profiles")
+    .insert({ id: newUserId, email, full_name: fullName, role, username });
+  if (ins.error) {
+    // Gỡ tài khoản auth vừa tạo để không bỏ lại tài khoản mồ côi.
+    await admin.auth.admin.deleteUser(newUserId);
+    throw new Error(`Tạo hồ sơ: ${ins.error.message}`);
+  }
+  revalidatePath("/settings");
+}
+
+export async function updateUserRoleAction(formData: FormData) {
+  const { admin, meId } = await requireOwnerAdmin();
+  const id = str(formData, "profile_id");
+  const role = str(formData, "role");
+  if (!APP_ROLES.includes(role)) throw new Error("Vai trò không hợp lệ.");
+  if (id === meId)
+    throw new Error("Bạn không thể tự đổi vai trò của chính mình.");
+  const target = await getTargetProfile(admin, id);
+  if (target.role === "OWNER" && role !== "OWNER") {
+    if ((await countOwners(admin)) <= 1)
+      throw new Error("Hệ thống cần ít nhất một Chủ cửa hàng.");
+  }
+  done(
+    await admin.from("profiles").update({ role }).eq("id", id),
+    "Đổi vai trò"
+  );
+  revalidatePath("/settings");
+}
+
+export async function setUserActiveAction(formData: FormData) {
+  const { admin, meId } = await requireOwnerAdmin();
+  const id = str(formData, "profile_id");
+  const active = str(formData, "active") === "1";
+  if (id === meId && !active)
+    throw new Error("Bạn không thể tự khoá tài khoản của mình.");
+  const target = await getTargetProfile(admin, id);
+  if (!active && target.role === "OWNER" && target.is_active) {
+    if ((await countOwners(admin, true)) <= 1)
+      throw new Error("Không thể khoá Chủ cửa hàng đang hoạt động cuối cùng.");
+  }
+  done(
+    await admin.from("profiles").update({ is_active: active }).eq("id", id),
+    "Cập nhật trạng thái tài khoản"
+  );
+  const ban = await admin.auth.admin.updateUserById(id, {
+    ban_duration: active ? "none" : "876000h",
+  });
+  if (ban.error) throw new Error(`Khoá/mở đăng nhập: ${ban.error.message}`);
+  revalidatePath("/settings");
+}
+
+export async function resetUserPasswordAction(formData: FormData) {
+  await requireOwnerAdmin();
+  const email = str(formData, "email").toLowerCase();
+  if (!email) throw new Error("Tài khoản không có email.");
+  const supabase = await db();
+  const origin = headers().get("origin");
+  const res = await supabase.auth.resetPasswordForEmail(
+    email,
+    origin ? { redirectTo: `${origin}/auth/set-password` } : undefined
+  );
+  if (res.error)
+    throw new Error(`Gửi email đặt lại mật khẩu: ${res.error.message}`);
+  revalidatePath("/settings");
+}
+
+export async function deleteUserAction(formData: FormData) {
+  const { admin, meId } = await requireOwnerAdmin();
+  const id = str(formData, "profile_id");
+  if (id === meId)
+    throw new Error("Bạn không thể tự xoá tài khoản của mình.");
+  const target = await getTargetProfile(admin, id);
+  if (target.role === "OWNER") {
+    if ((await countOwners(admin)) <= 1)
+      throw new Error("Không thể xoá Chủ cửa hàng cuối cùng.");
+  }
+  const res = await admin.auth.admin.deleteUser(id);
+  if (res.error) throw new Error(`Xoá tài khoản: ${res.error.message}`);
+  // Dòng profiles tự xoá theo khoá ngoại (on delete cascade).
+  revalidatePath("/settings");
 }

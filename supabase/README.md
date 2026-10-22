@@ -9,6 +9,7 @@ Chạy lần lượt trong Supabase SQL Editor (hoặc `supabase db push`):
 3. `migrations/0003_rls_and_roles.sql` — RLS theo 4 vai trò, view an toàn cho Sales, hàm điều chỉnh kiểm kê.
 4. `migrations/0004_username_login.sql` — cột `profiles.username` (unique không phân biệt hoa thường) + hàm `resolve_login_email` để đăng nhập bằng username hoặc email; đặt username trong Settings → Users & roles.
 5. `migrations/0005_grants.sql` — cấp quyền bảng cho role `authenticated` (bắt buộc: thiếu GRANT thì API bị Postgres từ chối 42501 trước cả RLS, app không đọc được dữ liệu sau đăng nhập).
+6. `migrations/0006_service_role_grants.sql` — cấp quyền bảng cho role `service_role`, phục vụ tính năng Quản lý tài khoản của OWNER (Cài đặt). Tính năng này cần thêm biến môi trường phía máy chủ `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API → service_role; chỉ đặt trên server/Vercel, tuyệt đối không dùng tiền tố NEXT_PUBLIC và không commit).
 
 ## Tạo tài khoản Chủ cửa hàng (OWNER) đầu tiên
 

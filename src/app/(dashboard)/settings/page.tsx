@@ -1,7 +1,9 @@
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import UserAdminPanel from "@/components/UserAdminPanel";
 import UsernameForm from "@/components/UsernameForm";
 import { createWarehouseAction, updateVatModeAction } from "@/lib/actions";
 import { getCurrentProfile, listLocations } from "@/lib/queries";
+import { isAdminConfigured } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ROLE_LABELS, type AnyRow } from "@/lib/types";
 
@@ -104,6 +106,22 @@ export default async function SettingsPage() {
             <li>Kế toán (ACCOUNTING) — phải trả, phải thu, đối soát, hoá đơn và báo cáo; không sửa kho trực tiếp.</li>
           </ul>
         </Card>
+
+        {me?.role === "OWNER" && (
+          <Card title="Quản lý tài khoản" className="lg:col-span-2">
+            <p className="mb-4 text-xs text-slate-500">
+              Chỉ Chủ cửa hàng thấy mục này. Tạo tài khoản cho nhân viên, đổi vai
+              trò, khoá/mở khoá, gửi email đặt lại mật khẩu hoặc xoá tài khoản.
+              Các chốt an toàn: không tự đổi vai trò, tự khoá hay tự xoá chính
+              mình; hệ thống luôn giữ ít nhất một Chủ cửa hàng.
+            </p>
+            <UserAdminPanel
+              users={profiles}
+              meId={me.id}
+              adminReady={isAdminConfigured()}
+            />
+          </Card>
+        )}
       </div>
     </>
   );
