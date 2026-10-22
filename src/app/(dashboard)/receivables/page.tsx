@@ -24,14 +24,14 @@ export default async function ReceivablesPage({
 
   return (
     <>
-      <PageHeader title="Receivables — Partners" description="Created automatically when a credit sale or a partner-consumption document (BH/KG) is confirmed. BH amounts are after discount; KG amounts use the agreed transfer price." />
+      <PageHeader title="Phải thu đối tác" description="Được tạo tự động khi xác nhận một giao dịch bán chịu hoặc một chứng từ tiêu thụ của đối tác (BH/KG). Số tiền BH là sau giảm giá; số tiền KG dùng giá chuyển giao đã thoả thuận." />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Saved successfully.</p>}
-      <p className="mb-4 text-sm text-slate-600">Total outstanding: <strong>{formatVND(totalOutstanding)}</strong></p>
+      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      <p className="mb-4 text-sm text-slate-600">Tổng còn phải thu: <strong>{formatVND(totalOutstanding)}</strong></p>
 
-      {receivables.data.length === 0 ? <EmptyState message="No receivables yet." /> : (
+      {receivables.data.length === 0 ? <EmptyState message="Chưa có khoản phải thu." /> : (
         <TableWrap>
-          <thead><tr><th className={thCls}>Partner</th><th className={thCls}>Amount</th><th className={thCls}>Paid</th><th className={thCls}>Outstanding</th><th className={thCls}>Due</th><th className={thCls}>Status</th></tr></thead>
+          <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Số tiền</th><th className={thCls}>Đã thu</th><th className={thCls}>Còn phải thu</th><th className={thCls}>Hạn thu</th><th className={thCls}>Trạng thái</th></tr></thead>
           <tbody>
             {receivables.data.map((r) => {
               const overdue = r.due_date && r.due_date < today && (r.status === "UNPAID" || r.status === "PARTIAL");
@@ -41,7 +41,7 @@ export default async function ReceivablesPage({
                   <td className={tdCls}>{formatVND(r.amount)}</td>
                   <td className={tdCls}>{formatVND(r.amount_paid)}</td>
                   <td className={`${tdCls} font-medium`}>{formatVND(Number(r.amount) - Number(r.amount_paid))}</td>
-                  <td className={`${tdCls} ${overdue ? "font-semibold text-red-600" : ""}`}>{formatDate(r.due_date)}{overdue ? " (overdue)" : ""}</td>
+                  <td className={`${tdCls} ${overdue ? "font-semibold text-red-600" : ""}`}>{formatDate(r.due_date)}{overdue ? " (quá hạn)" : ""}</td>
                   <td className={tdCls}><StatusBadge status={r.status} /></td>
                 </tr>
               );
@@ -51,58 +51,58 @@ export default async function ReceivablesPage({
       )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Card title="Record money received from a partner (PT)">
+        <Card title="Ghi nhận tiền thu từ đối tác (PT)">
           <form action={recordReceivablePaymentAction} className="space-y-3">
-            <div><label className={labelCls}>Open receivable *</label>
+            <div><label className={labelCls}>Khoản phải thu đang mở *</label>
               <select name="receivable_id" required className={inputCls}>
-                <option value="">— Select —</option>
+                <option value="">— Chọn —</option>
                 {open.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {partnerName.get(r.partner_id)} — outstanding {formatVND(Number(r.amount) - Number(r.amount_paid))}
+                    {partnerName.get(r.partner_id)} — còn phải thu {formatVND(Number(r.amount) - Number(r.amount_paid))}
                   </option>
                 ))}
               </select></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Amount *</label><input name="amount" type="number" step="1000" required className={inputCls} /></div>
-              <div><label className={labelCls}>Method</label>
-                <select name="method" className={inputCls}><option value="BANK">Bank transfer</option><option value="CASH">Cash</option></select></div>
+              <div><label className={labelCls}>Số tiền *</label><input name="amount" type="number" step="1000" required className={inputCls} /></div>
+              <div><label className={labelCls}>Phương thức</label>
+                <select name="method" className={inputCls}><option value="BANK">Chuyển khoản</option><option value="CASH">Tiền mặt</option></select></div>
             </div>
-            <div><label className={labelCls}>Payment date</label><input name="payment_date" type="date" className={inputCls} /></div>
-            <button type="submit" className={`${btnCls} w-full`}>Record receipt</button>
+            <div><label className={labelCls}>Ngày thu</label><input name="payment_date" type="date" className={inputCls} /></div>
+            <button type="submit" className={`${btnCls} w-full`}>Ghi nhận thu tiền</button>
           </form>
         </Card>
 
-        <Card title="Create a settlement batch (DS) for one partner">
+        <Card title="Tạo đợt đối soát (DS) cho một đối tác">
           <form action={createSettlementAction} className="space-y-3">
             <input type="hidden" name="party_kind" value="PARTNER" />
-            <div><label className={labelCls}>Partner *</label>
+            <div><label className={labelCls}>Đối tác *</label>
               <select name="partner_id" required className={inputCls}>
-                <option value="">— Select —</option>
+                <option value="">— Chọn —</option>
                 {partners.data.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Period from</label><input name="period_from" type="date" className={inputCls} /></div>
-              <div><label className={labelCls}>Period to</label><input name="period_to" type="date" className={inputCls} /></div>
+              <div><label className={labelCls}>Từ ngày</label><input name="period_from" type="date" className={inputCls} /></div>
+              <div><label className={labelCls}>Đến ngày</label><input name="period_to" type="date" className={inputCls} /></div>
             </div>
             <div className="space-y-1">
-              <p className={labelCls}>Open receivables to include (of the partner above)</p>
+              <p className={labelCls}>Các khoản phải thu đang mở đưa vào đối soát (của đối tác ở trên)</p>
               {open.map((r) => (
                 <label key={r.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="receivable_id" value={r.id} className="h-4 w-4" />
-                  {partnerName.get(r.partner_id)} — {formatVND(Number(r.amount) - Number(r.amount_paid))} outstanding, due {formatDate(r.due_date)}
+                  {partnerName.get(r.partner_id)} — còn phải thu {formatVND(Number(r.amount) - Number(r.amount_paid))}, hạn {formatDate(r.due_date)}
                 </label>
               ))}
             </div>
-            <button type="submit" className={`${btnCls} w-full`}>Create settlement</button>
+            <button type="submit" className={`${btnCls} w-full`}>Tạo đối soát</button>
           </form>
         </Card>
       </div>
 
       {partnerSettlements.length > 0 && (
         <div className="mt-6">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800">Settlements</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-800">Các đợt đối soát</h2>
           <TableWrap>
-            <thead><tr><th className={thCls}>Code</th><th className={thCls}>Partner</th><th className={thCls}>Period</th><th className={thCls}>Total</th><th className={thCls}>Status</th></tr></thead>
+            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Kỳ</th><th className={thCls}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
             <tbody>
               {partnerSettlements.map((s) => (
                 <tr key={s.id} className="border-t border-slate-100">

@@ -3,6 +3,7 @@ import ItemsRows from "@/components/ItemsRows";
 import { confirmConsignmentOutAction, createConsignmentOutAction } from "@/lib/actions";
 import { listBatchStock, listConsignmentOutSlips, listPartners } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
+import { OWNERSHIP_LABELS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -28,44 +29,44 @@ export default async function ConsignmentOutPage({
   );
   const batchOptions = ownBatches.map((r) => ({
     value: r.batch_id,
-    label: `${r.batch_code} — ${r.product_name} (${r.ownership}${r.supplier_name ? " / " + r.supplier_name : ""})`,
+    label: `${r.batch_code} — ${r.product_name} (${OWNERSHIP_LABELS[r.ownership] ?? r.ownership}${r.supplier_name ? " / " + r.supplier_name : ""})`,
   }));
 
   return (
     <>
       <PageHeader
-        title="Consignment Out (GK)"
-        description="Sending goods to a partner changes custody only — ownership stays ours, no revenue and no receivable until the partner reports consumption. Consigning a supplier's batch onward (cell D) is blocked unless that supplier allows it."
+        title="Gửi ký gửi (GK)"
+        description="Gửi hàng cho đối tác chỉ thay đổi nơi giữ hàng — quyền sở hữu vẫn của mình, chưa ghi doanh thu và chưa ghi phải thu cho tới khi đối tác báo tiêu thụ. Gửi tiếp lô của nhà cung cấp (ô D) bị chặn trừ khi nhà cung cấp đó cho phép."
       />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Saved successfully.</p>}
+      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="space-y-6">
-        <Card title="New consignment-out / delivery slip">
+        <Card title="Phiếu gửi ký gửi / giao hàng mới">
           <form action={createConsignmentOutAction} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-4">
-              <div><label className={labelCls}>Partner *</label>
-                <select name="partner_id" required className={inputCls}><option value="">— Select —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-              <div><label className={labelCls}>Slip date</label><input name="slip_date" type="date" className={inputCls} /></div>
-              <div><label className={labelCls}>Settlement due</label><input name="settlement_due_date" type="date" className={inputCls} /></div>
-              <div><label className={labelCls}>Return-by date</label><input name="return_by_date" type="date" className={inputCls} /></div>
+              <div><label className={labelCls}>Đối tác *</label>
+                <select name="partner_id" required className={inputCls}><option value="">— Chọn —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+              <div><label className={labelCls}>Ngày phiếu</label><input name="slip_date" type="date" className={inputCls} /></div>
+              <div><label className={labelCls}>Hạn đối soát</label><input name="settlement_due_date" type="date" className={inputCls} /></div>
+              <div><label className={labelCls}>Hạn trả</label><input name="return_by_date" type="date" className={inputCls} /></div>
             </div>
             <ItemsRows fields={[
-              { name: "batch_id", label: "Batch (in our warehouse)", type: "select", options: batchOptions },
-              { name: "qty", label: "Qty", type: "number" },
-              { name: "term", label: "Term", type: "select", options: [
-                { value: "CONSIGNMENT", label: "CONSIGNMENT — ký gửi" },
-                { value: "PURCHASE", label: "PURCHASE — mua đứt, invoice later" },
+              { name: "batch_id", label: "Lô (tại kho của mình)", type: "select", options: batchOptions },
+              { name: "qty", label: "Số lượng", type: "number" },
+              { name: "term", label: "Điều khoản", type: "select", options: [
+                { value: "CONSIGNMENT", label: "Ký gửi (CONSIGNMENT)" },
+                { value: "PURCHASE", label: "Mua đứt, xuất hoá đơn sau (PURCHASE)" },
               ] },
-              { name: "transfer_price", label: "Transfer / agreed price (₫)", type: "number", step: "1000" },
+              { name: "transfer_price", label: "Giá chuyển giao / giá thoả thuận (₫)", type: "number", step: "1000" },
             ]} initialRows={2} />
-            <p className="text-xs text-slate-500">The source warehouse is resolved automatically from where the batch currently sits. The term decides the allocation cap later (e.g. max 5 PURCHASED / 10 CONSIGNED).</p>
-            <button type="submit" className={btnCls}>Create draft slip</button>
+            <p className="text-xs text-slate-500">Kho nguồn được tự động xác định từ vị trí hiện tại của lô. Điều khoản quyết định hạn mức phân bổ sau này (vd. tối đa 5 MUA ĐỨT / 10 KÝ GỬI).</p>
+            <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
           </form>
         </Card>
 
-        {slips.data.length === 0 ? <EmptyState message="No slips yet." /> : (
+        {slips.data.length === 0 ? <EmptyState message="Chưa có phiếu gửi." /> : (
           <TableWrap>
-            <thead><tr><th className={thCls}>Code</th><th className={thCls}>Partner</th><th className={thCls}>Date</th><th className={thCls}>Settlement due</th><th className={thCls}>Status</th><th className={thCls}></th></tr></thead>
+            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Hạn đối soát</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
             <tbody>
               {slips.data.map((s) => (
                 <tr key={s.id} className="border-t border-slate-100">
@@ -78,7 +79,7 @@ export default async function ConsignmentOutPage({
                     {s.status === "DRAFT" && (
                       <form action={confirmConsignmentOutAction}>
                         <input type="hidden" name="id" value={s.id} />
-                        <button type="submit" className={btnGhostCls}>Confirm → move stock to partner</button>
+                        <button type="submit" className={btnGhostCls}>Xác nhận → chuyển hàng tới đối tác</button>
                       </form>
                     )}
                   </td>

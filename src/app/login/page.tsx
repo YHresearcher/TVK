@@ -39,7 +39,7 @@ export default function LoginPage() {
     const email = await resolveEmail(supabase, identifier);
     if (!email) {
       setLoading(false);
-      setError("No account found for that email or username.");
+      setError("Không tìm thấy tài khoản với email hoặc tên đăng nhập đó.");
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -50,7 +50,7 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
-    setNotice("Password reset link sent — check your email.");
+    setNotice("Đã gửi liên kết đặt lại mật khẩu — hãy kiểm tra email của bạn.");
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -63,7 +63,7 @@ export default function LoginPage() {
     const loginEmail = await resolveEmail(supabase, identifier);
     if (!loginEmail) {
       setLoading(false);
-      setError("Invalid username or password.");
+      setError("Tên đăng nhập hoặc mật khẩu không đúng.");
       return;
     }
     const { error } = await supabase.auth.signInWithPassword({
@@ -84,14 +84,14 @@ export default function LoginPage() {
       <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-xl">
         <h1 className="text-2xl font-bold text-slate-900">TVK</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Auto Parts Inventory — sign in to continue
+          Quản lý kho phụ tùng ô tô — đăng nhập để tiếp tục
         </p>
         {!configured ? (
           <div className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-            Supabase is not configured yet. Set{" "}
-            <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-            <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in{" "}
-            <code>.env.local</code> first (see <code>supabase/README.md</code>).
+            Supabase chưa được cấu hình. Hãy đặt{" "}
+            <code>NEXT_PUBLIC_SUPABASE_URL</code> và{" "}
+            <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> trong{" "}
+            <code>.env.local</code> trước (xem <code>supabase/README.md</code>).
           </div>
         ) : (
           <form
@@ -99,7 +99,7 @@ export default function LoginPage() {
             className="mt-6 space-y-4"
           >
             <div>
-              <label className={labelCls}>Email or username</label>
+              <label className={labelCls}>Email hoặc tên đăng nhập</label>
               <input
                 type="text"
                 autoComplete="username"
@@ -107,12 +107,12 @@ export default function LoginPage() {
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 className={inputCls}
-                placeholder="you@company.vn or username"
+                placeholder="you@company.vn hoặc tên đăng nhập"
               />
             </div>
             {mode === "login" && (
               <div>
-                <label className={labelCls}>Password</label>
+                <label className={labelCls}>Mật khẩu</label>
                 <input
                   type="password"
                   required
@@ -136,11 +136,11 @@ export default function LoginPage() {
             <button type="submit" disabled={loading} className={`${btnCls} w-full`}>
               {loading
                 ? mode === "login"
-                  ? "Signing in…"
-                  : "Sending…"
+                  ? "Đang đăng nhập…"
+                  : "Đang gửi…"
                 : mode === "login"
-                  ? "Sign in"
-                  : "Send reset link"}
+                  ? "Đăng nhập"
+                  : "Gửi liên kết đặt lại"}
             </button>
             <p className="text-center text-sm">
               {mode === "login" ? (
@@ -153,7 +153,7 @@ export default function LoginPage() {
                   }}
                   className="text-slate-500 underline hover:text-slate-700"
                 >
-                  Forgot password?
+                  Quên mật khẩu?
                 </button>
               ) : (
                 <button
@@ -165,7 +165,7 @@ export default function LoginPage() {
                   }}
                   className="text-slate-500 underline hover:text-slate-700"
                 >
-                  ← Back to sign in
+                  ← Quay lại đăng nhập
                 </button>
               )}
             </p>

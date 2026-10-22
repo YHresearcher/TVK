@@ -25,28 +25,28 @@ export default async function ProductsPage({
   return (
     <>
       <PageHeader
-        title="Products"
-        description="Catalog with OEM / equivalent codes and vehicle fitments. Stock is split: owned vs consigned."
+        title="Sản phẩm"
+        description="Danh mục kèm mã OEM / mã tương đương và xe tương thích. Tồn kho tách biệt: của mình và ký gửi."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && (
-        <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Saved successfully.</p>
+        <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>
       )}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <form method="get" className="mb-4 flex gap-2">
-            <input name="q" defaultValue={searchParams.q ?? ""} placeholder="Search by name or SKU…" className={inputCls} />
-            <button className={btnCls} type="submit">Search</button>
+            <input name="q" defaultValue={searchParams.q ?? ""} placeholder="Tìm theo tên hoặc SKU…" className={inputCls} />
+            <button className={btnCls} type="submit">Tìm kiếm</button>
           </form>
           {rows.length === 0 ? (
-            <EmptyState message="No products yet." />
+            <EmptyState message="Chưa có sản phẩm." />
           ) : (
             <TableWrap>
               <thead>
                 <tr>
-                  <th className={thCls}>SKU</th><th className={thCls}>Name</th><th className={thCls}>Brand</th>
-                  <th className={thCls}>Retail price</th><th className={thCls}>Owned</th><th className={thCls}>Consigned</th>
-                  <th className={thCls}>At partners</th><th className={thCls}>Total</th>
+                  <th className={thCls}>SKU</th><th className={thCls}>Tên</th><th className={thCls}>Thương hiệu</th>
+                  <th className={thCls}>Giá bán lẻ</th><th className={thCls}>Của mình</th><th className={thCls}>Ký gửi</th>
+                  <th className={thCls}>Tại đối tác</th><th className={thCls}>Tổng</th>
                 </tr>
               </thead>
               <tbody>
@@ -71,25 +71,25 @@ export default async function ProductsPage({
             </TableWrap>
           )}
         </div>
-        <Card title="New product" className="h-fit">
+        <Card title="Sản phẩm mới" className="h-fit">
           <form action={createProductAction} className="space-y-3">
             <div><label className={labelCls}>SKU *</label><input name="sku" required className={inputCls} /></div>
-            <div><label className={labelCls}>Name *</label><input name="name" required className={inputCls} /></div>
-            <div><label className={labelCls}>Brand</label><input name="brand" className={inputCls} /></div>
+            <div><label className={labelCls}>Tên *</label><input name="name" required className={inputCls} /></div>
+            <div><label className={labelCls}>Thương hiệu</label><input name="brand" className={inputCls} /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Unit</label><input name="unit" defaultValue="cái" className={inputCls} /></div>
-              <div><label className={labelCls}>Min stock</label><input name="min_stock" type="number" defaultValue="0" className={inputCls} /></div>
+              <div><label className={labelCls}>Đơn vị</label><input name="unit" defaultValue="cái" className={inputCls} /></div>
+              <div><label className={labelCls}>Tồn tối thiểu</label><input name="min_stock" type="number" defaultValue="0" className={inputCls} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div><label className={labelCls}>Retail price</label><input name="retail_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
-              <div><label className={labelCls}>Garage price</label><input name="garage_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
-              <div><label className={labelCls}>Wholesale price</label><input name="wholesale_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
+              <div><label className={labelCls}>Giá bán lẻ</label><input name="retail_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
+              <div><label className={labelCls}>Giá cho gara</label><input name="garage_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
+              <div><label className={labelCls}>Giá sỉ</label><input name="wholesale_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
             </div>
             <div>
-              <label className={labelCls}>Lookup codes (one per line, format: CODE or CODE|KIND — KIND: OEM, MANUFACTURER, AFTERMARKET, EQUIVALENT)</label>
+              <label className={labelCls}>Mã tra cứu (mỗi dòng một mã, định dạng: MÃ hoặc MÃ|LOẠI — LOẠI: OEM, MANUFACTURER, AFTERMARKET, EQUIVALENT)</label>
               <textarea name="codes" rows={3} className={inputCls} placeholder={"90915-YZZD4|OEM\n90915-20001|EQUIVALENT"} />
             </div>
-            <button type="submit" className={`${btnCls} w-full`}>Create product</button>
+            <button type="submit" className={`${btnCls} w-full`}>Tạo sản phẩm</button>
           </form>
         </Card>
       </div>

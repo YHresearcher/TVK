@@ -5,21 +5,21 @@ import { usePathname } from "next/navigation";
 import { signOutAction } from "@/lib/actions";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/products", label: "Products" },
-  { href: "/inventory", label: "Inventory (by batch)" },
-  { href: "/stock-in", label: "Stock In" },
-  { href: "/consignment-out", label: "Consignment Out" },
-  { href: "/sales", label: "Sales" },
-  { href: "/partner-consumption", label: "Partner Consumption" },
-  { href: "/invoices", label: "VAT Invoices" },
-  { href: "/payables", label: "Payables (Suppliers)" },
-  { href: "/receivables", label: "Receivables (Partners)" },
-  { href: "/returns", label: "Returns & Warranty" },
-  { href: "/suppliers", label: "Suppliers" },
-  { href: "/partners", label: "Partners" },
-  { href: "/reports", label: "Reports" },
-  { href: "/settings", label: "Settings" },
+  { href: "/dashboard", label: "Tổng quan" },
+  { href: "/products", label: "Sản phẩm" },
+  { href: "/inventory", label: "Tồn kho theo lô" },
+  { href: "/stock-in", label: "Nhập kho" },
+  { href: "/consignment-out", label: "Gửi ký gửi" },
+  { href: "/sales", label: "Bán hàng" },
+  { href: "/partner-consumption", label: "Tiêu thụ của đối tác" },
+  { href: "/invoices", label: "Hoá đơn GTGT" },
+  { href: "/payables", label: "Phải trả nhà cung cấp" },
+  { href: "/receivables", label: "Phải thu đối tác" },
+  { href: "/returns", label: "Trả hàng & bảo hành" },
+  { href: "/suppliers", label: "Nhà cung cấp" },
+  { href: "/partners", label: "Đối tác" },
+  { href: "/reports", label: "Báo cáo" },
+  { href: "/settings", label: "Cài đặt" },
 ];
 
 export default function Sidebar({
@@ -34,7 +34,7 @@ export default function Sidebar({
     <aside className="flex w-60 shrink-0 flex-col bg-slate-900 text-slate-200">
       <div className="border-b border-slate-700 px-5 py-4">
         <p className="text-lg font-bold tracking-wide text-white">TVK</p>
-        <p className="text-xs text-slate-400">Auto Parts Inventory</p>
+        <p className="text-xs text-slate-400">Quản lý kho phụ tùng</p>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
@@ -66,7 +66,7 @@ export default function Sidebar({
             type="submit"
             className="w-full rounded-md border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
           >
-            Sign out
+            Đăng xuất
           </button>
         </form>
       </div>

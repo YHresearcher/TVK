@@ -28,7 +28,7 @@ export default function UsernameForm({
     if (!supabase) return;
     const v = value.trim().toLowerCase();
     if (v && !USERNAME_RE.test(v)) {
-      setMsg("3–32 chars: a–z, 0–9, dot, underscore, dash.");
+      setMsg("3–32 ký tự: a–z, 0–9, dấu chấm, gạch dưới, gạch ngang.");
       return;
     }
     setBusy(true);
@@ -41,12 +41,12 @@ export default function UsernameForm({
     if (error) {
       setMsg(
         error.code === "23505" || error.message.includes("profiles_username")
-          ? "That username is already taken."
+          ? "Tên đăng nhập này đã có người dùng."
           : error.message
       );
       return;
     }
-    setMsg("Saved.");
+    setMsg("Đã lưu.");
     router.refresh();
   }
 
@@ -64,7 +64,7 @@ export default function UsernameForm({
         disabled={busy}
         className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
       >
-        {busy ? "Saving…" : "Save"}
+        {busy ? "Đang lưu…" : "Lưu"}
       </button>
       {msg && <span className="text-xs text-slate-500">{msg}</span>}
     </div>

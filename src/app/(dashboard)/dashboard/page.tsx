@@ -19,7 +19,7 @@ export default async function DashboardPage() {
   if (!d.configured) {
     return (
       <>
-        <PageHeader title="Dashboard" />
+        <PageHeader title="Tổng quan" />
         <NotConfigured />
       </>
     );
@@ -27,24 +27,24 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader
-        title="Dashboard"
-        description="Owned stock and consigned stock are always tracked separately."
+        title="Tổng quan"
+        description="Hàng của mình và hàng ký gửi luôn được theo dõi tách biệt."
       />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Owned stock (qty)" value={formatNumber(d.ownedQty)} sub={formatVND(d.ownedValue) + " capital in stock"} />
-        <StatCard label="Consigned stock (qty)" value={formatNumber(d.consignedQty)} sub={formatVND(d.consignedValue) + " held for suppliers"} />
-        <StatCard label="Stock at partners (qty)" value={formatNumber(d.atPartnersQty)} sub="Consigned out / delivered, not yet consumed" />
-        <StatCard label="Payables outstanding" value={formatVND(d.payablesOutstanding)} sub="Owed to suppliers for consigned goods sold" />
-        <StatCard label="Receivables outstanding" value={formatVND(d.receivablesOutstanding)} sub="Partners owe us" />
+        <StatCard label="Hàng của mình (số lượng)" value={formatNumber(d.ownedQty)} sub={formatVND(d.ownedValue) + " vốn đang nằm trong kho"} />
+        <StatCard label="Hàng ký gửi (số lượng)" value={formatNumber(d.consignedQty)} sub={formatVND(d.consignedValue) + " đang giữ hộ nhà cung cấp"} />
+        <StatCard label="Hàng tại đối tác (số lượng)" value={formatNumber(d.atPartnersQty)} sub="Đã gửi ký gửi / đã giao, chưa tiêu thụ" />
+        <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" />
+        <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ chúng ta" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Card title="Low stock (at or below minimum)">
+        <Card title="Hàng sắp hết (bằng hoặc dưới mức tối thiểu)">
           {d.lowStock.length === 0 ? (
-            <EmptyState message="No low-stock products." />
+            <EmptyState message="Chưa có sản phẩm sắp hết." />
           ) : (
             <TableWrap>
-              <thead><tr><th className={thCls}>SKU</th><th className={thCls}>Product</th><th className={thCls}>Total qty</th></tr></thead>
+              <thead><tr><th className={thCls}>SKU</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Tổng số lượng</th></tr></thead>
               <tbody>
                 {d.lowStock.map((r) => (
                   <tr key={r.product_id} className="border-t border-slate-100">
@@ -58,12 +58,12 @@ export default async function DashboardPage() {
           )}
         </Card>
 
-        <Card title="Consigned batches to return within 30 days">
+        <Card title="Lô ký gửi phải trả trong 30 ngày tới">
           {d.expiring.length === 0 ? (
-            <EmptyState message="Nothing expiring soon." />
+            <EmptyState message="Chưa có lô nào sắp đến hạn trả." />
           ) : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Batch</th><th className={thCls}>Product</th><th className={thCls}>Supplier</th><th className={thCls}>Qty</th><th className={thCls}>Return by</th></tr></thead>
+              <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Số lượng</th><th className={thCls}>Hạn trả</th></tr></thead>
               <tbody>
                 {d.expiring.map((r, i) => (
                   <tr key={i} className="border-t border-slate-100">
@@ -82,9 +82,9 @@ export default async function DashboardPage() {
 
       {d.discrepancies.length > 0 && (
         <div className="mt-6">
-          <Card title="Partner consignment discrepancies (sent ≠ consumed + returned + still held)">
+          <Card title="Chênh lệch ký gửi tại đối tác (đã gửi ≠ đã tiêu thụ + đã trả + còn giữ)">
             <TableWrap>
-              <thead><tr><th className={thCls}>Partner</th><th className={thCls}>Sent</th><th className={thCls}>Consumed</th><th className={thCls}>Returned</th><th className={thCls}>Still held</th></tr></thead>
+              <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã tiêu thụ</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th></tr></thead>
               <tbody>
                 {d.discrepancies.map((r) => (
                   <tr key={r.partner_id} className="border-t border-slate-100">

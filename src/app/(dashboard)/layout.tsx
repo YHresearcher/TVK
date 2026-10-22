@@ -11,8 +11,8 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  let userName = "Setup mode";
-  let role = "Supabase not configured";
+  let userName = "Chế độ cài đặt";
+  let role = "Chưa cấu hình Supabase";
 
   if (isSupabaseConfigured()) {
     const { data: profile } = await getCurrentProfile();
@@ -22,18 +22,18 @@ export default async function DashboardLayout({
       return (
         <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
           <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-xl">
-            <h1 className="text-xl font-bold text-slate-900">Account not ready</h1>
+            <h1 className="text-xl font-bold text-slate-900">Tài khoản chưa sẵn sàng</h1>
             <p className="mt-2 text-sm text-slate-600">
-              You are signed in, but no TVK profile is linked to this account
-              yet. Ask the shop owner to create your profile (Settings → Users
-              &amp; roles), then sign in again.
+              Bạn đã đăng nhập, nhưng chưa có hồ sơ TVK nào gắn với tài khoản
+              này. Hãy nhờ chủ cửa hàng tạo hồ sơ cho bạn (Cài đặt → Người dùng
+              &amp; vai trò), rồi đăng nhập lại.
             </p>
             <form action={signOutAction} className="mt-5">
               <button
                 type="submit"
                 className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
               >
-                Sign out
+                Đăng xuất
               </button>
             </form>
           </div>

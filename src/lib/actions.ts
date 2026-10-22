@@ -7,7 +7,7 @@ import type { AnyRow } from "@/lib/types";
 
 async function db() {
   const supabase = await createClient();
-  if (!supabase) throw new Error("Supabase is not configured yet.");
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
   return supabase;
 }
 
@@ -53,7 +53,7 @@ function zipItems(formData: FormData, fields: string[]): AnyRow[] {
 function must<T>(result: { data: T; error: AnyRow | null }, what: string): NonNullable<T> {
   if (result.error) throw new Error(`${what}: ${result.error.message}`);
   if (result.data === null || result.data === undefined)
-    throw new Error(`${what}: no data returned`);
+    throw new Error(`${what}: không có dữ liệu trả về`);
   return result.data as NonNullable<T>;
 }
 
@@ -121,7 +121,7 @@ export async function createProductAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Create product"
+    "Tạo sản phẩm"
   );
   const codesText = str(formData, "codes");
   if (codesText) {
@@ -152,7 +152,7 @@ export async function createProductCodeAction(productId: string, formData: FormD
       code_kind: str(formData, "code_kind") || "OEM",
       note: optStr(formData, "note"),
     }),
-    "Add product code"
+    "Thêm mã sản phẩm"
   );
   revalidatePath(`/products/${productId}`);
 }
@@ -180,7 +180,7 @@ export async function createFitmentAction(productId: string, formData: FormData)
       .maybeSingle();
     vehicleId = data?.id;
   }
-  if (!vehicleId) throw new Error("Could not create/find vehicle.");
+  if (!vehicleId) throw new Error("Không tạo/tìm được xe.");
   await supabase
     .from("product_fitments")
     .insert({ product_id: productId, vehicle_id: vehicleId, note: optStr(formData, "note") });
@@ -203,7 +203,7 @@ export async function createSupplierAction(formData: FormData) {
       allow_sub_consignment: formData.get("allow_sub_consignment") === "on",
       notes: optStr(formData, "notes"),
     }),
-    "Create supplier"
+    "Tạo nhà cung cấp"
   );
   revalidatePath("/suppliers");
   redirect("/suppliers?ok=1");
@@ -225,7 +225,7 @@ export async function createPartnerAction(formData: FormData) {
       consignment_limit: num(formData, "consignment_limit"),
       notes: optStr(formData, "notes"),
     }),
-    "Create partner"
+    "Tạo đối tác"
   );
   revalidatePath("/partners");
   redirect("/partners?ok=1");
@@ -239,7 +239,7 @@ export async function createWarehouseAction(formData: FormData) {
       location_kind: "OWN_WAREHOUSE",
       detail: optStr(formData, "detail"),
     }),
-    "Create warehouse"
+    "Tạo kho"
   );
   revalidatePath("/settings");
   revalidatePath("/stock-in");
@@ -261,7 +261,7 @@ export async function createPurchaseReceiptAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Create purchase receipt"
+    "Tạo phiếu nhập mua"
   );
   const items = zipItems(formData, ["product_id", "qty", "unit_cost"])
     .filter((r) => r.product_id && Number(r.qty) > 0)
@@ -271,8 +271,8 @@ export async function createPurchaseReceiptAction(formData: FormData) {
       qty: Math.trunc(Number(r.qty)),
       unit_cost: Number(r.unit_cost),
     }));
-  if (!items.length) throw new Error("Receipt needs at least one item row.");
-  done(await supabase.from("purchase_receipt_items").insert(items), "Add receipt items");
+  if (!items.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
+  done(await supabase.from("purchase_receipt_items").insert(items), "Thêm dòng phiếu nhập");
   revalidatePath("/stock-in");
   redirect("/stock-in?tab=purchase&ok=1");
 }
@@ -302,7 +302,7 @@ export async function createConsignmentReceiptAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Create consignment receipt"
+    "Tạo phiếu nhận ký gửi"
   );
   const items = zipItems(formData, ["product_id", "qty", "consignment_price"])
     .filter((r) => r.product_id && Number(r.qty) > 0)
@@ -312,8 +312,8 @@ export async function createConsignmentReceiptAction(formData: FormData) {
       qty: Math.trunc(Number(r.qty)),
       consignment_price: Number(r.consignment_price),
     }));
-  if (!items.length) throw new Error("Receipt needs at least one item row.");
-  done(await supabase.from("consignment_receipt_items").insert(items), "Add receipt items");
+  if (!items.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
+  done(await supabase.from("consignment_receipt_items").insert(items), "Thêm dòng phiếu nhập");
   revalidatePath("/stock-in");
   redirect("/stock-in?tab=consignment&ok=1");
 }
@@ -344,17 +344,17 @@ export async function createConsignmentOutAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Create consignment-out slip"
+    "Tạo phiếu gửi ký gửi"
   );
   const raw = zipItems(formData, ["batch_id", "qty", "term", "transfer_price"]).filter(
     (r) => r.batch_id && Number(r.qty) > 0
   );
-  if (!raw.length) throw new Error("Slip needs at least one batch row.");
+  if (!raw.length) throw new Error("Phiếu cần ít nhất một dòng lô hàng.");
   const items = [];
   for (const r of raw) {
     const fromLocation = await mainOwnLocationOfBatch(supabase, r.batch_id);
     if (!fromLocation)
-      throw new Error("A selected batch has no stock in our own warehouses.");
+      throw new Error("Một lô đã chọn không còn hàng tại kho của mình.");
     items.push({
       slip_id: slip.id,
       batch_id: r.batch_id,
@@ -364,7 +364,7 @@ export async function createConsignmentOutAction(formData: FormData) {
       transfer_price: Number(r.transfer_price),
     });
   }
-  done(await supabase.from("consignment_out_items").insert(items), "Add slip items");
+  done(await supabase.from("consignment_out_items").insert(items), "Thêm dòng phiếu");
   revalidatePath("/consignment-out");
   redirect("/consignment-out?ok=1");
 }
@@ -385,7 +385,7 @@ export async function createCounterSaleAction(formData: FormData) {
   const lines = zipItems(formData, ["batch_id", "qty", "unit_price"]).filter(
     (r) => r.batch_id && Number(r.qty) > 0
   );
-  if (!lines.length) throw new Error("Sale needs at least one batch row.");
+  if (!lines.length) throw new Error("Đơn bán cần ít nhất một dòng lô hàng.");
 
   const batchIds = lines.map((l) => l.batch_id);
   const { data: batches, error } = await supabase
@@ -406,15 +406,15 @@ export async function createCounterSaleAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Create sales order"
+    "Tạo đơn bán hàng"
   );
 
   const groups: Record<string, AnyRow[]> = { BH: [], KG: [] };
   for (const l of lines) {
     const batch = batchMap.get(l.batch_id);
-    if (!batch) throw new Error("Batch not found.");
+    if (!batch) throw new Error("Không tìm thấy lô hàng.");
     const fromLocation = await mainOwnLocationOfBatch(supabase, l.batch_id);
-    if (!fromLocation) throw new Error("A selected batch has no stock in our warehouses.");
+    if (!fromLocation) throw new Error("Một lô đã chọn không còn hàng tại kho của mình.");
     groups[batch.ownership === "OWNED" ? "BH" : "KG"].push({
       product_id: batch.product_id,
       batch_id: l.batch_id,
@@ -445,13 +445,13 @@ export async function createCounterSaleAction(formData: FormData) {
         })
         .select("id")
         .single(),
-      `Create ${kind} document`
+      `Tạo chứng từ ${kind}`
     );
     done(
       await supabase.from("sales_document_lines").insert(
         docLines.map((l) => ({ ...l, document_id: doc.id }))
       ),
-      "Add document lines"
+      "Thêm dòng chứng từ"
     );
     const { error: rpcError } = await supabase.rpc("confirm_sales_document", {
       p_doc_id: doc.id,
@@ -486,7 +486,7 @@ export async function createConsumptionReportAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Create consumption report"
+    "Tạo báo cáo tiêu thụ"
   );
   const items = zipItems(formData, ["product_id", "qty_consumed"])
     .filter((r) => r.product_id && Number(r.qty_consumed) > 0)
@@ -495,8 +495,8 @@ export async function createConsumptionReportAction(formData: FormData) {
       product_id: r.product_id,
       qty_consumed: Math.trunc(Number(r.qty_consumed)),
     }));
-  if (!items.length) throw new Error("Report needs at least one item row.");
-  done(await supabase.from("consumption_report_items").insert(items), "Add report items");
+  if (!items.length) throw new Error("Báo cáo cần ít nhất một dòng hàng.");
+  done(await supabase.from("consumption_report_items").insert(items), "Thêm dòng báo cáo");
   revalidatePath("/partner-consumption");
   redirect("/partner-consumption?ok=1");
 }
@@ -508,7 +508,7 @@ export async function setConsumptionReportStatusAction(formData: FormData) {
       .from("consumption_reports")
       .update({ status: str(formData, "status") })
       .eq("id", str(formData, "id")),
-    "Update report status"
+    "Cập nhật trạng thái báo cáo"
   );
   revalidatePath("/partner-consumption");
 }
@@ -526,7 +526,7 @@ export async function createAllocationAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Create allocation slip"
+    "Tạo phiếu phân bổ"
   );
   const lines = zipItems(formData, ["product_id", "batch_id", "nature", "qty", "unit_price"])
     .filter((r) => r.batch_id && r.product_id && Number(r.qty) > 0)
@@ -538,8 +538,8 @@ export async function createAllocationAction(formData: FormData) {
       qty: Math.trunc(Number(r.qty)),
       unit_price: Number(r.unit_price),
     }));
-  if (!lines.length) throw new Error("Allocation needs at least one line.");
-  done(await supabase.from("allocation_lines").insert(lines), "Add allocation lines");
+  if (!lines.length) throw new Error("Phiếu phân bổ cần ít nhất một dòng.");
+  done(await supabase.from("allocation_lines").insert(lines), "Thêm dòng phân bổ");
   revalidatePath("/partner-consumption");
   redirect(`/partner-consumption/allocations/${slip.id}?ok=1`);
 }
@@ -564,7 +564,7 @@ export async function createAllocationDocumentsAction(formData: FormData) {
     .single();
   if (error) throw new Error(error.message);
   if (slip.status !== "CONFIRMED")
-    throw new Error("Allocation must be CONFIRMED before creating documents.");
+    throw new Error("Phiếu phân bổ phải ở trạng thái Đã xác nhận trước khi tạo chứng từ.");
 
   const { data: lines } = await supabase
     .from("allocation_lines")
@@ -577,10 +577,10 @@ export async function createAllocationDocumentsAction(formData: FormData) {
     .in("allocation_line_id", lineIds);
   const doneSet = new Set((existing ?? []).map((r: AnyRow) => r.allocation_line_id));
   const pending = (lines ?? []).filter((l: AnyRow) => !doneSet.has(l.id));
-  if (!pending.length) throw new Error("All allocation lines already have documents.");
+  if (!pending.length) throw new Error("Mọi dòng phân bổ đều đã có chứng từ.");
 
   const fromLocation = await partnerLocationId(supabase, slip.partner_id);
-  if (!fromLocation) throw new Error("Partner virtual warehouse not found.");
+  if (!fromLocation) throw new Error("Không tìm thấy kho ảo của đối tác.");
 
   const groups: Record<string, AnyRow[]> = { BH: [], KG: [] };
   for (const l of pending) {
@@ -601,7 +601,7 @@ export async function createAllocationDocumentsAction(formData: FormData) {
         })
         .select("id")
         .single(),
-      `Create ${kind} document`
+      `Tạo chứng từ ${kind}`
     );
     done(
       await supabase.from("sales_document_lines").insert(
@@ -615,7 +615,7 @@ export async function createAllocationDocumentsAction(formData: FormData) {
           unit_price: l.unit_price,
         }))
       ),
-      "Add document lines"
+      "Thêm dòng chứng từ"
     );
     const { error: rpcError } = await supabase.rpc("confirm_sales_document", {
       p_doc_id: doc.id,
@@ -632,7 +632,7 @@ export async function createAllocationDocumentsAction(formData: FormData) {
 export async function createVatInvoiceAction(formData: FormData) {
   const supabase = await db();
   const lineIds = formData.getAll("line_id").map((v) => String(v));
-  if (!lineIds.length) throw new Error("Select at least one document line to invoice.");
+  if (!lineIds.length) throw new Error("Chọn ít nhất một dòng chứng từ để xuất hoá đơn.");
   const { error } = await supabase.rpc("create_vat_invoice", {
     p_partner_id: optStr(formData, "partner_id"),
     p_invoice_no: str(formData, "invoice_no"),
@@ -674,12 +674,12 @@ export async function createReturnAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Create return document"
+    "Tạo phiếu trả hàng"
   );
   const raw = zipItems(formData, ["batch_id", "qty", "reason"]).filter(
     (r) => r.batch_id && Number(r.qty) > 0
   );
-  if (!raw.length) throw new Error("Return needs at least one batch row.");
+  if (!raw.length) throw new Error("Phiếu trả cần ít nhất một dòng lô hàng.");
   const defaultWh = await defaultWarehouseId(supabase);
   const items = [];
   for (const r of raw) {
@@ -688,7 +688,7 @@ export async function createReturnAction(formData: FormData) {
     if (kind === "CUSTOMER_RETURN") {
       toLocation = defaultWh ?? null;
     } else if (kind === "PARTNER_RETURN") {
-      if (!partnerId) throw new Error("Partner return needs a partner.");
+      if (!partnerId) throw new Error("Trả hàng từ đối tác cần chọn đối tác.");
       fromLocation = (await partnerLocationId(supabase, partnerId)) ?? null;
       toLocation = defaultWh ?? null;
     } else if (kind === "SUPPLIER_RETURN") {
@@ -703,7 +703,7 @@ export async function createReturnAction(formData: FormData) {
       reason: r.reason || "OTHER",
     });
   }
-  done(await supabase.from("return_items").insert(items), "Add return items");
+  done(await supabase.from("return_items").insert(items), "Thêm dòng trả hàng");
   revalidatePath("/returns");
   redirect("/returns?ok=1");
 }
@@ -731,7 +731,7 @@ export async function recordPayablePaymentAction(formData: FormData) {
       note: optStr(formData, "note"),
       created_by: await userId(),
     }),
-    "Record payment"
+    "Ghi nhận thanh toán"
   );
   revalidatePath("/payables");
   redirect("/payables?ok=1");
@@ -749,7 +749,7 @@ export async function recordReceivablePaymentAction(formData: FormData) {
       note: optStr(formData, "note"),
       created_by: await userId(),
     }),
-    "Record receipt"
+    "Ghi nhận thu tiền"
   );
   revalidatePath("/receivables");
   redirect("/receivables?ok=1");
@@ -762,7 +762,7 @@ export async function createSettlementAction(formData: FormData) {
   const selectedIds = formData
     .getAll(isSupplier ? "payable_id" : "receivable_id")
     .map((v) => String(v));
-  if (!selectedIds.length) throw new Error("Select at least one open balance line.");
+  if (!selectedIds.length) throw new Error("Chọn ít nhất một dòng công nợ đang mở.");
 
   const table = isSupplier ? "supplier_payables" : "partner_receivables";
   const { data: balances, error } = await supabase
@@ -790,7 +790,7 @@ export async function createSettlementAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Create settlement"
+    "Tạo đợt đối soát"
   );
   done(
     await supabase.from("settlement_lines").insert(
@@ -801,7 +801,7 @@ export async function createSettlementAction(formData: FormData) {
         amount: Number(b.amount) - Number(b.amount_paid),
       }))
     ),
-    "Add settlement lines"
+    "Thêm dòng đối soát"
   );
   revalidatePath(isSupplier ? "/payables" : "/receivables");
   redirect(`${isSupplier ? "/payables" : "/receivables"}?ok=1`);
@@ -815,7 +815,7 @@ export async function updateVatModeAction(formData: FormData) {
       key: "vat_invoice_mode",
       value: str(formData, "vat_invoice_mode") || "COMBINED",
     }),
-    "Save setting"
+    "Lưu cài đặt"
   );
   revalidatePath("/settings");
 }

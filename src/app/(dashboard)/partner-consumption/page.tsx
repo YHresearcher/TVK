@@ -40,37 +40,37 @@ export default async function PartnerConsumptionPage({
   );
   const batchOptions = partnerBatches.map((r) => ({
     value: r.batch_id,
-    label: `${r.batch_code} — ${r.product_name} · at ${r.location_name}`,
+    label: `${r.batch_code} — ${r.product_name} · tại ${r.location_name}`,
   }));
 
   return (
     <>
       <PageHeader
-        title="Partner Consumption & Allocation"
-        description="Flow: partner reports consumption (BT) → allocation slip pins every quantity to a source — PURCHASED or CONSIGNED (PB) → BH/KG documents → VAT invoice. Allocation happens BEFORE invoicing, and each quantity can be invoiced exactly once."
+        title="Tiêu thụ của đối tác & Phân bổ"
+        description="Quy trình: đối tác báo tiêu thụ (BT) → phiếu phân bổ gán mọi số lượng vào một nguồn — MUA ĐỨT hoặc KÝ GỬI (PB) → chứng từ BH/KG → hoá đơn GTGT. Phân bổ thực hiện TRƯỚC khi xuất hoá đơn, và mỗi số lượng chỉ được xuất hoá đơn đúng một lần."
       />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Saved successfully.</p>}
+      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="space-y-8">
         <section className="space-y-4">
-          <Card title="New consumption report (BT)">
+          <Card title="Báo cáo tiêu thụ mới (BT)">
             <form action={createConsumptionReportAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-3">
-                <div><label className={labelCls}>Partner *</label>
-                  <select name="partner_id" required className={inputCls}><option value="">— Select —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                <div><label className={labelCls}>Period from *</label><input name="period_from" type="date" required className={inputCls} /></div>
-                <div><label className={labelCls}>Period to *</label><input name="period_to" type="date" required className={inputCls} /></div>
+                <div><label className={labelCls}>Đối tác *</label>
+                  <select name="partner_id" required className={inputCls}><option value="">— Chọn —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                <div><label className={labelCls}>Từ ngày *</label><input name="period_from" type="date" required className={inputCls} /></div>
+                <div><label className={labelCls}>Đến ngày *</label><input name="period_to" type="date" required className={inputCls} /></div>
               </div>
               <ItemsRows fields={[
-                { name: "product_id", label: "Product", type: "select", options: productOptions },
-                { name: "qty_consumed", label: "Qty consumed", type: "number" },
+                { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
+                { name: "qty_consumed", label: "Số lượng đã tiêu thụ", type: "number" },
               ]} initialRows={2} />
-              <button type="submit" className={btnCls}>Create draft report</button>
+              <button type="submit" className={btnCls}>Tạo báo cáo nháp</button>
             </form>
           </Card>
-          {reports.data.length === 0 ? <EmptyState message="No consumption reports yet." /> : (
+          {reports.data.length === 0 ? <EmptyState message="Chưa có báo cáo tiêu thụ." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Code</th><th className={thCls}>Partner</th><th className={thCls}>Period</th><th className={thCls}>Status</th><th className={thCls}></th></tr></thead>
+              <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Kỳ</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
               <tbody>
                 {reports.data.map((r) => (
                   <tr key={r.id} className="border-t border-slate-100">
@@ -83,7 +83,7 @@ export default async function PartnerConsumptionPage({
                         <form action={setConsumptionReportStatusAction}>
                           <input type="hidden" name="id" value={r.id} />
                           <input type="hidden" name="status" value="CONFIRMED" />
-                          <button type="submit" className={btnGhostCls}>Confirm report</button>
+                          <button type="submit" className={btnGhostCls}>Xác nhận báo cáo</button>
                         </form>
                       )}
                     </td>
@@ -95,31 +95,31 @@ export default async function PartnerConsumptionPage({
         </section>
 
         <section className="space-y-4">
-          <Card title="New allocation slip (PB)">
+          <Card title="Phiếu phân bổ mới (PB)">
             <form action={createAllocationAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
-                <div><label className={labelCls}>Partner *</label>
-                  <select name="partner_id" required className={inputCls}><option value="">— Select —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                <div><label className={labelCls}>Consumption report (optional)</label>
-                  <select name="report_id" className={inputCls}><option value="">— None —</option>{reportOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                <div><label className={labelCls}>Đối tác *</label>
+                  <select name="partner_id" required className={inputCls}><option value="">— Chọn —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                <div><label className={labelCls}>Báo cáo tiêu thụ (không bắt buộc)</label>
+                  <select name="report_id" className={inputCls}><option value="">— Không —</option>{reportOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
               </div>
               <ItemsRows fields={[
-                { name: "product_id", label: "Product", type: "select", options: productOptions },
-                { name: "batch_id", label: "Batch at partner", type: "select", options: batchOptions },
-                { name: "nature", label: "Source nature", type: "select", options: [
-                  { value: "PURCHASED", label: "PURCHASED — mua đứt" },
-                  { value: "CONSIGNED", label: "CONSIGNED — ký gửi" },
+                { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
+                { name: "batch_id", label: "Lô tại đối tác", type: "select", options: batchOptions },
+                { name: "nature", label: "Nguồn hàng", type: "select", options: [
+                  { value: "PURCHASED", label: "Mua đứt (PURCHASED)" },
+                  { value: "CONSIGNED", label: "Ký gửi (CONSIGNED)" },
                 ] },
-                { name: "qty", label: "Qty", type: "number" },
-                { name: "unit_price", label: "Unit price (₫)", type: "number", step: "1000" },
+                { name: "qty", label: "Số lượng", type: "number" },
+                { name: "unit_price", label: "Đơn giá (₫)", type: "number", step: "1000" },
               ]} initialRows={2} />
-              <p className="text-xs text-slate-500">On confirm, the database checks 3 locks: not more than reported consumption, not more than the delivered cap per nature, and the batch must still hold enough at the partner.</p>
-              <button type="submit" className={btnCls}>Create draft allocation</button>
+              <p className="text-xs text-slate-500">Khi xác nhận, cơ sở dữ liệu kiểm tra 3 chốt: không vượt quá lượng tiêu thụ đã báo, không vượt quá hạn mức đã giao theo từng tính chất, và lô phải còn đủ hàng tại đối tác.</p>
+              <button type="submit" className={btnCls}>Tạo phiếu phân bổ nháp</button>
             </form>
           </Card>
-          {allocations.data.length === 0 ? <EmptyState message="No allocation slips yet." /> : (
+          {allocations.data.length === 0 ? <EmptyState message="Chưa có phiếu phân bổ." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Code</th><th className={thCls}>Partner</th><th className={thCls}>Date</th><th className={thCls}>Status</th><th className={thCls}></th></tr></thead>
+              <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
               <tbody>
                 {allocations.data.map((a) => (
                   <tr key={a.id} className="border-t border-slate-100">
@@ -128,7 +128,7 @@ export default async function PartnerConsumptionPage({
                     <td className={tdCls}>{formatDate(a.alloc_date)}</td>
                     <td className={tdCls}><StatusBadge status={a.status} /></td>
                     <td className={tdCls}>
-                      <Link href={`/partner-consumption/allocations/${a.id}`} className="text-blue-600 hover:underline text-sm">Open</Link>
+                      <Link href={`/partner-consumption/allocations/${a.id}`} className="text-blue-600 hover:underline text-sm">Mở</Link>
                     </td>
                   </tr>
                 ))}

@@ -22,27 +22,27 @@ export default async function InvoicesPage({
   return (
     <>
       <PageHeader
-        title="VAT Invoices (GTGT)"
-        description="The legal invoice layer. It is generated from confirmed BH/KG document lines — each line can be invoiced exactly once, and every line on the invoice stays linked to its management document, so consigned and direct-sale money never mix. Depending on the accountant's decision (Settings: VAT invoice mode), the same lines can go on one combined invoice (one line per nature) or separate invoices."
+        title="Hoá đơn GTGT"
+        description="Lớp hoá đơn pháp lý. Hoá đơn được tạo từ các dòng chứng từ BH/KG đã xác nhận — mỗi dòng chỉ xuất hoá đơn đúng một lần, và mỗi dòng trên hoá đơn luôn liên kết với chứng từ quản lý của nó, nên tiền ký gửi và tiền bán trực tiếp không bao giờ trộn lẫn. Tuỳ quyết định của kế toán (Cài đặt: Chế độ hoá đơn GTGT), cùng các dòng có thể nằm trên một hoá đơn gộp (mỗi tính chất một dòng) hoặc các hoá đơn riêng."
       />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Invoice created.</p>}
+      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã tạo hoá đơn.</p>}
       <div className="space-y-6">
-        <Card title="Issue a VAT invoice from document lines">
+        <Card title="Phát hành hoá đơn GTGT từ dòng chứng từ">
           {uninvoiced.data.length === 0 ? (
-            <EmptyState message="No uninvoiced document lines. Confirm sales documents or allocation documents first." />
+            <EmptyState message="Chưa có dòng chứng từ chưa xuất hoá đơn. Hãy xác nhận chứng từ bán hàng hoặc chứng từ phân bổ trước." />
           ) : (
             <form action={createVatInvoiceAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-5">
-                <div><label className={labelCls}>Partner</label>
-                  <select name="partner_id" className={inputCls}><option value="">— Select —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                <div><label className={labelCls}>Invoice no. *</label><input name="invoice_no" required className={inputCls} /></div>
-                <div><label className={labelCls}>Symbol *</label><input name="symbol" required className={inputCls} placeholder="1C25T…" /></div>
-                <div><label className={labelCls}>Invoice date *</label><input name="invoice_date" type="date" required className={inputCls} /></div>
-                <div><label className={labelCls}>E-invoice provider</label><input name="provider" className={inputCls} placeholder="MISA / Viettel…" /></div>
+                <div><label className={labelCls}>Đối tác</label>
+                  <select name="partner_id" className={inputCls}><option value="">— Chọn —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                <div><label className={labelCls}>Số hoá đơn *</label><input name="invoice_no" required className={inputCls} /></div>
+                <div><label className={labelCls}>Ký hiệu *</label><input name="symbol" required className={inputCls} placeholder="1C25T…" /></div>
+                <div><label className={labelCls}>Ngày hoá đơn *</label><input name="invoice_date" type="date" required className={inputCls} /></div>
+                <div><label className={labelCls}>Nhà cung cấp hoá đơn điện tử</label><input name="provider" className={inputCls} placeholder="MISA / Viettel…" /></div>
               </div>
               <div className="space-y-2">
-                <p className={labelCls}>Document lines to include (each line can be invoiced only once)</p>
+                <p className={labelCls}>Các dòng chứng từ đưa vào hoá đơn (mỗi dòng chỉ xuất được một lần)</p>
                 {uninvoiced.data.map((l) => (
                   <label key={l.id} className="flex cursor-pointer items-center gap-3 rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
                     <input type="checkbox" name="line_id" value={l.id} className="h-4 w-4" />
@@ -53,14 +53,14 @@ export default async function InvoicesPage({
                   </label>
                 ))}
               </div>
-              <button type="submit" className={btnCls}>Issue invoice</button>
+              <button type="submit" className={btnCls}>Phát hành hoá đơn</button>
             </form>
           )}
         </Card>
 
-        {invoices.data.length === 0 ? <EmptyState message="No VAT invoices yet." /> : (
+        {invoices.data.length === 0 ? <EmptyState message="Chưa có hoá đơn GTGT." /> : (
           <TableWrap>
-            <thead><tr><th className={thCls}>Invoice no.</th><th className={thCls}>Symbol</th><th className={thCls}>Partner</th><th className={thCls}>Date</th><th className={thCls}>Total</th><th className={thCls}>Status</th><th className={thCls}></th></tr></thead>
+            <thead><tr><th className={thCls}>Số hoá đơn</th><th className={thCls}>Ký hiệu</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Tổng</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
             <tbody>
               {invoices.data.map((inv) => (
                 <tr key={inv.id} className="border-t border-slate-100">
@@ -74,7 +74,7 @@ export default async function InvoicesPage({
                     {inv.status === "ISSUED" && (
                       <form action={cancelVatInvoiceAction}>
                         <input type="hidden" name="id" value={inv.id} />
-                        <button type="submit" className={btnGhostCls}>Cancel invoice</button>
+                        <button type="submit" className={btnGhostCls}>Huỷ hoá đơn</button>
                       </form>
                     )}
                   </td>
@@ -83,7 +83,7 @@ export default async function InvoicesPage({
             </tbody>
           </TableWrap>
         )}
-        <p className="text-xs text-slate-500">Cancelling an invoice re-opens only the allocation lines that belonged to that invoice — other invoices are untouched.</p>
+        <p className="text-xs text-slate-500">Huỷ hoá đơn chỉ mở lại các dòng phân bổ thuộc hoá đơn đó — các hoá đơn khác không bị ảnh hưởng.</p>
       </div>
     </>
   );

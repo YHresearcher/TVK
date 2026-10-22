@@ -38,32 +38,32 @@ export default async function StockInPage({
 
   return (
     <>
-      <PageHeader title="Stock In" description="Purchases create OWN batches (white labels). Consignment receipts create CONS batches (yellow labels) and do NOT create payables until the goods are sold." />
+      <PageHeader title="Nhập kho" description="Nhập mua tạo lô OWN (nhãn trắng). Nhận ký gửi tạo lô CONS (nhãn vàng) và CHƯA tạo công nợ phải trả cho tới khi hàng bán được." />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Saved successfully.</p>}
+      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="mb-6 flex gap-2">
-        <Link href="/stock-in?tab=purchase" className={tabCls(tab === "purchase")}>Purchase receipts (PN)</Link>
-        <Link href="/stock-in?tab=consignment" className={tabCls(tab === "consignment")}>Consignment receipts (NK)</Link>
+        <Link href="/stock-in?tab=purchase" className={tabCls(tab === "purchase")}>Phiếu nhập mua (PN)</Link>
+        <Link href="/stock-in?tab=consignment" className={tabCls(tab === "consignment")}>Phiếu nhận ký gửi (NK)</Link>
       </div>
 
       {tab === "purchase" ? (
         <div className="space-y-6">
-          <Card title="New purchase receipt">
+          <Card title="Phiếu nhập mua mới">
             <form action={createPurchaseReceiptAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-4">
-                <div><label className={labelCls}>Supplier *</label>
-                  <select name="supplier_id" required className={inputCls}><option value="">— Select —</option>{supplierOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                <div><label className={labelCls}>Warehouse *</label>
-                  <select name="warehouse_id" required className={inputCls}><option value="">— Select —</option>{warehouseOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                <div><label className={labelCls}>Receipt date</label><input name="receipt_date" type="date" className={inputCls} /></div>
-                <div><label className={labelCls}>Supplier invoice no.</label><input name="supplier_invoice_no" className={inputCls} /></div>
+                <div><label className={labelCls}>Nhà cung cấp *</label>
+                  <select name="supplier_id" required className={inputCls}><option value="">— Chọn —</option>{supplierOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                <div><label className={labelCls}>Kho *</label>
+                  <select name="warehouse_id" required className={inputCls}><option value="">— Chọn —</option>{warehouseOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                <div><label className={labelCls}>Ngày nhập</label><input name="receipt_date" type="date" className={inputCls} /></div>
+                <div><label className={labelCls}>Số hoá đơn của nhà cung cấp</label><input name="supplier_invoice_no" className={inputCls} /></div>
               </div>
               <ItemsRows fields={[
-                { name: "product_id", label: "Product", type: "select", options: productOptions },
-                { name: "qty", label: "Qty", type: "number" },
-                { name: "unit_cost", label: "Unit cost (₫)", type: "number", step: "1000" },
+                { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
+                { name: "qty", label: "Số lượng", type: "number" },
+                { name: "unit_cost", label: "Đơn giá vốn (₫)", type: "number", step: "1000" },
               ]} />
-              <button type="submit" className={btnCls}>Create draft receipt</button>
+              <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
             </form>
           </Card>
           <ReceiptTable
@@ -74,22 +74,22 @@ export default async function StockInPage({
         </div>
       ) : (
         <div className="space-y-6">
-          <Card title="New consignment receipt">
+          <Card title="Phiếu nhận ký gửi mới">
             <form action={createConsignmentReceiptAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-4">
-                <div><label className={labelCls}>Supplier *</label>
-                  <select name="supplier_id" required className={inputCls}><option value="">— Select —</option>{supplierOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                <div><label className={labelCls}>Warehouse *</label>
-                  <select name="warehouse_id" required className={inputCls}><option value="">— Select —</option>{warehouseOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                <div><label className={labelCls}>Receipt date</label><input name="receipt_date" type="date" className={inputCls} /></div>
-                <div><label className={labelCls}>Return-by date (blank = supplier default)</label><input name="return_by_date" type="date" className={inputCls} /></div>
+                <div><label className={labelCls}>Nhà cung cấp *</label>
+                  <select name="supplier_id" required className={inputCls}><option value="">— Chọn —</option>{supplierOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                <div><label className={labelCls}>Kho *</label>
+                  <select name="warehouse_id" required className={inputCls}><option value="">— Chọn —</option>{warehouseOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+                <div><label className={labelCls}>Ngày nhập</label><input name="receipt_date" type="date" className={inputCls} /></div>
+                <div><label className={labelCls}>Hạn trả (để trống = mặc định của nhà cung cấp)</label><input name="return_by_date" type="date" className={inputCls} /></div>
               </div>
               <ItemsRows fields={[
-                { name: "product_id", label: "Product", type: "select", options: productOptions },
-                { name: "qty", label: "Qty", type: "number" },
-                { name: "consignment_price", label: "Consignment price (₫)", type: "number", step: "1000" },
+                { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
+                { name: "qty", label: "Số lượng", type: "number" },
+                { name: "consignment_price", label: "Giá ký gửi (₫)", type: "number", step: "1000" },
               ]} />
-              <button type="submit" className={btnCls}>Create draft receipt</button>
+              <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
             </form>
           </Card>
           <ReceiptTable
@@ -112,10 +112,10 @@ function ReceiptTable({
   supplierName: Map<string, string>;
   confirmAction: (formData: FormData) => Promise<void>;
 }) {
-  if (rows.length === 0) return <EmptyState message="No receipts yet." />;
+  if (rows.length === 0) return <EmptyState message="Chưa có phiếu nhập." />;
   return (
     <TableWrap>
-      <thead><tr><th className={thCls}>Code</th><th className={thCls}>Supplier</th><th className={thCls}>Date</th><th className={thCls}>Status</th><th className={thCls}></th></tr></thead>
+      <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
       <tbody>
         {rows.map((r) => (
           <tr key={r.id} className="border-t border-slate-100">
@@ -127,7 +127,7 @@ function ReceiptTable({
               {r.status === "DRAFT" && (
                 <form action={confirmAction}>
                   <input type="hidden" name="id" value={r.id} />
-                  <button type="submit" className={btnGhostCls}>Confirm → create batches</button>
+                  <button type="submit" className={btnGhostCls}>Xác nhận → tạo lô</button>
                 </form>
               )}
             </td>

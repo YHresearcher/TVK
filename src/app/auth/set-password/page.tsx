@@ -71,11 +71,11 @@ export default function SetPasswordPage() {
     const supabase = createClient();
     if (!supabase) return;
     if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError("Mật khẩu phải có ít nhất 8 ký tự.");
       return;
     }
     if (password !== confirm) {
-      setError("Passwords do not match.");
+      setError("Mật khẩu nhập lại không khớp.");
       return;
     }
     setPhase("saving");
@@ -95,23 +95,23 @@ export default function SetPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-xl">
         <h1 className="text-2xl font-bold text-slate-900">TVK</h1>
-        <p className="mt-1 text-sm text-slate-500">Set your password</p>
+        <p className="mt-1 text-sm text-slate-500">Đặt mật khẩu</p>
 
         {!configured || phase === "invalid" ? (
           <div className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
             {configured
-              ? "This link is invalid or has expired. Ask the shop owner to send a new invitation, or use “Forgot password” on the sign-in page."
-              : "Supabase is not configured yet."}{" "}
+              ? "Liên kết này không hợp lệ hoặc đã hết hạn. Hãy nhờ chủ cửa hàng gửi lời mời mới, hoặc dùng “Quên mật khẩu” ở trang đăng nhập."
+              : "Supabase chưa được cấu hình."}{" "}
             <Link href="/login" className="font-medium underline">
-              Go to sign in
+              Đi tới đăng nhập
             </Link>
           </div>
         ) : phase === "checking" ? (
-          <p className="mt-6 text-sm text-slate-500">Verifying your link…</p>
+          <p className="mt-6 text-sm text-slate-500">Đang xác minh liên kết…</p>
         ) : (
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <div>
-              <label className={labelCls}>New password</label>
+              <label className={labelCls}>Mật khẩu mới</label>
               <input
                 type="password"
                 autoComplete="new-password"
@@ -119,11 +119,11 @@ export default function SetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={inputCls}
-                placeholder="At least 8 characters"
+                placeholder="Ít nhất 8 ký tự"
               />
             </div>
             <div>
-              <label className={labelCls}>Confirm password</label>
+              <label className={labelCls}>Xác nhận mật khẩu</label>
               <input
                 type="password"
                 autoComplete="new-password"
@@ -131,7 +131,7 @@ export default function SetPasswordPage() {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 className={inputCls}
-                placeholder="Repeat the password"
+                placeholder="Nhập lại mật khẩu"
               />
             </div>
             {error && (
@@ -144,7 +144,7 @@ export default function SetPasswordPage() {
               disabled={phase === "saving"}
               className={`${btnCls} w-full`}
             >
-              {phase === "saving" ? "Saving…" : "Save password and continue"}
+              {phase === "saving" ? "Đang lưu…" : "Lưu mật khẩu và tiếp tục"}
             </button>
           </form>
         )}

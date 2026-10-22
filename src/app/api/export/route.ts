@@ -25,11 +25,11 @@ function toCsv(rows: Record<string, unknown>[]): string {
 export async function GET(request: NextRequest) {
   const view = request.nextUrl.searchParams.get("view") ?? "";
   if (!ALLOWED_VIEWS.has(view)) {
-    return NextResponse.json({ error: "View not allowed" }, { status: 400 });
+    return NextResponse.json({ error: "Không được phép xem báo cáo này" }, { status: 400 });
   }
   const supabase = await createClient();
   if (!supabase) {
-    return NextResponse.json({ error: "Supabase not configured" }, { status: 503 });
+    return NextResponse.json({ error: "Supabase chưa được cấu hình" }, { status: 503 });
   }
   const { data, error } = await supabase.from(view).select("*").limit(5000);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

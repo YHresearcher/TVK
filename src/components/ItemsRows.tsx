@@ -19,7 +19,7 @@ export interface ItemField {
 export default function ItemsRows({
   fields,
   initialRows = 3,
-  addLabel = "+ Add row",
+  addLabel = "+ Thêm dòng",
 }: {
   fields: ItemField[];
   initialRows?: number;
@@ -45,7 +45,7 @@ export default function ItemsRows({
               </label>
               {f.type === "select" ? (
                 <select name={f.name} className={inputCls} defaultValue="">
-                  <option value="">— Select —</option>
+                  <option value="">— Chọn —</option>
                   {(f.options ?? []).map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -69,7 +69,7 @@ export default function ItemsRows({
               onClick={() => setRows(rows.filter((r) => r !== rowId))}
               className="text-xs text-red-500 hover:underline"
             >
-              Remove row
+              Xoá dòng
             </button>
           </div>
         </div>

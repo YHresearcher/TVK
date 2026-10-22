@@ -28,29 +28,29 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="System-wide choices. The VAT invoice mode must match what your accountant decides together with the consignment contract model." />
+      <PageHeader title="Cài đặt" description="Các tuỳ chọn toàn hệ thống. Chế độ hoá đơn GTGT phải khớp với quyết định của kế toán cùng với mô hình hợp đồng ký gửi." />
       {!locations.configured && <NotConfigured />}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="VAT invoice mode">
+        <Card title="Chế độ hoá đơn GTGT">
           <form action={updateVatModeAction} className="space-y-3">
             <div>
-              <label className={labelCls}>How mixed invoices are issued</label>
+              <label className={labelCls}>Cách phát hành hoá đơn gộp</label>
               <select name="vat_invoice_mode" defaultValue={vatMode} className={inputCls}>
-                <option value="COMBINED">COMBINED — one GTGT invoice, one line per nature</option>
-                <option value="SEPARATE">SEPARATE — two GTGT invoices, one per nature</option>
+                <option value="COMBINED">COMBINED — một hoá đơn GTGT, mỗi tính chất một dòng</option>
+                <option value="SEPARATE">SEPARATE — hai hoá đơn GTGT, mỗi tính chất một hoá đơn</option>
               </select>
             </div>
             <p className="text-xs text-slate-500">
-              Either way, the internal management documents (BH / KG) are always separate and each
-              invoice line stays linked to exactly one of them. This setting only controls how lines
-              are grouped when issuing the legal invoice.
+              Dù chọn cách nào, các chứng từ quản lý nội bộ (BH / KG) luôn tách riêng và mỗi
+              dòng hoá đơn luôn liên kết với đúng một chứng từ. Cài đặt này chỉ quyết định cách
+              nhóm các dòng khi phát hành hoá đơn pháp lý.
             </p>
-            <button type="submit" className={btnCls}>Save</button>
+            <button type="submit" className={btnCls}>Lưu</button>
           </form>
         </Card>
 
-        <Card title="Our warehouses / locations">
-          {warehouses.length === 0 ? <EmptyState message="No warehouse yet — create the first one." /> : (
+        <Card title="Kho / địa điểm của chúng ta">
+          {warehouses.length === 0 ? <EmptyState message="Chưa có kho — hãy tạo kho đầu tiên." /> : (
             <ul className="space-y-1 text-sm">
               {warehouses.map((l) => (
                 <li key={l.id} className="flex justify-between"><span>{l.name}</span><span className="text-slate-500">{l.detail ?? ""}</span></li>
@@ -59,24 +59,24 @@ export default async function SettingsPage() {
           )}
           <form action={createWarehouseAction} className="mt-4 space-y-2 border-t border-slate-100 pt-3">
             <div className="flex gap-2">
-              <input name="name" required placeholder="Warehouse name (Kho chính)" className={inputCls} />
-              <input name="detail" placeholder="Detail (address / shelf zone)" className={inputCls} />
+              <input name="name" required placeholder="Tên kho (Kho chính)" className={inputCls} />
+              <input name="detail" placeholder="Chi tiết (địa chỉ / khu vực kệ)" className={inputCls} />
             </div>
-            <button type="submit" className={`${btnCls} w-full`}>Add warehouse</button>
+            <button type="submit" className={`${btnCls} w-full`}>Thêm kho</button>
           </form>
           {partnerWarehouses.length > 0 && (
             <p className="mt-4 text-xs text-slate-500">
-              Partner virtual warehouses ({partnerWarehouses.length}) are created automatically when the first consignment-out slip to a partner is confirmed.
+              Kho ảo của đối tác ({partnerWarehouses.length}) được tạo tự động khi phiếu gửi ký gửi đầu tiên cho một đối tác được xác nhận.
             </p>
           )}
         </Card>
 
-        <Card title="Users & roles" className="lg:col-span-2">
+        <Card title="Người dùng & vai trò" className="lg:col-span-2">
           {profiles.length === 0 ? (
-            <EmptyState message="No profiles yet. Create the first OWNER profile as described in supabase/README.md." />
+            <EmptyState message="Chưa có hồ sơ người dùng. Tạo hồ sơ OWNER đầu tiên theo hướng dẫn trong supabase/README.md." />
           ) : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Name</th><th className={thCls}>Email</th><th className={thCls}>Username</th><th className={thCls}>Role</th><th className={thCls}>Active</th></tr></thead>
+              <thead><tr><th className={thCls}>Tên</th><th className={thCls}>Email</th><th className={thCls}>Tên đăng nhập</th><th className={thCls}>Vai trò</th><th className={thCls}>Đang hoạt động</th></tr></thead>
               <tbody>
                 {profiles.map((p) => (
                   <tr key={p.id} className="border-t border-slate-100">
@@ -90,18 +90,18 @@ export default async function SettingsPage() {
                       />
                     </td>
                     <td className={tdCls}>{ROLE_LABELS[p.role as keyof typeof ROLE_LABELS] ?? p.role}</td>
-                    <td className={tdCls}>{p.is_active ? "Yes" : "No"}</td>
+                    <td className={tdCls}>{p.is_active ? "Có" : "Không"}</td>
                   </tr>
                 ))}
               </tbody>
             </TableWrap>
           )}
           <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-slate-500">
-            <li>Username — optional short sign-in name (3–32 chars). Users can sign in with their username or their email; the OWNER can set usernames for everyone, users can set their own.</li>
-            <li>OWNER — full access, sees consignment prices and profit.</li>
-            <li>SALES — sells and invoices; cannot see consignment prices, cost or profit (financial tables are blocked by RLS; the sales UI uses a cost-free batch view).</li>
-            <li>WAREHOUSE — stock in/out, stocktakes, returns; no money data.</li>
-            <li>ACCOUNTING — payables, receivables, settlements, invoices and reports; cannot edit stock directly.</li>
+            <li>Tên đăng nhập — tên đăng nhập ngắn tuỳ chọn (3–32 ký tự). Người dùng đăng nhập bằng tên đăng nhập hoặc email; OWNER đặt được tên đăng nhập cho mọi người, người dùng tự đặt cho mình.</li>
+            <li>Chủ cửa hàng (OWNER) — toàn quyền, xem được giá ký gửi và lợi nhuận.</li>
+            <li>Bán hàng (SALES) — bán hàng và xuất hoá đơn; không xem được giá ký gửi, giá vốn hay lợi nhuận (bảng tài chính bị chặn bởi RLS; giao diện bán hàng dùng khung nhìn lô không có giá vốn).</li>
+            <li>Kho (WAREHOUSE) — nhập/xuất kho, kiểm kê, trả hàng; không có dữ liệu tiền.</li>
+            <li>Kế toán (ACCOUNTING) — phải trả, phải thu, đối soát, hoá đơn và báo cáo; không sửa kho trực tiếp.</li>
           </ul>
         </Card>
       </div>

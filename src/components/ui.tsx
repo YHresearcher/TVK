@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { STATUS_LABELS } from "@/lib/types";
 
 export const inputCls =
   "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white";
@@ -56,16 +57,16 @@ export function Card({
 export function NotConfigured() {
   return (
     <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
-      <p className="font-semibold">Supabase is not configured yet.</p>
+      <p className="font-semibold">Supabase chưa được cấu hình.</p>
       <p className="mt-1">
-        Create a Supabase project, run the SQL files in{" "}
-        <code className="rounded bg-amber-100 px-1">supabase/migrations/</code> (in
-        order 0001 → 0002 → 0003), then set{" "}
+        Hãy tạo một project Supabase, chạy các file SQL trong{" "}
+        <code className="rounded bg-amber-100 px-1">supabase/migrations/</code> (theo
+        thứ tự 0001 → 0002 → 0003), rồi đặt{" "}
         <code className="rounded bg-amber-100 px-1">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
-        and{" "}
+        và{" "}
         <code className="rounded bg-amber-100 px-1">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>{" "}
-        in <code className="rounded bg-amber-100 px-1">.env.local</code> and restart
-        the app. See <code className="rounded bg-amber-100 px-1">supabase/README.md</code>.
+        trong <code className="rounded bg-amber-100 px-1">.env.local</code> và khởi động
+        lại app. Xem <code className="rounded bg-amber-100 px-1">supabase/README.md</code>.
       </p>
     </div>
   );
@@ -93,7 +94,7 @@ export function StatusBadge({ status }: { status: string }) {
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${colors[status] ?? "bg-slate-100 text-slate-600"}`}
     >
-      {status}
+      {STATUS_LABELS[status] ?? status}
     </span>
   );
 }
