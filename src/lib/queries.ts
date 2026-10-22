@@ -43,6 +43,23 @@ async function list<T = AnyRow>(
 
 export const listProducts = () =>
   list("products", { column: "name", ascending: true });
+export const listProductCodes = () =>
+  list("product_codes", { column: "code", ascending: true });
+
+/** Normalized (trim + uppercase) map: any known product code or SKU → product_id. Used by the barcode scan box. */
+export function buildProductCodeMap(
+  products: AnyRow[],
+  codes: AnyRow[]
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const p of products) {
+    if (p.sku) map[String(p.sku).trim().toUpperCase()] = p.id;
+  }
+  for (const c of codes) {
+    if (c.code) map[String(c.code).trim().toUpperCase()] = c.product_id;
+  }
+  return map;
+}
 export const listProductStock = () => list("v_product_stock", { column: "name", ascending: true });
 export const listBatchStock = () =>
   list("v_batch_stock", { column: "received_date", ascending: false });
@@ -162,16 +179,76 @@ export async function getDashboard() {
       ownedQty: 0, ownedValue: 0, consignedQty: 0, consignedValue: 0,
       atPartnersQty: 0, payablesOutstanding: 0, receivablesOutstanding: 0,
       lowStock: [] as AnyRow[], expiring: [] as AnyRow[], discrepancies: [] as AnyRow[],
+      revenue14: [] as { label: string; value: number }[],
+      topProducts: [] as AnyRow[],
+      stockComposition: {
+        ownedOwn: { qty: 0, value: 0 },
+        consignedOwn: { qty: 0, value: 0 },
+        atPartners: { qty: 0, value: 0 },
+      },
+      balances: { payablesUnpaid: 0, payablesPartial: 0, receivablesUnpaid: 0, receivablesPartial: 0 },
     };
   }
-  const [batchStock, payables, receivables, productStock, partnerCons, productMins] = await Promise.all([
+  const dayMs = 864e5;
+  const isoDay = (daysAgo: number) =>
+    new Date(Date.now() - daysAgo * dayMs).toISOString().slice(0, 10);
+  const [batchStock, payables, receivables, productStock, partnerCons, productMins, salesDocs] = await Promise.all([
     supabase.from("v_batch_stock").select("*").limit(2000),
     supabase.from("supplier_payables").select("amount, amount_paid, status").in("status", ["UNPAID", "PARTIAL"]),
     supabase.from("partner_receivables").select("amount, amount_paid, status").in("status", ["UNPAID", "PARTIAL"]),
     supabase.from("v_product_stock").select("*").limit(2000),
     supabase.from("v_partner_consignment").select("*"),
     supabase.from("products").select("id, min_stock"),
+    supabase
+      .from("sales_documents")
+      .select("id, doc_date, discount_amount")
+      .eq("status", "CONFIRMED")
+      .gte("doc_date", isoDay(29)),
   ]);
+  // Lines of those confirmed documents drive both revenue (14d) and top products (30d).
+  const docRows = (salesDocs.data ?? []) as AnyRow[];
+  const docDate = new Map(docRows.map((d) => [d.id, String(d.doc_date).slice(0, 10)]));
+  const docDiscount = new Map(docRows.map((d) => [d.id, Number(d.discount_amount ?? 0)]));
+  let salesLines: AnyRow[] = [];
+  if (docRows.length) {
+    const { data: lines } = await supabase
+      .from("sales_document_lines")
+      .select("document_id, product_id, qty, line_total")
+      .in("document_id", docRows.map((d) => d.id))
+      .limit(10000);
+    salesLines = (lines ?? []) as AnyRow[];
+  }
+  const docRevenue = new Map<string, number>();
+  const productQty = new Map<string, number>();
+  for (const l of salesLines) {
+    docRevenue.set(l.document_id, (docRevenue.get(l.document_id) ?? 0) + Number(l.line_total ?? 0));
+    productQty.set(l.product_id, (productQty.get(l.product_id) ?? 0) + Number(l.qty ?? 0));
+  }
+  const dailyRevenue = new Map<string, number>();
+  for (const [docId, sum] of Array.from(docRevenue.entries())) {
+    const date = docDate.get(docId);
+    if (!date) continue;
+    dailyRevenue.set(date, (dailyRevenue.get(date) ?? 0) + Math.max(sum - (docDiscount.get(docId) ?? 0), 0));
+  }
+  const revenue14 = Array.from({ length: 14 }, (_, i) => {
+    const iso = isoDay(13 - i);
+    return { label: `${iso.slice(8, 10)}/${iso.slice(5, 7)}`, value: dailyRevenue.get(iso) ?? 0 };
+  });
+  const topIds = Array.from(productQty.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([id]) => id);
+  let topProducts: AnyRow[] = [];
+  if (topIds.length) {
+    const { data: prods } = await supabase
+      .from("products")
+      .select("id, sku, name")
+      .in("id", topIds);
+    const byId = new Map(((prods ?? []) as AnyRow[]).map((p) => [p.id, p]));
+    topProducts = topIds
+      .filter((id) => byId.has(id))
+      .map((id) => ({ ...byId.get(id), qty_sold: productQty.get(id) ?? 0 }));
+  }
   const minMap = new Map(((productMins.data ?? []) as AnyRow[]).map((p) => [p.id, Number(p.min_stock ?? 0)]));
   const rows = (batchStock.data ?? []) as AnyRow[];
   const sum = (filter: (r: AnyRow) => boolean, field: (r: AnyRow) => number) =>
@@ -179,6 +256,14 @@ export async function getDashboard() {
   const owned = (r: AnyRow) => r.ownership === "OWNED";
   const consigned = (r: AnyRow) => r.ownership === "CONSIGNED";
   const soon = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  const compositionOf = (filter: (r: AnyRow) => boolean) => ({
+    qty: sum(filter, (r) => Number(r.qty)),
+    value: sum(filter, (r) => Number(r.qty) * Number(r.unit_cost)),
+  });
+  const remainingByStatus = (data: AnyRow[] | null, status: string) =>
+    (data ?? [])
+      .filter((r: AnyRow) => r.status === status)
+      .reduce((a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0);
   return {
     configured: true,
     ownedQty: sum(owned, (r) => Number(r.qty)),
@@ -190,6 +275,19 @@ export async function getDashboard() {
       (a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0),
     receivablesOutstanding: (receivables.data ?? []).reduce(
       (a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0),
+    revenue14,
+    topProducts,
+    stockComposition: {
+      ownedOwn: compositionOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE"),
+      consignedOwn: compositionOf((r) => consigned(r) && r.location_kind === "OWN_WAREHOUSE"),
+      atPartners: compositionOf((r) => r.location_kind === "PARTNER_VIRTUAL"),
+    },
+    balances: {
+      payablesUnpaid: remainingByStatus(payables.data as AnyRow[] | null, "UNPAID"),
+      payablesPartial: remainingByStatus(payables.data as AnyRow[] | null, "PARTIAL"),
+      receivablesUnpaid: remainingByStatus(receivables.data as AnyRow[] | null, "UNPAID"),
+      receivablesPartial: remainingByStatus(receivables.data as AnyRow[] | null, "PARTIAL"),
+    },
     lowStock: ((productStock.data ?? []) as AnyRow[]).filter(
       (r) => Number(r.total_qty) <= (minMap.get(r.product_id) ?? 0)
     ),

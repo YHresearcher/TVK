@@ -1,5 +1,6 @@
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
-import { getDashboard } from "@/lib/queries";
+import { BarChart, DonutChart, HBarList, formatCompactVND } from "@/components/Charts";
+import { getCurrentProfile, getDashboard } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 }
 
 export default async function DashboardPage() {
-  const d = await getDashboard();
+  const [d, profile] = await Promise.all([getDashboard(), getCurrentProfile()]);
   if (!d.configured) {
     return (
       <>
@@ -37,6 +38,72 @@ export default async function DashboardPage() {
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" />
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ chúng ta" />
       </div>
+
+      {(() => {
+        const role = profile.data?.role;
+        const canSeeMoney = role === "OWNER" || role === "ACCOUNTING";
+        const comp = d.stockComposition;
+        const compSegments = [
+          { label: "Hàng của mình tại kho", seg: comp.ownedOwn, color: "#10b981" },
+          { label: "Hàng ký gửi tại kho", seg: comp.consignedOwn, color: "#f59e0b" },
+          { label: "Hàng tại đối tác", seg: comp.atPartners, color: "#0ea5e9" },
+        ].map((s) => ({
+          label: s.label,
+          value: canSeeMoney ? s.seg.value : s.seg.qty,
+          color: s.color,
+        }));
+        const compTotal = compSegments.reduce((a, s) => a + s.value, 0);
+        return (
+          <>
+            <div className="mt-6 grid gap-6 lg:grid-cols-3">
+              {canSeeMoney && (
+                <Card title="Doanh thu 14 ngày gần nhất" className="lg:col-span-2">
+                  <BarChart data={d.revenue14} />
+                </Card>
+              )}
+              <Card title="Cơ cấu tồn kho">
+                <p className="mb-3 text-xs text-slate-500">
+                  {canSeeMoney ? "Theo giá trị vốn" : "Theo số lượng"}
+                </p>
+                <DonutChart
+                  segments={compSegments}
+                  format={canSeeMoney ? formatCompactVND : (v) => formatNumber(v)}
+                  centerLabel={canSeeMoney ? formatCompactVND(compTotal) : formatNumber(compTotal)}
+                  centerSub="Tổng tồn kho"
+                />
+              </Card>
+            </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              {canSeeMoney && (
+                <Card title="Công nợ theo trạng thái">
+                  <HBarList
+                    data={[
+                      { label: "Phải trả — chưa thanh toán", value: d.balances.payablesUnpaid, color: "#f43f5e" },
+                      { label: "Phải trả — thanh toán một phần", value: d.balances.payablesPartial, color: "#f59e0b" },
+                      { label: "Phải thu — chưa thanh toán", value: d.balances.receivablesUnpaid, color: "#0ea5e9" },
+                      { label: "Phải thu — thanh toán một phần", value: d.balances.receivablesPartial, color: "#8b5cf6" },
+                    ]}
+                  />
+                </Card>
+              )}
+              <Card title="Top 5 sản phẩm bán chạy (30 ngày)">
+                {d.topProducts.length === 0 ? (
+                  <EmptyState message="Chưa có sản phẩm nào được bán trong 30 ngày qua." />
+                ) : (
+                  <HBarList
+                    data={d.topProducts.map((p) => ({
+                      label: `${p.sku} — ${p.name}`,
+                      value: Number(p.qty_sold),
+                      color: "#2563eb",
+                    }))}
+                    format={(v) => formatNumber(v)}
+                  />
+                )}
+              </Card>
+            </div>
+          </>
+        );
+      })()}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title="Hàng sắp hết (bằng hoặc dưới mức tối thiểu)">

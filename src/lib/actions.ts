@@ -330,6 +330,249 @@ export async function confirmConsignmentReceiptAction(formData: FormData) {
   revalidatePath("/inventory");
 }
 
+// ------------------------------------------------------- import từ Excel
+interface ImportPayloadRow {
+  code?: unknown;
+  altCodes?: unknown;
+  name?: unknown;
+  brand?: unknown;
+  fitment?: unknown;
+  unit?: unknown;
+  qty?: unknown;
+  costVnd?: unknown;
+  usd?: unknown;
+  salePrice?: unknown;
+}
+
+/**
+ * Import a whole stock-in receipt (PN or NK) from a JSON payload produced by
+ * the /import page. Unit costs are recomputed here — the client's preview is
+ * never trusted. Products are matched by primary code or any equivalent code;
+ * unknown codes can optionally auto-create the product (codes + fitment too).
+ */
+export async function importStockAction(formData: FormData) {
+  const supabase = await db();
+  let payload: AnyRow;
+  try {
+    payload = JSON.parse(str(formData, "payload"));
+  } catch {
+    throw new Error("Dữ liệu import không hợp lệ.");
+  }
+  const kind = payload.kind === "NK" ? "NK" : "PN";
+  const supplierId = String(payload.supplierId ?? "");
+  const warehouseId = String(payload.warehouseId ?? "");
+  if (!supplierId) throw new Error("Cần chọn nhà cung cấp.");
+  if (!warehouseId) throw new Error("Cần chọn kho nhập.");
+  const tyGia = Number(payload.tyGia) || 0;
+  const vatPct = Number(payload.vatPct) || 0;
+  const autoCreate = !!payload.autoCreate;
+  const confirmNow = !!payload.confirmNow;
+  const rawRows: ImportPayloadRow[] = Array.isArray(payload.rows) ? payload.rows : [];
+  if (!rawRows.length) throw new Error("File không có dòng nào để nhập.");
+
+  // Catalog snapshots for matching (case-insensitive, trimmed).
+  const { data: allProducts } = await supabase.from("products").select("id, sku").limit(5000);
+  const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
+  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
+  const bySku = new Map<string, string>(
+    ((allProducts ?? []) as AnyRow[]).map(
+      (p): [string, string] => [norm(p.sku), p.id as string]
+    )
+  );
+  const byCode = new Map<string, string>(
+    ((allCodes ?? []) as AnyRow[]).map(
+      (c): [string, string] => [norm(c.code), c.product_id as string]
+    )
+  );
+
+  const items: { product_id: string; qty: number; unit_cost: number }[] = [];
+
+  for (const r of rawRows) {
+    const code = String(r.code ?? "").trim();
+    const qty = Math.trunc(Number(r.qty) || 0);
+    const costVnd = Number(r.costVnd) || 0;
+    const usd = Number(r.usd) || 0;
+    const unitCost =
+      costVnd > 0 ? costVnd : usd > 0 ? Math.round(usd * tyGia * (1 + vatPct / 100)) : 0;
+    const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
+      .map((a) => String(a ?? "").trim())
+      .filter(Boolean);
+    if (!code || qty <= 0 || unitCost <= 0) continue;
+
+    let productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
+    if (!productId) {
+      for (const alt of altCodes) {
+        productId = bySku.get(norm(alt)) ?? byCode.get(norm(alt));
+        if (productId) break;
+      }
+    }
+
+    if (!productId) {
+      if (!autoCreate) continue;
+      const created = must(
+        await supabase
+          .from("products")
+          .insert({
+            sku: code,
+            name: String(r.name ?? "").trim() || code,
+            brand: String(r.brand ?? "").trim() || null,
+            unit: String(r.unit ?? "").trim() || "Cái",
+            retail_price: 0,
+            garage_price: 0,
+            wholesale_price: Number(r.salePrice) || 0,
+            min_stock: 0,
+          })
+          .select("id")
+          .single(),
+        "Tạo sản phẩm từ import"
+      );
+      productId = created.id as string;
+      bySku.set(norm(code), productId);
+
+      // Primary code as OEM + every equivalent code; conflicts are ignored
+      // (the code may already be registered to this product).
+      const codeRows = [
+        { product_id: productId, code, code_kind: "OEM" },
+        ...altCodes
+          .filter((a) => norm(a) !== norm(code))
+          .map((a) => ({ product_id: productId, code: a, code_kind: "EQUIVALENT" })),
+      ];
+      const seenCodes = new Set<string>();
+      for (const cr of codeRows) {
+        const key = `${norm(cr.code)}|${cr.code_kind}`;
+        if (seenCodes.has(key)) continue;
+        seenCodes.add(key);
+        if (byCode.get(norm(cr.code)) === productId) continue;
+        await supabase.from("product_codes").insert(cr);
+        byCode.set(norm(cr.code), productId);
+      }
+
+      // Fitment: the free-text "Dòng xe" goes into vehicles.model, mirroring
+      // createFitmentAction's vehicle + product_fitments inserts.
+      const fitment = String(r.fitment ?? "").trim();
+      if (fitment) {
+        const vehicle = {
+          make: "",
+          model: fitment,
+          year_from: null,
+          year_to: null,
+          engine: null,
+        };
+        let vehicleId: string | undefined;
+        const inserted = await supabase
+          .from("vehicles")
+          .insert(vehicle)
+          .select("id")
+          .single();
+        if (!inserted.error) {
+          vehicleId = inserted.data.id;
+        } else {
+          const { data } = await supabase
+            .from("vehicles")
+            .select("id")
+            .eq("make", vehicle.make)
+            .eq("model", vehicle.model)
+            .limit(1)
+            .maybeSingle();
+          vehicleId = data?.id;
+        }
+        if (vehicleId) {
+          await supabase
+            .from("product_fitments")
+            .insert({ product_id: productId, vehicle_id: vehicleId });
+        }
+      }
+    } else if (!byCode.has(norm(code)) && bySku.get(norm(code)) !== productId) {
+      // Matched via an equivalent code: register the row's primary code too.
+      await supabase
+        .from("product_codes")
+        .insert({ product_id: productId, code, code_kind: "OEM" });
+      byCode.set(norm(code), productId);
+    }
+
+    items.push({ product_id: productId, qty, unit_cost: unitCost });
+  }
+
+  if (!items.length)
+    throw new Error(
+      "Không có dòng hợp lệ nào để nhập (kiểm tra mã hàng, số lượng và giá vốn)."
+    );
+
+  const me = await userId();
+  const receiptDate = String(payload.receiptDate ?? "").trim() || undefined;
+
+  if (kind === "PN") {
+    const receipt = must(
+      await supabase
+        .from("purchase_receipts")
+        .insert({
+          supplier_id: supplierId,
+          warehouse_id: warehouseId,
+          receipt_date: receiptDate,
+          supplier_invoice_no: String(payload.supplierInvoiceNo ?? "").trim() || null,
+          created_by: me,
+        })
+        .select("id")
+        .single(),
+      "Tạo phiếu nhập mua"
+    );
+    done(
+      await supabase.from("purchase_receipt_items").insert(
+        items.map((i) => ({
+          receipt_id: receipt.id,
+          product_id: i.product_id,
+          qty: i.qty,
+          unit_cost: i.unit_cost,
+        }))
+      ),
+      "Thêm dòng phiếu nhập"
+    );
+    if (confirmNow) {
+      const { error } = await supabase.rpc("confirm_purchase_receipt", {
+        p_receipt_id: receipt.id,
+      });
+      if (error) throw new Error(error.message);
+    }
+    revalidatePath("/stock-in");
+    revalidatePath("/inventory");
+    redirect("/stock-in?tab=purchase&ok=1");
+  }
+
+  const receipt = must(
+    await supabase
+      .from("consignment_receipts")
+      .insert({
+        supplier_id: supplierId,
+        warehouse_id: warehouseId,
+        receipt_date: receiptDate,
+        created_by: me,
+      })
+      .select("id")
+      .single(),
+    "Tạo phiếu nhận ký gửi"
+  );
+  done(
+    await supabase.from("consignment_receipt_items").insert(
+      items.map((i) => ({
+        receipt_id: receipt.id,
+        product_id: i.product_id,
+        qty: i.qty,
+        consignment_price: i.unit_cost,
+      }))
+    ),
+    "Thêm dòng phiếu nhập"
+  );
+  if (confirmNow) {
+    const { error } = await supabase.rpc("confirm_consignment_receipt", {
+      p_receipt_id: receipt.id,
+    });
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath("/stock-in");
+  revalidatePath("/inventory");
+  redirect("/stock-in?tab=consignment&ok=1");
+}
+
 // -------------------------------------------------------- consignment out
 export async function createConsignmentOutAction(formData: FormData) {
   const supabase = await db();

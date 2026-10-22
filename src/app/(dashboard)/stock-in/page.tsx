@@ -7,7 +7,7 @@ import {
   createConsignmentReceiptAction,
   createPurchaseReceiptAction,
 } from "@/lib/actions";
-import { listConsignmentReceipts, listLocations, listProducts, listPurchaseReceipts, listSuppliers } from "@/lib/queries";
+import { buildProductCodeMap, listConsignmentReceipts, listLocations, listProductCodes, listProducts, listPurchaseReceipts, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
 import type { AnyRow } from "@/lib/types";
 
@@ -19,13 +19,15 @@ export default async function StockInPage({
   searchParams: { tab?: string; ok?: string };
 }) {
   const tab = searchParams.tab === "consignment" ? "consignment" : "purchase";
-  const [suppliers, locations, products, purchases, consignments] = await Promise.all([
+  const [suppliers, locations, products, purchases, consignments, productCodes] = await Promise.all([
     listSuppliers(),
     listLocations(),
     listProducts(),
     listPurchaseReceipts(),
     listConsignmentReceipts(),
+    listProductCodes(),
   ]);
+  const codeMap = buildProductCodeMap(products.data, productCodes.data);
   const configured = suppliers.configured;
   const warehouses = locations.data.filter((l) => l.location_kind === "OWN_WAREHOUSE");
   const supplierOptions = suppliers.data.map((s) => ({ value: s.id, label: s.name }));
@@ -58,7 +60,7 @@ export default async function StockInPage({
                 <div><label className={labelCls}>Ngày nhập</label><input name="receipt_date" type="date" className={inputCls} /></div>
                 <div><label className={labelCls}>Số hoá đơn của nhà cung cấp</label><input name="supplier_invoice_no" className={inputCls} /></div>
               </div>
-              <ItemsRows fields={[
+              <ItemsRows codeMap={codeMap} fields={[
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty", label: "Số lượng", type: "number" },
                 { name: "unit_cost", label: "Đơn giá vốn (₫)", type: "number", step: "1000" },
@@ -84,7 +86,7 @@ export default async function StockInPage({
                 <div><label className={labelCls}>Ngày nhập</label><input name="receipt_date" type="date" className={inputCls} /></div>
                 <div><label className={labelCls}>Hạn trả (để trống = mặc định của nhà cung cấp)</label><input name="return_by_date" type="date" className={inputCls} /></div>
               </div>
-              <ItemsRows fields={[
+              <ItemsRows codeMap={codeMap} fields={[
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty", label: "Số lượng", type: "number" },
                 { name: "consignment_price", label: "Giá ký gửi (₫)", type: "number", step: "1000" },

@@ -6,7 +6,7 @@ import {
   createConsumptionReportAction,
   setConsumptionReportStatusAction,
 } from "@/lib/actions";
-import { listAllocations, listBatchStock, listConsumptionReports, listPartners, listProducts } from "@/lib/queries";
+import { buildProductCodeMap, listAllocations, listBatchStock, listConsumptionReports, listPartners, listProductCodes, listProducts } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -16,13 +16,15 @@ export default async function PartnerConsumptionPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [reports, allocations, partners, products, batchStock] = await Promise.all([
+  const [reports, allocations, partners, products, batchStock, productCodes] = await Promise.all([
     listConsumptionReports(),
     listAllocations(),
     listPartners(),
     listProducts(),
     listBatchStock(),
+    listProductCodes(),
   ]);
+  const codeMap = buildProductCodeMap(products.data, productCodes.data);
   const configured = reports.configured;
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
@@ -61,7 +63,7 @@ export default async function PartnerConsumptionPage({
                 <div><label className={labelCls}>Từ ngày *</label><input name="period_from" type="date" required className={inputCls} /></div>
                 <div><label className={labelCls}>Đến ngày *</label><input name="period_to" type="date" required className={inputCls} /></div>
               </div>
-              <ItemsRows fields={[
+              <ItemsRows codeMap={codeMap} fields={[
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty_consumed", label: "Số lượng đã tiêu thụ", type: "number" },
               ]} initialRows={2} />
@@ -103,7 +105,7 @@ export default async function PartnerConsumptionPage({
                 <div><label className={labelCls}>Báo cáo tiêu thụ (không bắt buộc)</label>
                   <select name="report_id" className={inputCls}><option value="">— Không —</option>{reportOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
               </div>
-              <ItemsRows fields={[
+              <ItemsRows codeMap={codeMap} fields={[
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "batch_id", label: "Lô tại đối tác", type: "select", options: batchOptions },
                 { name: "nature", label: "Nguồn hàng", type: "select", options: [
