@@ -299,20 +299,42 @@ export default function ImportExcel({
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="payload" value={JSON.stringify(payload)} />
-      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-        <label className={labelCls}>File danh mục (.xlsx / .csv)</label>
-        <div className="mt-1 flex flex-wrap items-center gap-3">
+      <div className="rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/70 px-4 py-4">
+        <div className="flex items-center gap-2">
+          <svg
+            className="h-5 w-5 text-blue-600"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+            />
+          </svg>
+          <label className="text-sm font-semibold text-blue-950">
+            File danh mục (.xlsx / .csv)
+          </label>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
           <input
             type="file"
             accept=".xlsx,.csv"
             onChange={(e) => handleFile(e.target.files?.[0])}
-            className={`${inputCls} max-w-md flex-1`}
+            className={`${inputCls} max-w-md flex-1 bg-white`}
           />
-          <a href="/mau-import-nhap-hang.xlsx" download className={btnCls}>
+          <a
+            href="/mau-import-nhap-hang.xlsx"
+            download
+            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-500"
+          >
             Tải file mẫu (.xlsx)
           </a>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-blue-900/70">
           Chưa có file đúng chuẩn? Tải file mẫu về, điền hàng hoá theo mẫu rồi
           chọn file tải lên — hệ thống sẽ kiểm tra định dạng và cho xem trước
           ở bên dưới trước khi nhập.

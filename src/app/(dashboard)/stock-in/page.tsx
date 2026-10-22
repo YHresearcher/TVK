@@ -44,8 +44,8 @@ export default async function StockInPage({
   const productOptions = products.data.map((p) => ({ value: p.id, label: `${p.sku} — ${p.name}` }));
   const supplierName = new Map(suppliers.data.map((s) => [s.id, s.name]));
 
-  const tabCls = (active: boolean) =>
-    `rounded-md px-4 py-2 text-sm font-medium ${active ? "bg-blue-600 text-white" : "bg-white border border-slate-300 text-slate-700"}`;
+  const tabCls = (active: boolean, activeCls: string) =>
+    `rounded-md px-4 py-2 text-sm font-medium ${active ? activeCls : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"}`;
 
   return (
     <>
@@ -53,9 +53,9 @@ export default async function StockInPage({
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="mb-6 flex gap-2">
-        <Link href="/stock-in?tab=purchase" className={tabCls(tab === "purchase")}>Phiếu nhập mua (PN)</Link>
-        <Link href="/stock-in?tab=consignment" className={tabCls(tab === "consignment")}>Phiếu nhận ký gửi (NK)</Link>
-        <Link href="/stock-in?tab=import" className={tabCls(tab === "import")}>Nhập từ Excel</Link>
+        <Link href="/stock-in?tab=purchase" className={tabCls(tab === "purchase", "bg-blue-600 text-white")}>Phiếu nhập mua (PN)</Link>
+        <Link href="/stock-in?tab=consignment" className={tabCls(tab === "consignment", "bg-amber-500 text-white")}>Phiếu nhận ký gửi (NK)</Link>
+        <Link href="/stock-in?tab=import" className={tabCls(tab === "import", "bg-emerald-600 text-white")}>Nhập từ Excel</Link>
       </div>
 
       {tab === "import" ? (

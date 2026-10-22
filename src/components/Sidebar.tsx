@@ -13,6 +13,8 @@ interface NavItem {
 interface NavGroup {
   id: string;
   title: string;
+  /** Màu chấm nhấn riêng cho từng nhóm. */
+  dot: string;
   items: NavItem[];
 }
 
@@ -22,6 +24,7 @@ const GROUPS: NavGroup[] = [
   {
     id: "hang-hoa-kho",
     title: "Hàng hoá & Kho",
+    dot: "bg-sky-400",
     items: [
       { href: "/products", label: "Sản phẩm" },
       { href: "/inventory", label: "Tồn kho theo lô" },
@@ -31,6 +34,7 @@ const GROUPS: NavGroup[] = [
   {
     id: "ky-gui",
     title: "Ký gửi",
+    dot: "bg-amber-400",
     items: [
       { href: "/consignment-out", label: "Gửi ký gửi" },
       { href: "/partner-consumption", label: "Tiêu thụ của đối tác" },
@@ -39,6 +43,7 @@ const GROUPS: NavGroup[] = [
   {
     id: "ban-hang-hoa-don",
     title: "Bán hàng & Hoá đơn",
+    dot: "bg-emerald-400",
     items: [
       { href: "/sales", label: "Bán hàng" },
       { href: "/invoices", label: "Hoá đơn GTGT" },
@@ -48,6 +53,7 @@ const GROUPS: NavGroup[] = [
   {
     id: "cong-no-bao-cao",
     title: "Công nợ & Báo cáo",
+    dot: "bg-violet-400",
     items: [
       { href: "/payables", label: "Phải trả nhà cung cấp" },
       { href: "/receivables", label: "Phải thu đối tác" },
@@ -57,6 +63,7 @@ const GROUPS: NavGroup[] = [
   {
     id: "danh-muc",
     title: "Danh mục",
+    dot: "bg-rose-400",
     items: [
       { href: "/suppliers", label: "Nhà cung cấp" },
       { href: "/partners", label: "Đối tác" },
@@ -66,7 +73,7 @@ const GROUPS: NavGroup[] = [
 
 const BOTTOM_ITEM: NavItem = { href: "/settings", label: "Cài đặt" };
 
-const STORAGE_KEY = "tvk-nav-open-groups";
+const STORAGE_KEY = "tvk-nav-open-group";
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
@@ -89,23 +96,16 @@ export default function Sidebar({
   const pathname = usePathname();
   const currentGroup = activeGroupId(pathname);
 
-  // Nhóm chứa trang đang xem luôn mở; các nhóm khác theo lựa chọn đã lưu
-  // của người dùng (localStorage), mặc định đóng cho gọn.
-  const [open, setOpen] = useState<Record<string, boolean>>(() =>
-    currentGroup ? { [currentGroup]: true } : {}
-  );
+  // Kiểu accordion: tại một thời điểm chỉ MỘT nhóm mở — mở nhóm khác thì
+  // nhóm đang mở tự thu lại. Nhóm chứa trang đang xem tự mở khi chuyển
+  // trang; lựa chọn mở/thu của người dùng được nhớ trong localStorage.
+  const [openId, setOpenId] = useState<string | null>(currentGroup);
 
   useEffect(() => {
+    if (currentGroup) return;
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as Record<string, boolean>;
-        setOpen((prev) => {
-          const next = { ...saved, ...prev };
-          if (currentGroup) next[currentGroup] = true;
-          return next;
-        });
-      }
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved) setOpenId(saved);
     } catch {
       // Không đọc được localStorage: dùng trạng thái mặc định.
     }
@@ -114,15 +114,14 @@ export default function Sidebar({
   }, []);
 
   useEffect(() => {
-    if (!currentGroup) return;
-    setOpen((prev) => (prev[currentGroup] ? prev : { ...prev, [currentGroup]: true }));
+    if (currentGroup) setOpenId(currentGroup);
   }, [currentGroup]);
 
   function toggleGroup(id: string) {
-    setOpen((prev) => {
-      const next = { ...prev, [id]: !prev[id] };
+    setOpenId((prev) => {
+      const next = prev === id ? null : id;
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        window.localStorage.setItem(STORAGE_KEY, next ?? "");
       } catch {
         // Bỏ qua nếu trình duyệt chặn lưu trữ.
       }
@@ -138,7 +137,7 @@ export default function Sidebar({
     }`;
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col bg-slate-900 text-slate-200">
+    <aside className="flex w-60 shrink-0 flex-col bg-gradient-to-b from-slate-900 to-slate-950 text-slate-200">
       <div className="border-b border-slate-700 px-5 py-4">
         <p className="text-lg font-bold tracking-wide text-white">TVK</p>
         <p className="text-xs text-slate-400">Quản lý kho phụ tùng</p>
@@ -153,7 +152,7 @@ export default function Sidebar({
         </ul>
 
         {GROUPS.map((group) => {
-          const expanded = !!open[group.id];
+          const expanded = openId === group.id;
           const containsActive = group.id === currentGroup;
           return (
             <div key={group.id} className="mt-3">
@@ -167,7 +166,10 @@ export default function Sidebar({
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                <span>{group.title}</span>
+                <span className="flex items-center gap-2">
+                  <span className={`h-1.5 w-1.5 rounded-full ${group.dot}`} />
+                  {group.title}
+                </span>
                 <svg
                   className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
                   viewBox="0 0 20 20"
