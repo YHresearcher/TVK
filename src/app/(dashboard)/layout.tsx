@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import HelpButton from "@/components/HelpButton";
+import MobileTopBar from "@/components/MobileTopBar";
 import Sidebar from "@/components/Sidebar";
 import { signOutAction } from "@/lib/actions";
 import { getCurrentProfile } from "@/lib/queries";
@@ -56,12 +57,18 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar userName={userName} role={role} />
-      <main className="min-w-0 flex-1 px-6 py-6">
-        <div className="mb-4 flex items-center justify-end">
-          <HelpButton role={rawRole} />
-        </div>
-        {children}
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Thanh trên cùng cho màn hình nhỏ: hamburger + Trợ giúp.
+            Từ lg trở lên ẩn — khi đó dùng sidebar tĩnh và hàng Trợ giúp
+            bên dưới như cũ. */}
+        <MobileTopBar role={rawRole} />
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6">
+          <div className="mb-4 hidden items-center justify-end lg:flex">
+            <HelpButton role={rawRole} />
+          </div>
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

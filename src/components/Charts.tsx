@@ -226,7 +226,7 @@ export function HBarList({
     <ul className="space-y-3">
       {data.map((d, i) => (
         <li key={i} className="flex items-center gap-3">
-          <span className="w-44 shrink-0 truncate text-xs text-slate-600" title={d.label}>
+          <span className="w-24 shrink-0 truncate text-xs text-slate-600 sm:w-44" title={d.label}>
             {d.label}
           </span>
           <span className="h-4 flex-1 overflow-hidden rounded bg-slate-100">

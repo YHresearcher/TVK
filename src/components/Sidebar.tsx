@@ -79,6 +79,13 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+/**
+ * Thanh trên cùng cho màn hình nhỏ — do layout (server component) render
+ * tách khỏi Sidebar (client component). Nút hamburger phát sự kiện này để
+ * Sidebar mở/đóng ngăn kéo điều hướng mà hai bên không cần dùng chung state.
+ */
+export const MOBILE_NAV_TOGGLE_EVENT = "tvk:toggle-mobile-nav";
+
 function activeGroupId(pathname: string): string | null {
   for (const g of GROUPS) {
     if (g.items.some((i) => isActive(pathname, i.href))) return g.id;
@@ -117,6 +124,30 @@ export default function Sidebar({
     if (currentGroup) setOpenId(currentGroup);
   }, [currentGroup]);
 
+  // Ngăn kéo điều hướng trên màn hình nhỏ (< lg): mặc định đóng, mở bằng
+  // nút hamburger trên thanh trên cùng (layout render). Chuyển trang thì
+  // tự đóng; bấm phím Escape cũng đóng.
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    const onToggle = () => setMobileOpen((v) => !v);
+    window.addEventListener(MOBILE_NAV_TOGGLE_EVENT, onToggle);
+    return () => window.removeEventListener(MOBILE_NAV_TOGGLE_EVENT, onToggle);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
   function toggleGroup(id: string) {
     setOpenId((prev) => {
       const next = prev === id ? null : id;
@@ -137,7 +168,20 @@ export default function Sidebar({
     }`;
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col bg-gradient-to-b from-slate-900 to-slate-950 text-slate-200">
+    <>
+      {/* Lớp phủ tối sau ngăn kéo trên màn hình nhỏ — bấm vào để đóng. */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/60 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col bg-gradient-to-b from-slate-900 to-slate-950 text-slate-200 transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
       <div className="border-b border-slate-700 px-5 py-4">
         <p className="text-lg font-bold tracking-wide text-white">TVK</p>
         <p className="text-xs text-slate-400">Quản lý kho phụ tùng</p>
@@ -145,7 +189,11 @@ export default function Sidebar({
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
           <li>
-            <Link href={TOP_ITEM.href} className={itemCls(TOP_ITEM.href)}>
+            <Link
+              href={TOP_ITEM.href}
+              className={itemCls(TOP_ITEM.href)}
+              onClick={() => setMobileOpen(false)}
+            >
               {TOP_ITEM.label}
             </Link>
           </li>
@@ -187,7 +235,11 @@ export default function Sidebar({
                 <ul className="mt-1 space-y-1 pl-2">
                   {group.items.map((item) => (
                     <li key={item.href}>
-                      <Link href={item.href} className={itemCls(item.href)}>
+                      <Link
+                        href={item.href}
+                        className={itemCls(item.href)}
+                        onClick={() => setMobileOpen(false)}
+                      >
                         {item.label}
                       </Link>
                     </li>
@@ -200,7 +252,11 @@ export default function Sidebar({
 
         <ul className="mt-3 space-y-1 border-t border-slate-700 pt-3">
           <li>
-            <Link href={BOTTOM_ITEM.href} className={itemCls(BOTTOM_ITEM.href)}>
+            <Link
+              href={BOTTOM_ITEM.href}
+              className={itemCls(BOTTOM_ITEM.href)}
+              onClick={() => setMobileOpen(false)}
+            >
               {BOTTOM_ITEM.label}
             </Link>
           </li>
@@ -218,6 +274,7 @@ export default function Sidebar({
           </button>
         </form>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
