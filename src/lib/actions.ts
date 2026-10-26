@@ -347,9 +347,12 @@ interface ImportPayloadRow {
  * the /import page. Prices are recomputed here — the client's preview is
  * never trusted. Tỷ giá, VAT and % lợi nhuận from the form apply to the
  * whole file: unit cost = GiaUSD × Tỷ giá × (1 + VAT%), selling price =
- * unit cost × (1 + Lợi nhuận%). Products are matched by primary code or
- * any equivalent code; unknown codes can optionally auto-create the
- * product (codes + fitment too).
+ * unit cost × (1 + Lợi nhuận%). The receipt also stores rounding_adjustment
+ * (migration 0010): round(sum of exact line values) minus sum of rounded
+ * lines, so the receipt total matches the accountant's convention while
+ * per-line prices stay invoice-compatible. Products are matched by primary
+ * code or any equivalent code; unknown codes can optionally auto-create
+ * the product (codes + fitment too).
  */
 export async function importStockAction(formData: FormData) {
   const supabase = await db();
@@ -396,6 +399,14 @@ export async function importStockAction(formData: FormData) {
     const unitCost = usd > 0 ? Math.round(usd * tyGia * (1 + vatPct / 100)) : 0;
     return { unitCost, salePrice: Math.round(unitCost * (1 + profitPct / 100)) };
   };
+  // Chênh lệch làm tròn (khớp kế toán, migration 0010): tổng làm tròn một
+  // lần ở cuối từ giá trị chính xác của từng dòng, trừ đi tổng các dòng
+  // (đơn giá đã làm tròn). Được lưu cùng phiếu và cộng vào total_amount
+  // khi xác nhận, nên mọi số nguyên hiển thị đều cộng khớp tuyệt đối.
+  // Cách tính tổng chính xác phải khớp từng phép tính với bản xem trước ở
+  // client (cùng thứ tự dòng, cùng biểu thức) để hai bên ra cùng một số.
+  let linesSum = 0;
+  let exactSum = 0;
   // Kiểm soát phía máy chủ: kiểm tra TOÀN BỘ file trước khi ghi bất cứ thứ
   // gì. Bất kỳ dòng nào không hợp lệ cũng từ chối cả import (không nhập
   // một phần, không tạo sản phẩm dở dang), kể cả khi giao diện bị bỏ qua.
@@ -436,6 +447,9 @@ export async function importStockAction(formData: FormData) {
       .map((a) => String(a ?? "").trim())
       .filter(Boolean);
     if (!code || qty <= 0 || unitCost <= 0) continue; // đã chặn ở vòng kiểm tra trước
+
+    linesSum += qty * unitCost;
+    exactSum += qty * (Number(r.usd) || 0) * tyGia * (1 + vatPct / 100);
 
     let productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
     if (!productId) {
@@ -539,6 +553,8 @@ export async function importStockAction(formData: FormData) {
       "Không có dòng hợp lệ nào để nhập (kiểm tra mã hàng, số lượng và giá vốn)."
     );
 
+  const roundingAdjustment = Math.round(exactSum) - linesSum;
+
   const me = await userId();
   const receiptDate = String(payload.receiptDate ?? "").trim() || undefined;
 
@@ -551,6 +567,7 @@ export async function importStockAction(formData: FormData) {
           warehouse_id: warehouseId,
           receipt_date: receiptDate,
           supplier_invoice_no: String(payload.supplierInvoiceNo ?? "").trim() || null,
+          rounding_adjustment: roundingAdjustment,
           created_by: me,
         })
         .select("id")
@@ -586,6 +603,7 @@ export async function importStockAction(formData: FormData) {
         supplier_id: supplierId,
         warehouse_id: warehouseId,
         receipt_date: receiptDate,
+        rounding_adjustment: roundingAdjustment,
         created_by: me,
       })
       .select("id")

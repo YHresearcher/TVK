@@ -265,6 +265,17 @@ export default function ImportExcel({
   const errorCount = preview.length - importable.length;
   const totalQty = importable.reduce((a, r) => a + r.qty, 0);
   const totalAmount = importable.reduce((a, r) => a + r.qty * r.unitCost, 0);
+  // Tổng khớp kế toán: làm tròn một lần ở cuối từ giá trị chính xác của
+  // từng dòng; chênh lệch với tổng các dòng (đơn giá đã làm tròn) được
+  // hiện rõ và lưu cùng phiếu (migration 0010). Cách tính phải khớp từng
+  // phép tính với máy chủ (cùng thứ tự dòng, cùng biểu thức).
+  const exactTotal = Math.round(
+    importable.reduce(
+      (a, r) => a + Math.trunc(r.qty) * r.usd * tyGia * (1 + vatPct / 100),
+      0
+    )
+  );
+  const roundingAdjustment = exactTotal - totalAmount;
   // Kiểm soát chặt: còn bất kỳ dòng lỗi nào là không cho nhập (không nhập một phần).
   const canSubmit =
     rawRows !== null &&
@@ -434,7 +445,9 @@ export default function ImportExcel({
         bộ sản phẩm trong file (thông tin chung tại một thời điểm). Công thức:
         Đơn giá VND + VAT = GiaUSD × Tỷ giá × (1 + VAT%); Thành tiền = Số
         lượng × Đơn giá VND + VAT; Giá bán = Đơn giá VND + VAT × (1 + %
-        lợi nhuận).
+        lợi nhuận). Total ở cuối bảng khớp với kế toán: tổng các dòng (đơn
+        giá đã làm tròn) cộng chênh lệch làm tròn — chênh lệch này được lưu
+        cùng phiếu nhập.
       </p>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -569,14 +582,43 @@ export default function ImportExcel({
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 bg-slate-50 font-medium">
+            {roundingAdjustment !== 0 && (
+              <tr className="border-t border-slate-200 bg-slate-50 font-medium">
+                <td className={tdCls} colSpan={4}>
+                  Tổng các dòng ({importable.length} dòng)
+                </td>
+                <td className={tdCls}>{formatNumber(totalQty)}</td>
+                <td className={tdCls}></td>
+                <td className={tdCls}></td>
+                <td className={tdNumCls}>{formatVND(totalAmount)}</td>
+                <td className={tdCls}></td>
+                <td className={tdCls}></td>
+              </tr>
+            )}
+            {roundingAdjustment !== 0 && (
+              <tr className="border-t border-slate-100 bg-slate-50">
+                <td className={tdCls} colSpan={4}>
+                  Chênh lệch làm tròn (khớp kế toán)
+                </td>
+                <td className={tdCls}></td>
+                <td className={tdCls}></td>
+                <td className={tdCls}></td>
+                <td className={tdNumCls}>
+                  {(roundingAdjustment > 0 ? "+" : "") +
+                    formatVND(roundingAdjustment)}
+                </td>
+                <td className={tdCls}></td>
+                <td className={tdCls}></td>
+              </tr>
+            )}
+            <tr className="border-t border-slate-200 bg-slate-50 font-bold">
               <td className={tdCls} colSpan={4}>
-                Tổng các dòng sẽ nhập ({importable.length} dòng)
+                Total giá nhập VND
               </td>
               <td className={tdCls}>{formatNumber(totalQty)}</td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
-              <td className={tdNumCls}>{formatVND(totalAmount)}</td>
+              <td className={tdNumCls}>{formatVND(exactTotal)}</td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
             </tr>

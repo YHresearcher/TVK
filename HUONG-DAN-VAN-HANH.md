@@ -199,9 +199,11 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **Lỗi** (đỏ) | Dòng không hợp lệ (thiếu mã, số lượng ≤ 0, thiếu GiaUSD, hàng mới mà thiếu tên…). **Còn bất kỳ dòng lỗi nào là hệ thống không cho nhập** — sửa trong file Excel rồi tải lại. |
 | **Trùng mã trong file** (vàng) | Mã xuất hiện từ 2 dòng trở lên trong cùng file — cần kiểm tra lại (thường là lỗi soạn file). |
 
-Ngoài trạng thái, bảng xem trước còn cho thấy **kết quả tính toán của từng dòng**: Đơn giá USD, Đơn giá VND + VAT, Thành tiền, và Giá bán; cuối bảng là **Total giá nhập VND** (tổng Thành tiền của tất cả các dòng sẽ nhập).
+Ngoài trạng thái, bảng xem trước còn cho thấy **kết quả tính toán của từng dòng**: Đơn giá USD, Đơn giá VND + VAT, Thành tiền, và Giá bán; cuối bảng là **Total giá nhập VND** — tổng khớp với kế toán (xem công thức).
 
 **Công thức áp dụng cho mọi dòng (Tỷ giá, VAT, % lợi nhuận trên form áp chung cho cả file):** Đơn giá VND + VAT = GiaUSD × Tỷ giá × (1 + VAT%). Thành tiền = Số lượng × Đơn giá VND + VAT. Giá bán = Đơn giá VND + VAT × (1 + % lợi nhuận) — với hàng mới, giá bán này thành giá bán sỉ ban đầu của sản phẩm. Ví dụ: GiaUSD 100, Tỷ giá 27.000, VAT 8%, Lợi nhuận 35% → Đơn giá VND + VAT 2.916.000; Giá bán 3.936.600; nhập 15 cái → Thành tiền 43.740.000.
+
+**Chênh lệch làm tròn (khớp kế toán):** đơn giá từng dòng được làm tròn về đồng chẵn (khớp hoá đơn nhà cung cấp), nên tổng các dòng có thể lệch vài chục đồng so với tổng làm tròn một lần ở cuối từ giá trị chính xác — đúng kiểu lệch 47 đồng từng gặp. Để tổng khớp tuyệt đối với kế toán, cuối bảng xem trước hiện thêm dòng **Chênh lệch làm tròn** (= Total làm tròn một lần − tổng các dòng, có thể âm) và **Total giá nhập VND** = tổng các dòng + chênh lệch. Chênh lệch này được lưu cùng phiếu nhập (cột `rounding_adjustment`) và cộng vào tổng phiếu khi xác nhận — mọi số nguyên hiển thị đều cộng khớp tuyệt đối, không giấu phần lẻ đi đâu.
 
 Sau khi bấm **Xác nhận nhập**: hệ thống kiểm tra lại toàn bộ ở máy chủ rồi mới ghi — phiếu tạo thành công sẽ **tự chuyển về đúng danh sách phiếu PN/NK ngay trong trang Nhập kho** để kiểm tra/xác nhận.
 
