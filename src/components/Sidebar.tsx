@@ -15,16 +15,33 @@ interface NavGroup {
   title: string;
   /** Màu chấm nhấn riêng cho từng nhóm. */
   dot: string;
+  /**
+   * Khung tab 3D màu sáng của nhóm: nền gradient nhạt, viền màu, cạnh dưới
+   * dày hơn + bóng đổ tạo chiều sâu — mỗi nhóm một màu cho dễ nhận biết.
+   */
+  card: string;
+  /** Nền của mục đang chọn trong nhóm. */
+  active: string;
   items: NavItem[];
 }
 
 const TOP_ITEM: NavItem = { href: "/dashboard", label: "Tổng quan" };
+const TOP_FRAME = {
+  card: "rounded-xl border-2 border-blue-300 border-b-4 border-b-blue-500 bg-gradient-to-b from-blue-100 to-blue-50 p-1.5 shadow-md",
+  active: "bg-blue-600 text-white shadow",
+};
+const BOTTOM_FRAME = {
+  card: "rounded-xl border-2 border-slate-300 border-b-4 border-b-slate-500 bg-gradient-to-b from-slate-100 to-white p-1.5 shadow-md",
+  active: "bg-slate-700 text-white shadow",
+};
 
 const GROUPS: NavGroup[] = [
   {
     id: "hang-hoa-kho",
     title: "Hàng hoá & Kho",
-    dot: "bg-sky-400",
+    dot: "bg-sky-500",
+    card: "rounded-xl border-2 border-sky-300 border-b-4 border-b-sky-500 bg-gradient-to-b from-sky-100 to-sky-50 p-1.5 shadow-md",
+    active: "bg-sky-500 text-white shadow",
     items: [
       { href: "/products", label: "Sản phẩm" },
       { href: "/inventory", label: "Tồn kho theo lô" },
@@ -34,7 +51,9 @@ const GROUPS: NavGroup[] = [
   {
     id: "ky-gui",
     title: "Ký gửi",
-    dot: "bg-amber-400",
+    dot: "bg-amber-500",
+    card: "rounded-xl border-2 border-amber-300 border-b-4 border-b-amber-500 bg-gradient-to-b from-amber-100 to-amber-50 p-1.5 shadow-md",
+    active: "bg-amber-500 text-white shadow",
     items: [
       { href: "/consignment-out", label: "Gửi ký gửi" },
       { href: "/partner-consumption", label: "Tiêu thụ của đối tác" },
@@ -43,7 +62,9 @@ const GROUPS: NavGroup[] = [
   {
     id: "ban-hang-hoa-don",
     title: "Bán hàng & Hoá đơn",
-    dot: "bg-emerald-400",
+    dot: "bg-emerald-500",
+    card: "rounded-xl border-2 border-emerald-300 border-b-4 border-b-emerald-500 bg-gradient-to-b from-emerald-100 to-emerald-50 p-1.5 shadow-md",
+    active: "bg-emerald-500 text-white shadow",
     items: [
       { href: "/sales", label: "Bán hàng" },
       { href: "/invoices", label: "Hoá đơn GTGT" },
@@ -53,7 +74,9 @@ const GROUPS: NavGroup[] = [
   {
     id: "cong-no-bao-cao",
     title: "Công nợ & Báo cáo",
-    dot: "bg-violet-400",
+    dot: "bg-violet-500",
+    card: "rounded-xl border-2 border-violet-300 border-b-4 border-b-violet-500 bg-gradient-to-b from-violet-100 to-violet-50 p-1.5 shadow-md",
+    active: "bg-violet-500 text-white shadow",
     items: [
       { href: "/payables", label: "Phải trả nhà cung cấp" },
       { href: "/receivables", label: "Phải thu đối tác" },
@@ -63,7 +86,9 @@ const GROUPS: NavGroup[] = [
   {
     id: "danh-muc",
     title: "Danh mục",
-    dot: "bg-rose-400",
+    dot: "bg-rose-500",
+    card: "rounded-xl border-2 border-rose-300 border-b-4 border-b-rose-500 bg-gradient-to-b from-rose-100 to-rose-50 p-1.5 shadow-md",
+    active: "bg-rose-500 text-white shadow",
     items: [
       { href: "/suppliers", label: "Nhà cung cấp" },
       { href: "/partners", label: "Đối tác" },
@@ -160,11 +185,13 @@ export default function Sidebar({
     });
   }
 
-  const itemCls = (href: string) =>
+  // Mục trong khung sáng: chữ đậm trên nền nhạt, mục đang chọn tô đặc
+  // màu của nhóm — nhìn là biết đang ở đâu.
+  const itemCls = (href: string, activeCls: string) =>
     `block rounded-md px-3 py-2 text-sm ${
       isActive(pathname, href)
-        ? "bg-blue-600 font-medium text-white"
-        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+        ? `font-medium ${activeCls}`
+        : "text-slate-700 hover:bg-white/80 hover:text-slate-900"
     }`;
 
   return (
@@ -186,36 +213,34 @@ export default function Sidebar({
         <p className="text-lg font-bold tracking-wide text-white">TVK</p>
         <p className="text-xs text-slate-400">Quản lý kho phụ tùng</p>
       </div>
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">
-          <li>
-            <Link
-              href={TOP_ITEM.href}
-              className={itemCls(TOP_ITEM.href)}
-              onClick={() => setMobileOpen(false)}
-            >
-              {TOP_ITEM.label}
-            </Link>
-          </li>
-        </ul>
+      <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
+        <div className={TOP_FRAME.card}>
+          <Link
+            href={TOP_ITEM.href}
+            className={itemCls(TOP_ITEM.href, TOP_FRAME.active)}
+            onClick={() => setMobileOpen(false)}
+          >
+            {TOP_ITEM.label}
+          </Link>
+        </div>
 
         {GROUPS.map((group) => {
           const expanded = openId === group.id;
           const containsActive = group.id === currentGroup;
           return (
-            <div key={group.id} className="mt-3">
+            <div key={group.id} className={group.card}>
               <button
                 type="button"
                 onClick={() => toggleGroup(group.id)}
                 aria-expanded={expanded}
-                className={`flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider ${
+                className={`flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ${
                   containsActive
-                    ? "text-white"
-                    : "text-slate-400 hover:text-slate-200"
+                    ? "text-slate-900"
+                    : "text-slate-700 hover:text-slate-900"
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  <span className={`h-1.5 w-1.5 rounded-full ${group.dot}`} />
+                  <span className={`h-2 w-2 rounded-full ${group.dot}`} />
                   {group.title}
                 </span>
                 <svg
@@ -232,12 +257,12 @@ export default function Sidebar({
                 </svg>
               </button>
               {expanded && (
-                <ul className="mt-1 space-y-1 pl-2">
+                <ul className="mt-1 space-y-1">
                   {group.items.map((item) => (
                     <li key={item.href}>
                       <Link
                         href={item.href}
-                        className={itemCls(item.href)}
+                        className={itemCls(item.href, group.active)}
                         onClick={() => setMobileOpen(false)}
                       >
                         {item.label}
@@ -250,17 +275,15 @@ export default function Sidebar({
           );
         })}
 
-        <ul className="mt-3 space-y-1 border-t border-slate-700 pt-3">
-          <li>
-            <Link
-              href={BOTTOM_ITEM.href}
-              className={itemCls(BOTTOM_ITEM.href)}
-              onClick={() => setMobileOpen(false)}
-            >
-              {BOTTOM_ITEM.label}
-            </Link>
-          </li>
-        </ul>
+        <div className={BOTTOM_FRAME.card}>
+          <Link
+            href={BOTTOM_ITEM.href}
+            className={itemCls(BOTTOM_ITEM.href, BOTTOM_FRAME.active)}
+            onClick={() => setMobileOpen(false)}
+          >
+            {BOTTOM_ITEM.label}
+          </Link>
+        </div>
       </nav>
       <div className="border-t border-slate-700 px-5 py-4">
         <p className="truncate text-sm font-medium text-white">{userName}</p>

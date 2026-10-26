@@ -275,6 +275,15 @@ export async function createPurchaseReceiptAction(formData: FormData) {
     }));
   if (!items.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
   done(await supabase.from("purchase_receipt_items").insert(items), "Thêm dòng phiếu nhập");
+  // Tick "Xác nhận ngay": xác nhận luôn trong cùng một thao tác, không để
+  // lại phiếu nháp — cùng cách làm như import (xác nhận ngay).
+  if (formData.get("confirm_now") === "on") {
+    const { error } = await supabase.rpc("confirm_purchase_receipt", {
+      p_receipt_id: receipt.id,
+    });
+    if (error) throw new Error(error.message);
+    revalidatePath("/inventory");
+  }
   revalidatePath("/stock-in");
   redirect("/stock-in?tab=purchase&ok=1");
 }
@@ -316,6 +325,15 @@ export async function createConsignmentReceiptAction(formData: FormData) {
     }));
   if (!items.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
   done(await supabase.from("consignment_receipt_items").insert(items), "Thêm dòng phiếu nhập");
+  // Tick "Xác nhận ngay": xác nhận luôn trong cùng một thao tác, không để
+  // lại phiếu nháp — cùng cách làm như import (xác nhận ngay).
+  if (formData.get("confirm_now") === "on") {
+    const { error } = await supabase.rpc("confirm_consignment_receipt", {
+      p_receipt_id: receipt.id,
+    });
+    if (error) throw new Error(error.message);
+    revalidatePath("/inventory");
+  }
   revalidatePath("/stock-in");
   redirect("/stock-in?tab=consignment&ok=1");
 }

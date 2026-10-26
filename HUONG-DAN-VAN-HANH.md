@@ -116,7 +116,7 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 
 ## PHẦN C — NHẬP HÀNG CHI TIẾT (giải thích từng mục)
 
-Trang **Nhập kho** có 3 nút: **Phiếu nhập mua (PN)** · **Phiếu nhận ký gửi (NK)** · **Nhập từ Excel**. Phiếu tạo ra ở trạng thái **Nháp**; chỉ khi bấm **Xác nhận** thì hàng mới thực sự vào kho (tạo lô + ghi sổ cái). Phiếu nháp sai có thể huỷ.
+Trang **Nhập kho** có 3 nút: **Phiếu nhập mua (PN)** · **Phiếu nhận ký gửi (NK)** · **Nhập từ Excel**. Phiếu tạo ra ở trạng thái **Nháp**; chỉ khi bấm **Xác nhận** thì hàng mới thực sự vào kho (tạo lô + ghi sổ cái). Phiếu nháp sai có thể huỷ. Cả hai form nhập tay (PN, NK) đều có tick **Xác nhận ngay → tạo lô**: tick vào thì phiếu được xác nhận luôn trong cùng một thao tác, không qua bước nháp; không tick thì giữ luồng nháp để kiểm tra lại rồi xác nhận sau.
 
 ### C1. Phiếu nhập mua (PN) — mua đứt
 
@@ -203,7 +203,7 @@ Ngoài trạng thái, bảng xem trước còn cho thấy **kết quả tính to
 
 **Công thức áp dụng cho mọi dòng (Tỷ giá, VAT, % lợi nhuận trên form áp chung cho cả file):** Đơn giá VND + VAT = GiaUSD × Tỷ giá × (1 + VAT%). Thành tiền = Số lượng × Đơn giá VND + VAT. Giá bán = Đơn giá VND + VAT × (1 + % lợi nhuận) — với hàng mới, giá bán này thành giá bán sỉ ban đầu của sản phẩm. Ví dụ: GiaUSD 100, Tỷ giá 27.000, VAT 8%, Lợi nhuận 35% → Đơn giá VND + VAT 2.916.000; Giá bán 3.936.600; nhập 15 cái → Thành tiền 43.740.000.
 
-**Chênh lệch làm tròn (khớp kế toán):** đơn giá từng dòng được làm tròn về đồng chẵn (khớp hoá đơn nhà cung cấp), nên tổng các dòng có thể lệch vài chục đồng so với tổng làm tròn một lần ở cuối từ giá trị chính xác — đúng kiểu lệch 47 đồng từng gặp. Để tổng khớp tuyệt đối với kế toán, cuối bảng xem trước hiện thêm dòng **Chênh lệch làm tròn** (= Total làm tròn một lần − tổng các dòng, có thể âm) và **Total giá nhập VND** = tổng các dòng + chênh lệch. Chênh lệch này được lưu cùng phiếu nhập (cột `rounding_adjustment`) và cộng vào tổng phiếu khi xác nhận — mọi số nguyên hiển thị đều cộng khớp tuyệt đối, không giấu phần lẻ đi đâu.
+**Chênh lệch làm tròn (khớp kế toán, lưu ngầm):** đơn giá từng dòng được làm tròn về đồng chẵn (khớp hoá đơn nhà cung cấp), nên tổng các dòng có thể lệch vài chục đồng so với tổng làm tròn một lần ở cuối từ giá trị chính xác — đúng kiểu lệch 47 đồng từng gặp. Để tổng khớp tuyệt đối với kế toán, **Total giá nhập VND** ở cuối bảng = tổng làm tròn một lần (không phải tổng các dòng). Chênh lệch (= Total làm tròn một lần − tổng các dòng, có thể âm) vẫn được tính và lưu cùng phiếu nhập (cột `rounding_adjustment`), cộng vào tổng phiếu khi xác nhận — nhưng không hiện thành dòng riêng ở cuối bảng nữa, bảng chỉ hiện Total cuối cùng.
 
 Sau khi bấm **Xác nhận nhập**: hệ thống kiểm tra lại toàn bộ ở máy chủ rồi mới ghi — phiếu tạo thành công sẽ **tự chuyển về đúng danh sách phiếu PN/NK ngay trong trang Nhập kho** để kiểm tra/xác nhận.
 

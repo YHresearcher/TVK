@@ -49,7 +49,7 @@ export default async function StockInPage({
 
   return (
     <>
-      <PageHeader title="Nhập kho" description="Nhập mua tạo lô OWN (nhãn trắng). Nhận ký gửi tạo lô CONS (nhãn vàng) và CHƯA tạo công nợ phải trả cho tới khi hàng bán được." />
+      <PageHeader title="Nhập kho" />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="mb-6 flex gap-2">
@@ -86,33 +86,6 @@ export default async function StockInPage({
                   action={importStockAction}
                 />
               </Card>
-              <Card title="Cấu trúc file chuẩn">
-                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
-                  <li>
-                    Các cột: <b>MaHang</b> (bắt buộc), MaThayThe (nhiều mã cách
-                    nhau bằng dấu “;”), TenHang, TenTiengAnh, ThuongHieu,
-                    DongXe, DonViTinh, <b>SoLuong</b>, GiaVonVND, GiaUSD,
-                    GiaBanDeXuat, GhiChu. Tên cột không phân biệt hoa thường
-                    và dấu.
-                  </li>
-                  <li>
-                    Giá vốn mỗi dòng: ưu tiên GiaVonVND; nếu để trống sẽ tính
-                    từ GiaUSD × tỷ giá × (1 + VAT%) theo thông số ở trên.
-                  </li>
-                  <li>
-                    Mã hàng khớp với SKU hoặc bất kỳ mã thay thế nào đã đăng
-                    ký thì vào sản phẩm đã có; mã chưa có sẽ được tự tạo (kèm
-                    mã thay thế và dòng xe) khi bật tuỳ chọn tự tạo.
-                  </li>
-                  <li>
-                    Hãy dùng nút “Tải file mẫu” để lấy đúng định dạng, và kiểm
-                    tra bảng xem trước (trạng thái từng dòng, tổng số lượng,
-                    tổng tiền) trước khi bấm “Xác nhận nhập”. Nhập xong, hệ
-                    thống tự chuyển về danh sách phiếu tương ứng ở trang này
-                    để bạn kiểm tra phiếu vừa tạo.
-                  </li>
-                </ul>
-              </Card>
             </>
           )}
         </div>
@@ -134,7 +107,13 @@ export default async function StockInPage({
                 { name: "qty", label: "Số lượng", type: "number" },
                 { name: "unit_cost", label: "Đơn giá vốn (₫)", type: "number", step: "1000" },
               ]} />
-              <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" name="confirm_now" />
+                  Xác nhận ngay → tạo lô (không qua phiếu nháp)
+                </label>
+              </div>
+              <button type="submit" className={btnCls}>Tạo phiếu</button>
             </form>
           </Card>
           )}
@@ -163,7 +142,13 @@ export default async function StockInPage({
                 { name: "qty", label: "Số lượng", type: "number" },
                 { name: "consignment_price", label: "Giá ký gửi (₫)", type: "number", step: "1000" },
               ]} />
-              <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" name="confirm_now" />
+                  Xác nhận ngay → tạo lô (không qua phiếu nháp)
+                </label>
+              </div>
+              <button type="submit" className={btnCls}>Tạo phiếu</button>
             </form>
           </Card>
           )}
