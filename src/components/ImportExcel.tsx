@@ -4,6 +4,10 @@ import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
+
+/** Cột tiền: căn phải để dễ dò số. */
+const thNumCls = `${thCls} text-right`;
+const tdNumCls = `${tdCls} text-right`;
 import type { AnyRow } from "@/lib/types";
 
 interface CatalogProduct {
@@ -510,10 +514,10 @@ export default function ImportExcel({
               <th className={thCls}>Tên hàng</th>
               <th className={thCls}>ĐVT</th>
               <th className={thCls}>SL</th>
-              <th className={thCls}>Đơn giá USD</th>
-              <th className={thCls}>Đơn giá VND + VAT</th>
-              <th className={thCls}>Thành tiền</th>
-              <th className={thCls}>Giá bán</th>
+              <th className={thNumCls}>Đơn giá USD</th>
+              <th className={thNumCls}>Đơn giá VND + VAT</th>
+              <th className={thNumCls}>Thành tiền</th>
+              <th className={thNumCls}>Giá bán</th>
               <th className={thCls}>Trạng thái</th>
             </tr>
           </thead>
@@ -530,12 +534,12 @@ export default function ImportExcel({
                 </td>
                 <td className={tdCls}>{r.unit || "—"}</td>
                 <td className={tdCls}>{formatNumber(r.qty)}</td>
-                <td className={tdCls}>{r.usd > 0 ? formatUSD(r.usd) : "—"}</td>
-                <td className={tdCls}>{r.unitCost > 0 ? formatVND(r.unitCost) : "—"}</td>
-                <td className={tdCls}>
+                <td className={tdNumCls}>{r.usd > 0 ? formatUSD(r.usd) : "—"}</td>
+                <td className={tdNumCls}>{r.unitCost > 0 ? formatVND(r.unitCost) : "—"}</td>
+                <td className={tdNumCls}>
                   {r.unitCost > 0 ? formatVND(r.qty * r.unitCost) : "—"}
                 </td>
-                <td className={tdCls}>
+                <td className={tdNumCls}>
                   {r.salePriceEff > 0 ? formatVND(r.salePriceEff) : "—"}
                 </td>
                 <td className={tdCls}>
@@ -572,7 +576,7 @@ export default function ImportExcel({
               <td className={tdCls}>{formatNumber(totalQty)}</td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
-              <td className={tdCls}>{formatVND(totalAmount)}</td>
+              <td className={tdNumCls}>{formatVND(totalAmount)}</td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
             </tr>
