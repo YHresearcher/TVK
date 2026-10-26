@@ -339,18 +339,17 @@ interface ImportPayloadRow {
   fitment?: unknown;
   unit?: unknown;
   qty?: unknown;
-  costVnd?: unknown;
   usd?: unknown;
-  tyGiaRow?: unknown;
-  vatRow?: unknown;
-  salePrice?: unknown;
 }
 
 /**
  * Import a whole stock-in receipt (PN or NK) from a JSON payload produced by
- * the /import page. Unit costs are recomputed here — the client's preview is
- * never trusted. Products are matched by primary code or any equivalent code;
- * unknown codes can optionally auto-create the product (codes + fitment too).
+ * the /import page. Prices are recomputed here — the client's preview is
+ * never trusted. Tỷ giá, VAT and % lợi nhuận from the form apply to the
+ * whole file: unit cost = GiaUSD × Tỷ giá × (1 + VAT%), selling price =
+ * unit cost × (1 + Lợi nhuận%). Products are matched by primary code or
+ * any equivalent code; unknown codes can optionally auto-create the
+ * product (codes + fitment too).
  */
 export async function importStockAction(formData: FormData) {
   const supabase = await db();
@@ -367,6 +366,7 @@ export async function importStockAction(formData: FormData) {
   if (!warehouseId) throw new Error("Cần chọn kho nhập.");
   const tyGia = Number(payload.tyGia) || 0;
   const vatPct = Number(payload.vatPct) || 0;
+  const profitPct = Number(payload.profitPct) || 0;
   const autoCreate = !!payload.autoCreate;
   const confirmNow = !!payload.confirmNow;
   const rawRows: ImportPayloadRow[] = Array.isArray(payload.rows) ? payload.rows : [];
@@ -388,31 +388,13 @@ export async function importStockAction(formData: FormData) {
   );
 
   const items: { product_id: string; qty: number; unit_cost: number }[] = [];
-  // Công thức giá vốn phía máy chủ (không tin bản xem trước ở client):
-  // có GiaVonVND thì dùng luôn; chỉ có GiaUSD thì quy đổi theo tỷ giá và
-  // VAT của DÒNG (cột TyGiaUSD / VAT) nếu dòng có ghi, ngược lại dùng tỷ
-  // giá và VAT trên form. Ô trống = dùng mặc định form; ô có số không hợp
-  // lệ (tỷ giá <= 0, VAT < 0) = dòng lỗi (trả null).
-  const rowRate = (
-    v: unknown,
-    fallback: number,
-    allowZero: boolean
-  ): number | null => {
-    if (v === null || v === undefined || v === "") return fallback;
-    const n = Number(v);
-    if (!Number.isFinite(n)) return null;
-    if (allowZero ? n < 0 : n <= 0) return null;
-    return n;
-  };
-  const rowUnitCost = (r: ImportPayloadRow): number | null => {
-    const costVnd = Number(r.costVnd) || 0;
+  // Công thức phía máy chủ (không tin bản xem trước ở client), áp chung
+  // cho toàn bộ file: Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%);
+  // Giá bán = Đơn giá nhập × (1 + % lợi nhuận).
+  const rowPrices = (r: ImportPayloadRow): { unitCost: number; salePrice: number } => {
     const usd = Number(r.usd) || 0;
-    if (costVnd > 0) return costVnd;
-    if (!(usd > 0)) return 0;
-    const tg = rowRate(r.tyGiaRow, tyGia, false);
-    const vt = rowRate(r.vatRow, vatPct, true);
-    if (tg === null || vt === null) return null;
-    return Math.round(usd * tg * (1 + vt / 100));
+    const unitCost = usd > 0 ? Math.round(usd * tyGia * (1 + vatPct / 100)) : 0;
+    return { unitCost, salePrice: Math.round(unitCost * (1 + profitPct / 100)) };
   };
   // Kiểm soát phía máy chủ: kiểm tra TOÀN BỘ file trước khi ghi bất cứ thứ
   // gì. Bất kỳ dòng nào không hợp lệ cũng từ chối cả import (không nhập
@@ -421,8 +403,8 @@ export async function importStockAction(formData: FormData) {
   for (const r of rawRows) {
     const code = String(r.code ?? "").trim();
     const qty = Math.trunc(Number(r.qty) || 0);
-    const unitCost = rowUnitCost(r);
-    if (!code || qty <= 0 || unitCost === null || unitCost <= 0) {
+    const { unitCost } = rowPrices(r);
+    if (!code || qty <= 0 || unitCost <= 0) {
       invalid.push(code || "(dòng thiếu mã)");
       continue;
     }
@@ -449,11 +431,11 @@ export async function importStockAction(formData: FormData) {
   for (const r of rawRows) {
     const code = String(r.code ?? "").trim();
     const qty = Math.trunc(Number(r.qty) || 0);
-    const unitCost = rowUnitCost(r);
+    const { unitCost, salePrice } = rowPrices(r);
     const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
       .map((a) => String(a ?? "").trim())
       .filter(Boolean);
-    if (!code || qty <= 0 || unitCost === null || unitCost <= 0) continue; // đã chặn ở vòng kiểm tra trước
+    if (!code || qty <= 0 || unitCost <= 0) continue; // đã chặn ở vòng kiểm tra trước
 
     let productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
     if (!productId) {
@@ -476,12 +458,9 @@ export async function importStockAction(formData: FormData) {
             unit: String(r.unit ?? "").trim() || "Cái",
             retail_price: 0,
             garage_price: 0,
-            // Giá bán đề xuất: theo file nếu có; để trống thì tự tính
-            // bằng giá vốn sau VAT + 35%.
-            wholesale_price:
-              Number(r.salePrice) > 0
-                ? Number(r.salePrice)
-                : Math.round(unitCost * 1.35),
+            // Giá bán sỉ ban đầu của sản phẩm mới = Đơn giá nhập ×
+            // (1 + % lợi nhuận trên form).
+            wholesale_price: salePrice,
             min_stock: 0,
           })
           .select("id")

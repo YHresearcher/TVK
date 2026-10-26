@@ -171,29 +171,23 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **Kho nhập \*** | Kho nhận toàn bộ hàng trong file. |
 | **Ngày nhập** | Ngày của phiếu được tạo. |
 | **Số hoá đơn của nhà cung cấp (chỉ PN)** | Như ở C1; để trống nếu là NK. |
-| **Tỷ giá (VNĐ/USD)** | Tỷ giá **mặc định cho cả file** dùng để quy đổi những dòng chỉ có giá USD. Mặc định 27.000. Nếu file có cột TyGiaUSD thì tỷ giá ghi theo dòng được ưu tiên cho dòng đó. |
-| **VAT % (cộng vào giá USD)** | % thuế **mặc định cho cả file** cộng thêm khi quy đổi giá USD (mặc định 8%). Nếu file có cột VAT thì VAT ghi theo dòng được ưu tiên cho dòng đó. Công thức đơn giá vốn cho dòng có GiaUSD: **GiaUSD × Tỷ giá × (1 + VAT%)**. |
+| **Tỷ giá (VNĐ/USD)** | Tỷ giá áp dụng chung cho toàn bộ file để quy đổi giá USD sang VNĐ. Mặc định 27.000 — đổi theo tỷ giá tại thời điểm nhập. |
+| **VAT % (cộng vào giá USD)** | % thuế áp dụng chung cho toàn bộ file, cộng thêm khi quy đổi giá USD (mặc định 8%). |
+| **% lợi nhuận / sản phẩm** | % lợi nhuận áp dụng chung cho toàn bộ file để tính giá bán (mặc định 35%). Công thức giá bán: **Đơn giá nhập × (1 + % lợi nhuận)**. |
 | **Tự tạo sản phẩm mới nếu mã chưa có** | Bật: mã hàng chưa có trong danh mục sẽ được **tự tạo sản phẩm mới** (kèm mã thay thế + dòng xe trong file). Tắt: dòng nào mã chưa có sẽ báo lỗi và chặn import. |
 | **Xác nhận nhập kho ngay sau khi tạo phiếu** | Bật: phiếu tạo xong được xác nhận luôn (hàng vào kho ngay). Tắt: phiếu ở trạng thái Nháp để kiểm tra lại rồi xác nhận sau ở danh sách phiếu. |
 
-**14 cột trong file Excel:**
+**7 cột trong file Excel — chỉ nhập 7 cột này** (Tỷ giá, VAT, % lợi nhuận nhập trên form, áp chung cho cả file):
 
 | Cột | Bắt buộc | Ý nghĩa |
 |---|---|---|
-| **MaHang** | ✔ | Mã hàng chính (SKU) — căn cứ khớp với danh mục. Khớp theo MaHang **hoặc bất kỳ mã thay thế nào** đã đăng ký. |
-| **MaThayThe** | | Các mã tương đương/mã tra cứu khác, cách nhau bằng dấu `;` — được đăng ký cho sản phẩm để quét/tra cứu bằng mã nào cũng ra. |
-| **TenHang** | ✔ | Tên hàng. Bắt buộc với sản phẩm mới; sản phẩm đã có thì tên trong danh mục được giữ nguyên. |
-| **TenTiengAnh** | | Tên tiếng Anh (tham khảo; hiện chưa lưu vào danh mục). |
-| **ThuongHieu** | | Thương hiệu (ví dụ SMS, Normal…) — gán cho sản phẩm khi tự tạo mới. |
 | **DongXe** | | Dòng xe tương thích (ví dụ HOWO 420/430/440) — tạo thông tin xe tương thích cho sản phẩm mới. |
+| **TenHang** | ✔ | Tên phụ tùng. Bắt buộc với sản phẩm mới; sản phẩm đã có thì tên trong danh mục được giữ nguyên. |
+| **MaHang** | ✔ | Mã số của phụ tùng (SKU) — căn cứ khớp với danh mục. Khớp theo MaHang **hoặc bất kỳ mã thay thế nào** đã đăng ký. |
+| **ThuongHieu** | | Thương hiệu (ví dụ SMS, Normal…) — gán cho sản phẩm khi tự tạo mới. |
 | **DonViTinh** | | Đơn vị tính (cái, bộ, chiếc…). |
 | **SoLuong** | ✔ | Số lượng nhập, phải lớn hơn 0. |
-| **GiaVonVND** | ✔\* | Đơn giá vốn tính sẵn bằng VNĐ. **Ưu tiên dùng cột này nếu có.** |
-| **GiaUSD** | ✔\* | Đơn giá bằng USD — hệ thống quy đổi theo Tỷ giá × (1 + VAT%) (lấy theo dòng nếu có cột TyGiaUSD/VAT, ngược lại lấy trên form). \*Chỉ cần **một trong hai** cột giá. |
-| **TyGiaUSD** | | Tỷ giá VNĐ/USD **riêng của dòng** (tuỳ chọn). Dòng nào ghi thì dùng tỷ giá đó; để trống thì dùng Tỷ giá trên form. Phải lớn hơn 0 nếu có ghi. |
-| **VAT** | | VAT **riêng của dòng** tính theo % (tuỳ chọn, vd 8 = 8%; 0 = không cộng VAT). Dòng nào ghi thì dùng VAT đó; để trống thì dùng VAT trên form. |
-| **GiaBanDeXuat** | | Giá bán đề xuất — khi tự tạo sản phẩm mới, giá này thành giá bán sỉ ban đầu của sản phẩm. **Để trống thì hệ thống tự tính = giá vốn sau VAT + 35%** (vd giá vốn 2.916.000 → 3.936.600). |
-| **GhiChu** | | Ghi chú tự do cho dòng hàng. |
+| **GiaUSD** | ✔ | Đơn giá bằng USD của một đơn vị — đầu vào duy nhất để tính giá nhập. |
 
 **Bảng xem trước (preview) — đọc trạng thái từng dòng trước khi nhập:**
 
@@ -201,18 +195,18 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 |---|---|
 | **Đã có** (xanh lá) | Mã khớp với sản phẩm đã có trong danh mục — hàng nhập thêm vào sản phẩm đó. |
 | **Hàng mới** (xanh dương) | Mã chưa có — sẽ tự tạo sản phẩm mới (khi bật tuỳ chọn tự tạo). |
-| **Lỗi** (đỏ) | Dòng không hợp lệ (thiếu mã, số lượng ≤ 0, thiếu cả hai giá, hàng mới mà thiếu tên…). **Còn bất kỳ dòng lỗi nào là hệ thống không cho nhập** — sửa trong file Excel rồi tải lại. |
+| **Lỗi** (đỏ) | Dòng không hợp lệ (thiếu mã, số lượng ≤ 0, thiếu GiaUSD, hàng mới mà thiếu tên…). **Còn bất kỳ dòng lỗi nào là hệ thống không cho nhập** — sửa trong file Excel rồi tải lại. |
 | **Trùng mã trong file** (vàng) | Mã xuất hiện từ 2 dòng trở lên trong cùng file — cần kiểm tra lại (thường là lỗi soạn file). |
 
-Ngoài trạng thái, bảng xem trước còn cho thấy **căn cứ tính tiền của từng dòng**: Đơn giá vốn, cột Tỷ giá · VAT thực tế áp dụng (ghi chú "theo dòng" khi dòng có tỷ giá/VAT riêng; dòng dùng GiaVonVND thì không qua quy đổi nên không hiện tỷ giá), Thành tiền (= Số lượng × Đơn giá vốn), và Giá bán đề xuất (ghi chú "tự tính +35%" khi cột GiaBanDeXuat để trống).
+Ngoài trạng thái, bảng xem trước còn cho thấy **kết quả tính toán của từng dòng**: Đơn giá nhập VNĐ, Thành tiền, và Giá bán; cuối bảng là **Total giá nhập VND** (tổng Thành tiền của tất cả các dòng sẽ nhập).
 
-**Công thức áp dụng cho mọi dòng:** Giá vốn = GiaVonVND nếu có; ngược lại = GiaUSD × Tỷ giá × (1 + VAT%) — tỷ giá/VAT lấy theo dòng nếu có, ngược lại lấy trên form. Thành tiền = Số lượng × Giá vốn. Giá bán đề xuất = GiaBanDeXuat nếu có; để trống = Giá vốn sau VAT × 1,35.
+**Công thức áp dụng cho mọi dòng (Tỷ giá, VAT, % lợi nhuận trên form áp chung cho cả file):** Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%). Thành tiền = Số lượng × Đơn giá nhập. Giá bán = Đơn giá nhập × (1 + % lợi nhuận) — với hàng mới, giá bán này thành giá bán sỉ ban đầu của sản phẩm. Ví dụ: GiaUSD 100, Tỷ giá 27.000, VAT 8%, Lợi nhuận 35% → Đơn giá nhập 2.916.000; Giá bán 3.936.600; nhập 15 cái → Thành tiền 43.740.000.
 
 Sau khi bấm **Xác nhận nhập**: hệ thống kiểm tra lại toàn bộ ở máy chủ rồi mới ghi — phiếu tạo thành công sẽ **tự chuyển về đúng danh sách phiếu PN/NK ngay trong trang Nhập kho** để kiểm tra/xác nhận.
 
 ### C4. Luật kiểm soát định dạng file (từ chối khi nào?)
 
-File bị **từ chối ngay, không xem trước**, kèm lý do cụ thể, khi: thiếu cột bắt buộc (MaHang / TenHang / SoLuong); không có cột giá nào (GiaVonVND và GiaUSD đều thiếu); trùng tên cột; file trống hoặc không đọc được. Dòng dữ liệu lỗi thì **chặn toàn bộ lần nhập** (không nhập một phần) — theo nguyên tắc: một phiếu nhập phải đúng 100% mới được vào kho, tránh kho sách lệch khó truy vết.
+File bị **từ chối ngay, không xem trước**, kèm lý do cụ thể, khi: thiếu cột bắt buộc (MaHang / TenHang / SoLuong / GiaUSD); trùng tên cột; file trống hoặc không đọc được. Các cột cũ về giá theo dòng (GiaVonVND, TyGiaUSD, VAT, GiaBanDeXuat) không còn dùng — nếu còn trong file thì hệ thống bỏ qua. Dòng dữ liệu lỗi thì **chặn toàn bộ lần nhập** (không nhập một phần) — theo nguyên tắc: một phiếu nhập phải đúng 100% mới được vào kho, tránh kho sách lệch khó truy vết.
 
 ---
 

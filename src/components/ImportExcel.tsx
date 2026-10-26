@@ -25,23 +25,15 @@ interface RawRow {
   fitment: string;
   unit: string;
   qty: number;
-  costVnd: number;
   usd: number;
-  /** Tỷ giá riêng của dòng (cột TyGiaUSD) — null = dùng tỷ giá trên form. */
-  tyGiaRow: number | null;
-  /** VAT riêng của dòng (cột VAT, %) — null = dùng VAT trên form. */
-  vatRow: number | null;
-  salePrice: number;
   note: string;
 }
 
 interface PreviewRow extends RawRow {
   stt: number;
+  /** Đơn giá nhập VNĐ: GiaUSD × Tỷ giá × (1 + VAT%) — tỷ giá, VAT trên form. */
   unitCost: number;
-  /** Tỷ giá và VAT thực tế áp dụng cho dòng (theo dòng, hoặc mặc định form). */
-  effTyGia: number;
-  effVat: number;
-  /** Giá bán đề xuất thực tế: theo file, hoặc tự tính = giá vốn sau VAT + 35%. */
+  /** Giá bán: Đơn giá nhập × (1 + % lợi nhuận trên form). */
   salePriceEff: number;
   status: "existing" | "new" | "error";
   matchedName?: string;
@@ -68,11 +60,7 @@ const FIELD_ALIASES: Record<keyof RawRow, string[]> = {
   fitment: ["dongxe", "dong", "fitment"],
   unit: ["donvitinh", "dvt", "unit"],
   qty: ["soluong", "sl", "qty", "quantity"],
-  costVnd: ["giavonvnd", "giavon", "dongia", "cost", "unitcost"],
   usd: ["giausd", "usd", "priceusd"],
-  tyGiaRow: ["tygia", "tygiausd", "tygiavndusd", "tygiavnd"],
-  vatRow: ["vat", "vatphantram", "thuevat", "thuegtgt"],
-  salePrice: ["giabandexuat", "giaban", "saleprice"],
   note: ["ghichu", "note"],
 };
 
@@ -114,6 +102,7 @@ export default function ImportExcel({
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState("");
   const [tyGia, setTyGia] = useState(27000);
   const [vatPct, setVatPct] = useState(8);
+  const [profitPct, setProfitPct] = useState(35);
   const [autoCreate, setAutoCreate] = useState(true);
   const [confirmNow, setConfirmNow] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -179,18 +168,13 @@ export default function ImportExcel({
       if (fieldCol.qty === undefined) missing.push("SoLuong");
       if (missing.length)
         problems.push(`Thiếu cột bắt buộc: ${missing.join(", ")}.`);
-      if (fieldCol.costVnd === undefined && fieldCol.usd === undefined)
-        problems.push(
-          "Thiếu cột giá: cần ít nhất một trong hai cột GiaVonVND hoặc GiaUSD."
-        );
+      if (fieldCol.usd === undefined)
+        problems.push("Thiếu cột giá: cần cột GiaUSD.");
       const val = (cells: unknown[], field: keyof RawRow) => {
         const i = fieldCol[field];
         return i === undefined ? "" : cells[i] ?? "";
       };
-      // Ô trống = không ghi đè (dùng giá trị mặc định trên form); ô có số
-      // (kể cả 0) = giá trị riêng của dòng.
-      const numOrNull = (v: unknown): number | null =>
-        toStr(v) === "" ? null : toNum(v);
+
       const rows: RawRow[] = [];
       for (const cells of aoa.slice(1) as unknown[][]) {
         if (cells.every((c) => toStr(c) === "")) continue;
@@ -206,11 +190,7 @@ export default function ImportExcel({
           fitment: toStr(val(cells, "fitment")),
           unit: toStr(val(cells, "unit")),
           qty: toNum(val(cells, "qty")),
-          costVnd: toNum(val(cells, "costVnd")),
           usd: toNum(val(cells, "usd")),
-          tyGiaRow: numOrNull(val(cells, "tyGiaRow")),
-          vatRow: numOrNull(val(cells, "vatRow")),
-          salePrice: toNum(val(cells, "salePrice")),
           note: toStr(val(cells, "note")),
         });
       }
@@ -239,21 +219,13 @@ export default function ImportExcel({
     if (!rawRows) return [];
     const seen = new Set<string>();
     return rawRows.map((r, i) => {
-      // Công thức giá vốn: có GiaVonVND thì dùng luôn (đã gồm VAT nếu có);
-      // chỉ có GiaUSD thì quy đổi theo tỷ giá và VAT của DÒNG (cột TyGiaUSD /
-      // VAT) nếu dòng có ghi, ngược lại dùng tỷ giá và VAT trên form.
-      const effTyGia = r.tyGiaRow != null && r.tyGiaRow > 0 ? r.tyGiaRow : tyGia;
-      const effVat = r.vatRow != null && r.vatRow >= 0 ? r.vatRow : vatPct;
+      // Công thức áp chung cho toàn bộ file (tỷ giá, VAT, % lợi nhuận nhập
+      // trên form): Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%);
+      // Giá bán = Đơn giá nhập × (1 + % lợi nhuận).
       const unitCost =
-        r.costVnd > 0
-          ? r.costVnd
-          : r.usd > 0
-            ? Math.round(r.usd * effTyGia * (1 + effVat / 100))
-            : 0;
-      // Giá bán đề xuất: theo file nếu có; để trống thì tự tính = giá vốn
-      // sau VAT + 35%.
+        r.usd > 0 ? Math.round(r.usd * tyGia * (1 + vatPct / 100)) : 0;
       const salePriceEff =
-        r.salePrice > 0 ? r.salePrice : unitCost > 0 ? Math.round(unitCost * 1.35) : 0;
+        unitCost > 0 ? Math.round(unitCost * (1 + profitPct / 100)) : 0;
       const matched =
         catalog.get(r.code.trim().toUpperCase()) ??
         r.altCodes
@@ -266,11 +238,7 @@ export default function ImportExcel({
       let error: string | undefined;
       if (!r.code) error = "Thiếu mã hàng";
       else if (!(r.qty > 0)) error = "Số lượng phải lớn hơn 0";
-      else if (r.tyGiaRow != null && !(r.tyGiaRow > 0))
-        error = "Tỷ giá của dòng (TyGiaUSD) phải lớn hơn 0";
-      else if (r.vatRow != null && !(r.vatRow >= 0))
-        error = "VAT của dòng không được âm";
-      else if (unitCost <= 0) error = "Chưa có giá vốn (cần GiaVonVND hoặc GiaUSD)";
+      else if (unitCost <= 0) error = "Chưa có giá USD (cần cột GiaUSD)";
       else if (!matched && !r.name) error = "Thiếu tên hàng cho sản phẩm mới";
       else if (!matched && !autoCreate)
         error = "Mã chưa có trong hệ thống (đã tắt tự tạo sản phẩm)";
@@ -280,8 +248,6 @@ export default function ImportExcel({
         ...r,
         stt: i + 1,
         unitCost,
-        effTyGia,
-        effVat,
         salePriceEff,
         status,
         matchedName: matched?.name,
@@ -289,7 +255,7 @@ export default function ImportExcel({
         duplicate,
       };
     });
-  }, [rawRows, catalog, tyGia, vatPct, autoCreate]);
+  }, [rawRows, catalog, tyGia, vatPct, profitPct, autoCreate]);
 
   const importable = preview.filter((r) => r.status !== "error");
   const errorCount = preview.length - importable.length;
@@ -311,6 +277,7 @@ export default function ImportExcel({
     supplierInvoiceNo,
     tyGia,
     vatPct,
+    profitPct,
     autoCreate,
     confirmNow,
     rows: importable.map((r) => ({
@@ -322,11 +289,7 @@ export default function ImportExcel({
       fitment: r.fitment,
       unit: r.unit,
       qty: r.qty,
-      costVnd: r.costVnd,
       usd: r.usd,
-      tyGiaRow: r.tyGiaRow,
-      vatRow: r.vatRow,
-      salePrice: r.salePrice,
       note: r.note,
     })),
   };
@@ -452,13 +415,21 @@ export default function ImportExcel({
             className={inputCls}
           />
         </div>
+        <div>
+          <label className={labelCls}>% lợi nhuận / sản phẩm</label>
+          <input
+            type="number"
+            value={profitPct}
+            onChange={(e) => setProfitPct(Number(e.target.value) || 0)}
+            className={inputCls}
+          />
+        </div>
       </div>
       <p className="text-xs text-slate-500">
-        Tỷ giá và VAT trên form là mặc định cho cả file — nếu file có cột
-        TyGiaUSD / VAT thì giá trị ghi theo từng dòng sẽ được ưu tiên cho dòng
-        đó. Công thức giá vốn: GiaVonVND (nếu có), ngược lại GiaUSD × Tỷ giá ×
-        (1 + VAT%). Giá bán đề xuất để trống sẽ tự tính bằng giá vốn sau VAT +
-        35%.
+        Tỷ giá, VAT và % lợi nhuận nhập trên form được áp dụng chung cho toàn
+        bộ sản phẩm trong file (thông tin chung tại một thời điểm). Công thức:
+        Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%); Thành tiền = Số lượng
+        × Đơn giá nhập; Giá bán = Đơn giá nhập × (1 + % lợi nhuận).
       </p>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -495,20 +466,19 @@ export default function ImportExcel({
           <div className="rounded-md bg-white/70 px-3 py-2 text-xs leading-relaxed text-slate-700">
             <p className="font-semibold">Định dạng chuẩn của file nhập hàng:</p>
             <p className="mt-1 font-mono text-[11px]">
-              MaHang* · MaThayThe · TenHang* · TenTiengAnh · ThuongHieu · DongXe ·
-              DonViTinh · SoLuong* · GiaVonVND · GiaUSD · TyGiaUSD · VAT ·
-              GiaBanDeXuat · GhiChu
+              DongXe · TenHang* · MaHang* · ThuongHieu · DonViTinh · SoLuong* ·
+              GiaUSD*
             </p>
             <p className="mt-1">
               Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là bắt
-              buộc; về giá cần ít nhất một trong hai cột GiaVonVND / GiaUSD).
-              Cột TyGiaUSD / VAT là tuỳ chọn theo từng dòng: dòng nào ghi thì
-              dùng tỷ giá và VAT của dòng đó để tính giá vốn, dòng nào để trống
-              thì dùng tỷ giá và VAT trên form. Cột GiaBanDeXuat để trống sẽ
-              tự tính bằng giá vốn sau VAT + 35%. Mỗi dòng là một mặt hàng,
-              không gộp ô (merge), không thêm hàng tiêu đề phụ. Một file chỉ
-              nhập cho một nhà cung cấp. File .csv phải lưu ở mã hoá UTF-8.
-              Dễ nhất: bấm “Tải file mẫu” ở trên, điền vào file mẫu rồi tải lên.
+              buộc). File chỉ cần 7 cột này — Tỷ giá, VAT và % lợi nhuận nhập
+              trên form, áp dụng chung cho toàn bộ file. Hệ thống tự tính:
+              Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%); Thành tiền =
+              Số lượng × Đơn giá nhập; Giá bán = Đơn giá nhập × (1 + %
+              lợi nhuận). Mỗi dòng là một mặt hàng, không gộp ô (merge),
+              không thêm hàng tiêu đề phụ. Một file chỉ nhập cho một nhà cung
+              cấp. File .csv phải lưu ở mã hoá UTF-8. Dễ nhất: bấm “Tải file
+              mẫu” ở trên, điền vào file mẫu rồi tải lên.
             </p>
           </div>
         </div>
@@ -536,10 +506,9 @@ export default function ImportExcel({
               <th className={thCls}>Tên hàng</th>
               <th className={thCls}>ĐVT</th>
               <th className={thCls}>SL</th>
-              <th className={thCls}>Đơn giá vốn</th>
-              <th className={thCls}>Tỷ giá · VAT</th>
+              <th className={thCls}>Đơn giá nhập VNĐ</th>
               <th className={thCls}>Thành tiền</th>
-              <th className={thCls}>Giá bán đề xuất</th>
+              <th className={thCls}>Giá bán</th>
               <th className={thCls}>Trạng thái</th>
             </tr>
           </thead>
@@ -558,27 +527,10 @@ export default function ImportExcel({
                 <td className={tdCls}>{formatNumber(r.qty)}</td>
                 <td className={tdCls}>{r.unitCost > 0 ? formatVND(r.unitCost) : "—"}</td>
                 <td className={tdCls}>
-                  {r.costVnd > 0 || !(r.usd > 0)
-                    ? "—"
-                    : `${formatNumber(r.effTyGia)} · ${r.effVat}%`}
-                  {(r.tyGiaRow != null || r.vatRow != null) &&
-                    r.costVnd <= 0 &&
-                    r.usd > 0 && (
-                      <span className="block text-[10px] text-amber-600">
-                        theo dòng
-                      </span>
-                    )}
-                </td>
-                <td className={tdCls}>
                   {r.unitCost > 0 ? formatVND(r.qty * r.unitCost) : "—"}
                 </td>
                 <td className={tdCls}>
                   {r.salePriceEff > 0 ? formatVND(r.salePriceEff) : "—"}
-                  {r.salePrice <= 0 && r.salePriceEff > 0 && (
-                    <span className="block text-[10px] text-slate-400">
-                      tự tính +35%
-                    </span>
-                  )}
                 </td>
                 <td className={tdCls}>
                   {r.status === "existing" && (
@@ -612,7 +564,6 @@ export default function ImportExcel({
                 Tổng các dòng sẽ nhập ({importable.length} dòng)
               </td>
               <td className={tdCls}>{formatNumber(totalQty)}</td>
-              <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdCls}>{formatVND(totalAmount)}</td>
               <td className={tdCls}></td>
