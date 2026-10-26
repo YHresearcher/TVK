@@ -171,12 +171,12 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **Kho nhập \*** | Kho nhận toàn bộ hàng trong file. |
 | **Ngày nhập** | Ngày của phiếu được tạo. |
 | **Số hoá đơn của nhà cung cấp (chỉ PN)** | Như ở C1; để trống nếu là NK. |
-| **Tỷ giá (VNĐ/USD)** | Tỷ giá dùng để quy đổi những dòng chỉ có giá USD. Mặc định 27.000. |
-| **VAT % (cộng vào giá USD)** | % thuế cộng thêm khi quy đổi giá USD (mặc định 8%). Công thức đơn giá vốn cho dòng có GiaUSD: **GiaUSD × Tỷ giá × (1 + VAT%)**. |
+| **Tỷ giá (VNĐ/USD)** | Tỷ giá **mặc định cho cả file** dùng để quy đổi những dòng chỉ có giá USD. Mặc định 27.000. Nếu file có cột TyGiaUSD thì tỷ giá ghi theo dòng được ưu tiên cho dòng đó. |
+| **VAT % (cộng vào giá USD)** | % thuế **mặc định cho cả file** cộng thêm khi quy đổi giá USD (mặc định 8%). Nếu file có cột VAT thì VAT ghi theo dòng được ưu tiên cho dòng đó. Công thức đơn giá vốn cho dòng có GiaUSD: **GiaUSD × Tỷ giá × (1 + VAT%)**. |
 | **Tự tạo sản phẩm mới nếu mã chưa có** | Bật: mã hàng chưa có trong danh mục sẽ được **tự tạo sản phẩm mới** (kèm mã thay thế + dòng xe trong file). Tắt: dòng nào mã chưa có sẽ báo lỗi và chặn import. |
 | **Xác nhận nhập kho ngay sau khi tạo phiếu** | Bật: phiếu tạo xong được xác nhận luôn (hàng vào kho ngay). Tắt: phiếu ở trạng thái Nháp để kiểm tra lại rồi xác nhận sau ở danh sách phiếu. |
 
-**12 cột trong file Excel:**
+**14 cột trong file Excel:**
 
 | Cột | Bắt buộc | Ý nghĩa |
 |---|---|---|
@@ -189,8 +189,10 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **DonViTinh** | | Đơn vị tính (cái, bộ, chiếc…). |
 | **SoLuong** | ✔ | Số lượng nhập, phải lớn hơn 0. |
 | **GiaVonVND** | ✔\* | Đơn giá vốn tính sẵn bằng VNĐ. **Ưu tiên dùng cột này nếu có.** |
-| **GiaUSD** | ✔\* | Đơn giá bằng USD — hệ thống quy đổi theo Tỷ giá × (1 + VAT%) ở form. \*Chỉ cần **một trong hai** cột giá. |
-| **GiaBanDeXuat** | | Giá bán đề xuất — khi tự tạo sản phẩm mới, giá này thành giá bán sỉ ban đầu của sản phẩm. |
+| **GiaUSD** | ✔\* | Đơn giá bằng USD — hệ thống quy đổi theo Tỷ giá × (1 + VAT%) (lấy theo dòng nếu có cột TyGiaUSD/VAT, ngược lại lấy trên form). \*Chỉ cần **một trong hai** cột giá. |
+| **TyGiaUSD** | | Tỷ giá VNĐ/USD **riêng của dòng** (tuỳ chọn). Dòng nào ghi thì dùng tỷ giá đó; để trống thì dùng Tỷ giá trên form. Phải lớn hơn 0 nếu có ghi. |
+| **VAT** | | VAT **riêng của dòng** tính theo % (tuỳ chọn, vd 8 = 8%; 0 = không cộng VAT). Dòng nào ghi thì dùng VAT đó; để trống thì dùng VAT trên form. |
+| **GiaBanDeXuat** | | Giá bán đề xuất — khi tự tạo sản phẩm mới, giá này thành giá bán sỉ ban đầu của sản phẩm. **Để trống thì hệ thống tự tính = giá vốn sau VAT + 35%** (vd giá vốn 2.916.000 → 3.936.600). |
 | **GhiChu** | | Ghi chú tự do cho dòng hàng. |
 
 **Bảng xem trước (preview) — đọc trạng thái từng dòng trước khi nhập:**
@@ -201,6 +203,10 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **Hàng mới** (xanh dương) | Mã chưa có — sẽ tự tạo sản phẩm mới (khi bật tuỳ chọn tự tạo). |
 | **Lỗi** (đỏ) | Dòng không hợp lệ (thiếu mã, số lượng ≤ 0, thiếu cả hai giá, hàng mới mà thiếu tên…). **Còn bất kỳ dòng lỗi nào là hệ thống không cho nhập** — sửa trong file Excel rồi tải lại. |
 | **Trùng mã trong file** (vàng) | Mã xuất hiện từ 2 dòng trở lên trong cùng file — cần kiểm tra lại (thường là lỗi soạn file). |
+
+Ngoài trạng thái, bảng xem trước còn cho thấy **căn cứ tính tiền của từng dòng**: Đơn giá vốn, cột Tỷ giá · VAT thực tế áp dụng (ghi chú "theo dòng" khi dòng có tỷ giá/VAT riêng; dòng dùng GiaVonVND thì không qua quy đổi nên không hiện tỷ giá), Thành tiền (= Số lượng × Đơn giá vốn), và Giá bán đề xuất (ghi chú "tự tính +35%" khi cột GiaBanDeXuat để trống).
+
+**Công thức áp dụng cho mọi dòng:** Giá vốn = GiaVonVND nếu có; ngược lại = GiaUSD × Tỷ giá × (1 + VAT%) — tỷ giá/VAT lấy theo dòng nếu có, ngược lại lấy trên form. Thành tiền = Số lượng × Giá vốn. Giá bán đề xuất = GiaBanDeXuat nếu có; để trống = Giá vốn sau VAT × 1,35.
 
 Sau khi bấm **Xác nhận nhập**: hệ thống kiểm tra lại toàn bộ ở máy chủ rồi mới ghi — phiếu tạo thành công sẽ **tự chuyển về đúng danh sách phiếu PN/NK ngay trong trang Nhập kho** để kiểm tra/xác nhận.
 

@@ -341,6 +341,8 @@ interface ImportPayloadRow {
   qty?: unknown;
   costVnd?: unknown;
   usd?: unknown;
+  tyGiaRow?: unknown;
+  vatRow?: unknown;
   salePrice?: unknown;
 }
 
@@ -386,6 +388,32 @@ export async function importStockAction(formData: FormData) {
   );
 
   const items: { product_id: string; qty: number; unit_cost: number }[] = [];
+  // Công thức giá vốn phía máy chủ (không tin bản xem trước ở client):
+  // có GiaVonVND thì dùng luôn; chỉ có GiaUSD thì quy đổi theo tỷ giá và
+  // VAT của DÒNG (cột TyGiaUSD / VAT) nếu dòng có ghi, ngược lại dùng tỷ
+  // giá và VAT trên form. Ô trống = dùng mặc định form; ô có số không hợp
+  // lệ (tỷ giá <= 0, VAT < 0) = dòng lỗi (trả null).
+  const rowRate = (
+    v: unknown,
+    fallback: number,
+    allowZero: boolean
+  ): number | null => {
+    if (v === null || v === undefined || v === "") return fallback;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return null;
+    if (allowZero ? n < 0 : n <= 0) return null;
+    return n;
+  };
+  const rowUnitCost = (r: ImportPayloadRow): number | null => {
+    const costVnd = Number(r.costVnd) || 0;
+    const usd = Number(r.usd) || 0;
+    if (costVnd > 0) return costVnd;
+    if (!(usd > 0)) return 0;
+    const tg = rowRate(r.tyGiaRow, tyGia, false);
+    const vt = rowRate(r.vatRow, vatPct, true);
+    if (tg === null || vt === null) return null;
+    return Math.round(usd * tg * (1 + vt / 100));
+  };
   // Kiểm soát phía máy chủ: kiểm tra TOÀN BỘ file trước khi ghi bất cứ thứ
   // gì. Bất kỳ dòng nào không hợp lệ cũng từ chối cả import (không nhập
   // một phần, không tạo sản phẩm dở dang), kể cả khi giao diện bị bỏ qua.
@@ -393,11 +421,8 @@ export async function importStockAction(formData: FormData) {
   for (const r of rawRows) {
     const code = String(r.code ?? "").trim();
     const qty = Math.trunc(Number(r.qty) || 0);
-    const costVnd = Number(r.costVnd) || 0;
-    const usd = Number(r.usd) || 0;
-    const unitCost =
-      costVnd > 0 ? costVnd : usd > 0 ? Math.round(usd * tyGia * (1 + vatPct / 100)) : 0;
-    if (!code || qty <= 0 || unitCost <= 0) {
+    const unitCost = rowUnitCost(r);
+    if (!code || qty <= 0 || unitCost === null || unitCost <= 0) {
       invalid.push(code || "(dòng thiếu mã)");
       continue;
     }
@@ -424,14 +449,11 @@ export async function importStockAction(formData: FormData) {
   for (const r of rawRows) {
     const code = String(r.code ?? "").trim();
     const qty = Math.trunc(Number(r.qty) || 0);
-    const costVnd = Number(r.costVnd) || 0;
-    const usd = Number(r.usd) || 0;
-    const unitCost =
-      costVnd > 0 ? costVnd : usd > 0 ? Math.round(usd * tyGia * (1 + vatPct / 100)) : 0;
+    const unitCost = rowUnitCost(r);
     const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
       .map((a) => String(a ?? "").trim())
       .filter(Boolean);
-    if (!code || qty <= 0 || unitCost <= 0) continue; // đã chặn ở vòng kiểm tra trước
+    if (!code || qty <= 0 || unitCost === null || unitCost <= 0) continue; // đã chặn ở vòng kiểm tra trước
 
     let productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
     if (!productId) {
@@ -454,7 +476,12 @@ export async function importStockAction(formData: FormData) {
             unit: String(r.unit ?? "").trim() || "Cái",
             retail_price: 0,
             garage_price: 0,
-            wholesale_price: Number(r.salePrice) || 0,
+            // Giá bán đề xuất: theo file nếu có; để trống thì tự tính
+            // bằng giá vốn sau VAT + 35%.
+            wholesale_price:
+              Number(r.salePrice) > 0
+                ? Number(r.salePrice)
+                : Math.round(unitCost * 1.35),
             min_stock: 0,
           })
           .select("id")

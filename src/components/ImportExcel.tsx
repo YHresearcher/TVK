@@ -27,6 +27,10 @@ interface RawRow {
   qty: number;
   costVnd: number;
   usd: number;
+  /** Tỷ giá riêng của dòng (cột TyGiaUSD) — null = dùng tỷ giá trên form. */
+  tyGiaRow: number | null;
+  /** VAT riêng của dòng (cột VAT, %) — null = dùng VAT trên form. */
+  vatRow: number | null;
   salePrice: number;
   note: string;
 }
@@ -34,6 +38,11 @@ interface RawRow {
 interface PreviewRow extends RawRow {
   stt: number;
   unitCost: number;
+  /** Tỷ giá và VAT thực tế áp dụng cho dòng (theo dòng, hoặc mặc định form). */
+  effTyGia: number;
+  effVat: number;
+  /** Giá bán đề xuất thực tế: theo file, hoặc tự tính = giá vốn sau VAT + 35%. */
+  salePriceEff: number;
   status: "existing" | "new" | "error";
   matchedName?: string;
   error?: string;
@@ -61,6 +70,8 @@ const FIELD_ALIASES: Record<keyof RawRow, string[]> = {
   qty: ["soluong", "sl", "qty", "quantity"],
   costVnd: ["giavonvnd", "giavon", "dongia", "cost", "unitcost"],
   usd: ["giausd", "usd", "priceusd"],
+  tyGiaRow: ["tygia", "tygiausd", "tygiavndusd", "tygiavnd"],
+  vatRow: ["vat", "vatphantram", "thuevat", "thuegtgt"],
   salePrice: ["giabandexuat", "giaban", "saleprice"],
   note: ["ghichu", "note"],
 };
@@ -176,6 +187,10 @@ export default function ImportExcel({
         const i = fieldCol[field];
         return i === undefined ? "" : cells[i] ?? "";
       };
+      // Ô trống = không ghi đè (dùng giá trị mặc định trên form); ô có số
+      // (kể cả 0) = giá trị riêng của dòng.
+      const numOrNull = (v: unknown): number | null =>
+        toStr(v) === "" ? null : toNum(v);
       const rows: RawRow[] = [];
       for (const cells of aoa.slice(1) as unknown[][]) {
         if (cells.every((c) => toStr(c) === "")) continue;
@@ -193,6 +208,8 @@ export default function ImportExcel({
           qty: toNum(val(cells, "qty")),
           costVnd: toNum(val(cells, "costVnd")),
           usd: toNum(val(cells, "usd")),
+          tyGiaRow: numOrNull(val(cells, "tyGiaRow")),
+          vatRow: numOrNull(val(cells, "vatRow")),
           salePrice: toNum(val(cells, "salePrice")),
           note: toStr(val(cells, "note")),
         });
@@ -222,12 +239,21 @@ export default function ImportExcel({
     if (!rawRows) return [];
     const seen = new Set<string>();
     return rawRows.map((r, i) => {
+      // Công thức giá vốn: có GiaVonVND thì dùng luôn (đã gồm VAT nếu có);
+      // chỉ có GiaUSD thì quy đổi theo tỷ giá và VAT của DÒNG (cột TyGiaUSD /
+      // VAT) nếu dòng có ghi, ngược lại dùng tỷ giá và VAT trên form.
+      const effTyGia = r.tyGiaRow != null && r.tyGiaRow > 0 ? r.tyGiaRow : tyGia;
+      const effVat = r.vatRow != null && r.vatRow >= 0 ? r.vatRow : vatPct;
       const unitCost =
         r.costVnd > 0
           ? r.costVnd
           : r.usd > 0
-            ? Math.round(r.usd * tyGia * (1 + vatPct / 100))
+            ? Math.round(r.usd * effTyGia * (1 + effVat / 100))
             : 0;
+      // Giá bán đề xuất: theo file nếu có; để trống thì tự tính = giá vốn
+      // sau VAT + 35%.
+      const salePriceEff =
+        r.salePrice > 0 ? r.salePrice : unitCost > 0 ? Math.round(unitCost * 1.35) : 0;
       const matched =
         catalog.get(r.code.trim().toUpperCase()) ??
         r.altCodes
@@ -240,6 +266,10 @@ export default function ImportExcel({
       let error: string | undefined;
       if (!r.code) error = "Thiếu mã hàng";
       else if (!(r.qty > 0)) error = "Số lượng phải lớn hơn 0";
+      else if (r.tyGiaRow != null && !(r.tyGiaRow > 0))
+        error = "Tỷ giá của dòng (TyGiaUSD) phải lớn hơn 0";
+      else if (r.vatRow != null && !(r.vatRow >= 0))
+        error = "VAT của dòng không được âm";
       else if (unitCost <= 0) error = "Chưa có giá vốn (cần GiaVonVND hoặc GiaUSD)";
       else if (!matched && !r.name) error = "Thiếu tên hàng cho sản phẩm mới";
       else if (!matched && !autoCreate)
@@ -250,6 +280,9 @@ export default function ImportExcel({
         ...r,
         stt: i + 1,
         unitCost,
+        effTyGia,
+        effVat,
+        salePriceEff,
         status,
         matchedName: matched?.name,
         error,
@@ -291,6 +324,8 @@ export default function ImportExcel({
       qty: r.qty,
       costVnd: r.costVnd,
       usd: r.usd,
+      tyGiaRow: r.tyGiaRow,
+      vatRow: r.vatRow,
       salePrice: r.salePrice,
       note: r.note,
     })),
@@ -418,6 +453,13 @@ export default function ImportExcel({
           />
         </div>
       </div>
+      <p className="text-xs text-slate-500">
+        Tỷ giá và VAT trên form là mặc định cho cả file — nếu file có cột
+        TyGiaUSD / VAT thì giá trị ghi theo từng dòng sẽ được ưu tiên cho dòng
+        đó. Công thức giá vốn: GiaVonVND (nếu có), ngược lại GiaUSD × Tỷ giá ×
+        (1 + VAT%). Giá bán đề xuất để trống sẽ tự tính bằng giá vốn sau VAT +
+        35%.
+      </p>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -454,15 +496,19 @@ export default function ImportExcel({
             <p className="font-semibold">Định dạng chuẩn của file nhập hàng:</p>
             <p className="mt-1 font-mono text-[11px]">
               MaHang* · MaThayThe · TenHang* · TenTiengAnh · ThuongHieu · DongXe ·
-              DonViTinh · SoLuong* · GiaVonVND · GiaUSD · GiaBanDeXuat · GhiChu
+              DonViTinh · SoLuong* · GiaVonVND · GiaUSD · TyGiaUSD · VAT ·
+              GiaBanDeXuat · GhiChu
             </p>
             <p className="mt-1">
               Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là bắt
               buộc; về giá cần ít nhất một trong hai cột GiaVonVND / GiaUSD).
-              Mỗi dòng là một mặt hàng, không gộp ô (merge), không thêm hàng
-              tiêu đề phụ. Một file chỉ nhập cho một nhà cung cấp. File .csv
-              phải lưu ở mã hoá UTF-8. Dễ nhất: bấm “Tải file mẫu” ở trên, điền
-              vào file mẫu rồi tải lên.
+              Cột TyGiaUSD / VAT là tuỳ chọn theo từng dòng: dòng nào ghi thì
+              dùng tỷ giá và VAT của dòng đó để tính giá vốn, dòng nào để trống
+              thì dùng tỷ giá và VAT trên form. Cột GiaBanDeXuat để trống sẽ
+              tự tính bằng giá vốn sau VAT + 35%. Mỗi dòng là một mặt hàng,
+              không gộp ô (merge), không thêm hàng tiêu đề phụ. Một file chỉ
+              nhập cho một nhà cung cấp. File .csv phải lưu ở mã hoá UTF-8.
+              Dễ nhất: bấm “Tải file mẫu” ở trên, điền vào file mẫu rồi tải lên.
             </p>
           </div>
         </div>
@@ -491,7 +537,9 @@ export default function ImportExcel({
               <th className={thCls}>ĐVT</th>
               <th className={thCls}>SL</th>
               <th className={thCls}>Đơn giá vốn</th>
+              <th className={thCls}>Tỷ giá · VAT</th>
               <th className={thCls}>Thành tiền</th>
+              <th className={thCls}>Giá bán đề xuất</th>
               <th className={thCls}>Trạng thái</th>
             </tr>
           </thead>
@@ -510,7 +558,27 @@ export default function ImportExcel({
                 <td className={tdCls}>{formatNumber(r.qty)}</td>
                 <td className={tdCls}>{r.unitCost > 0 ? formatVND(r.unitCost) : "—"}</td>
                 <td className={tdCls}>
+                  {r.costVnd > 0 || !(r.usd > 0)
+                    ? "—"
+                    : `${formatNumber(r.effTyGia)} · ${r.effVat}%`}
+                  {(r.tyGiaRow != null || r.vatRow != null) &&
+                    r.costVnd <= 0 &&
+                    r.usd > 0 && (
+                      <span className="block text-[10px] text-amber-600">
+                        theo dòng
+                      </span>
+                    )}
+                </td>
+                <td className={tdCls}>
                   {r.unitCost > 0 ? formatVND(r.qty * r.unitCost) : "—"}
+                </td>
+                <td className={tdCls}>
+                  {r.salePriceEff > 0 ? formatVND(r.salePriceEff) : "—"}
+                  {r.salePrice <= 0 && r.salePriceEff > 0 && (
+                    <span className="block text-[10px] text-slate-400">
+                      tự tính +35%
+                    </span>
+                  )}
                 </td>
                 <td className={tdCls}>
                   {r.status === "existing" && (
@@ -545,7 +613,9 @@ export default function ImportExcel({
               </td>
               <td className={tdCls}>{formatNumber(totalQty)}</td>
               <td className={tdCls}></td>
+              <td className={tdCls}></td>
               <td className={tdCls}>{formatVND(totalAmount)}</td>
+              <td className={tdCls}></td>
               <td className={tdCls}></td>
             </tr>
           </tfoot>
