@@ -177,17 +177,18 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **Tự tạo sản phẩm mới nếu mã chưa có** | Bật: mã hàng chưa có trong danh mục sẽ được **tự tạo sản phẩm mới** (kèm mã thay thế + dòng xe trong file). Tắt: dòng nào mã chưa có sẽ báo lỗi và chặn import. |
 | **Xác nhận nhập kho ngay sau khi tạo phiếu** | Bật: phiếu tạo xong được xác nhận luôn (hàng vào kho ngay). Tắt: phiếu ở trạng thái Nháp để kiểm tra lại rồi xác nhận sau ở danh sách phiếu. |
 
-**7 cột trong file Excel — chỉ nhập 7 cột này** (Tỷ giá, VAT, % lợi nhuận nhập trên form, áp chung cho cả file):
+**8 cột trong file Excel — chỉ nhập 8 cột này theo đúng thứ tự** (Tỷ giá, VAT, % lợi nhuận nhập trên form, áp chung cho cả file; tên cột viết bằng tiếng Việt tương ứng — Dòng xe, Tên phụ tùng, Tên tiếng anh, Mã số, Thương hiệu, ĐVT, Số lượng, Đơn giá USD — cũng được nhận):
 
 | Cột | Bắt buộc | Ý nghĩa |
 |---|---|---|
-| **DongXe** | | Dòng xe tương thích (ví dụ HOWO 420/430/440) — tạo thông tin xe tương thích cho sản phẩm mới. |
-| **TenHang** | ✔ | Tên phụ tùng. Bắt buộc với sản phẩm mới; sản phẩm đã có thì tên trong danh mục được giữ nguyên. |
-| **MaHang** | ✔ | Mã số của phụ tùng (SKU) — căn cứ khớp với danh mục. Khớp theo MaHang **hoặc bất kỳ mã thay thế nào** đã đăng ký. |
-| **ThuongHieu** | | Thương hiệu (ví dụ SMS, Normal…) — gán cho sản phẩm khi tự tạo mới. |
-| **DonViTinh** | | Đơn vị tính (cái, bộ, chiếc…). |
-| **SoLuong** | ✔ | Số lượng nhập, phải lớn hơn 0. |
-| **GiaUSD** | ✔ | Đơn giá bằng USD của một đơn vị — đầu vào duy nhất để tính giá nhập. |
+| **DongXe** (Dòng xe) | | Dòng xe tương thích (ví dụ HOWO 420/430/440) — tạo thông tin xe tương thích cho sản phẩm mới. |
+| **TenHang** (Tên phụ tùng) | ✔ | Tên phụ tùng. Bắt buộc với sản phẩm mới; sản phẩm đã có thì tên trong danh mục được giữ nguyên. |
+| **TenTiengAnh** (Tên tiếng anh) | | Tên tiếng Anh nếu có — không bắt buộc, dòng nào chưa có vẫn nhập được (hiện hệ thống chưa lưu cột này vào danh mục). |
+| **MaHang** (Mã số) | ✔ | Mã số của phụ tùng (SKU) — căn cứ khớp với danh mục. Khớp theo MaHang **hoặc bất kỳ mã thay thế nào** đã đăng ký. |
+| **ThuongHieu** (Thương hiệu) | | Thương hiệu (ví dụ SMS, Normal…) — gán cho sản phẩm khi tự tạo mới. |
+| **DonViTinh** (ĐVT) | | Đơn vị tính (cái, bộ, chiếc…). |
+| **SoLuong** (Số lượng) | ✔ | Số lượng nhập, phải lớn hơn 0. |
+| **GiaUSD** (Đơn giá USD) | ✔ | Đơn giá bằng USD của một đơn vị — đầu vào duy nhất để tính giá nhập. |
 
 **Bảng xem trước (preview) — đọc trạng thái từng dòng trước khi nhập:**
 

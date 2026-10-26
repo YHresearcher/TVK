@@ -52,15 +52,15 @@ function normalizeHeader(h: unknown): string {
 }
 
 const FIELD_ALIASES: Record<keyof RawRow, string[]> = {
-  code: ["mahang", "ma", "sku", "code", "mahanghoa"],
+  code: ["mahang", "maso", "ma", "sku", "code", "mahanghoa"],
   altCodes: ["mathaythe", "mathay", "altcodes", "matuongduong"],
-  name: ["tenhang", "ten", "name"],
+  name: ["tenhang", "tenphutung", "ten", "name"],
   nameEn: ["tentienganh", "nameen"],
   brand: ["thuonghieu", "brand"],
   fitment: ["dongxe", "dong", "fitment"],
   unit: ["donvitinh", "dvt", "unit"],
   qty: ["soluong", "sl", "qty", "quantity"],
-  usd: ["giausd", "usd", "priceusd"],
+  usd: ["giausd", "dongiausd", "usd", "priceusd"],
   note: ["ghichu", "note"],
 };
 
@@ -466,13 +466,16 @@ export default function ImportExcel({
           <div className="rounded-md bg-white/70 px-3 py-2 text-xs leading-relaxed text-slate-700">
             <p className="font-semibold">Định dạng chuẩn của file nhập hàng:</p>
             <p className="mt-1 font-mono text-[11px]">
-              DongXe · TenHang* · MaHang* · ThuongHieu · DonViTinh · SoLuong* ·
-              GiaUSD*
+              DongXe · TenHang* · TenTiengAnh · MaHang* · ThuongHieu · DonViTinh ·
+              SoLuong* · GiaUSD*
             </p>
             <p className="mt-1">
               Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là bắt
-              buộc). File chỉ cần 7 cột này — Tỷ giá, VAT và % lợi nhuận nhập
-              trên form, áp dụng chung cho toàn bộ file. Hệ thống tự tính:
+              buộc). File chỉ cần 8 cột này — Tỷ giá, VAT và % lợi nhuận nhập
+              trên form, áp dụng chung cho toàn bộ file. Đặt tên cột bằng tên
+              tiếng Việt tương ứng (Dòng xe, Tên phụ tùng, Tên tiếng anh, Mã
+              số, Thương hiệu, ĐVT, Số lượng, Đơn giá USD) cũng được nhận.
+              Hệ thống tự tính:
               Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%); Thành tiền =
               Số lượng × Đơn giá nhập; Giá bán = Đơn giá nhập × (1 + %
               lợi nhuận). Mỗi dòng là một mặt hàng, không gộp ô (merge),
