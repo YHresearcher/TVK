@@ -37,8 +37,10 @@ interface PreviewRow extends RawRow {
   stt: number;
   /** Đơn giá nhập VNĐ: GiaUSD × Tỷ giá × (1 + VAT%) — tỷ giá, VAT trên form. */
   unitCost: number;
-  /** Giá bán: Đơn giá nhập × (1 + % lợi nhuận trên form). */
+  /** Giá đại lý: Đơn giá nhập × (1 + % lợi nhuận trên form). */
   salePriceEff: number;
+  /** Giá lẻ: Đơn giá nhập × (1 + % giá bán lẻ trên form). */
+  retailPriceEff: number;
   status: "existing" | "new" | "error";
   matchedName?: string;
   error?: string;
@@ -107,6 +109,9 @@ export default function ImportExcel({
   const [tyGia, setTyGia] = useState(27000);
   const [vatPct, setVatPct] = useState(8);
   const [profitPct, setProfitPct] = useState(35);
+  // % giá bán lẻ: cùng cách tính như giá đại lý (Đơn giá nhập × (1 + %)),
+  // mặc định cao hơn % lợi nhuận đại lý — đổi được ngay trên form.
+  const [retailPct, setRetailPct] = useState(50);
   const [autoCreate, setAutoCreate] = useState(true);
   const [confirmNow, setConfirmNow] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -223,13 +228,16 @@ export default function ImportExcel({
     if (!rawRows) return [];
     const seen = new Set<string>();
     return rawRows.map((r, i) => {
-      // Công thức áp chung cho toàn bộ file (tỷ giá, VAT, % lợi nhuận nhập
-      // trên form): Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%);
-      // Giá bán = Đơn giá nhập × (1 + % lợi nhuận).
+      // Công thức áp chung cho toàn bộ file (tỷ giá, VAT, % lợi nhuận và
+      // % giá bán lẻ nhập trên form): Đơn giá nhập VNĐ = GiaUSD × Tỷ giá
+      // × (1 + VAT%); Giá đại lý = Đơn giá nhập × (1 + % lợi nhuận);
+      // Giá lẻ = Đơn giá nhập × (1 + % giá bán lẻ).
       const unitCost =
         r.usd > 0 ? Math.round(r.usd * tyGia * (1 + vatPct / 100)) : 0;
       const salePriceEff =
         unitCost > 0 ? Math.round(unitCost * (1 + profitPct / 100)) : 0;
+      const retailPriceEff =
+        unitCost > 0 ? Math.round(unitCost * (1 + retailPct / 100)) : 0;
       const matched =
         catalog.get(r.code.trim().toUpperCase()) ??
         r.altCodes
@@ -253,13 +261,14 @@ export default function ImportExcel({
         stt: i + 1,
         unitCost,
         salePriceEff,
+        retailPriceEff,
         status,
         matchedName: matched?.name,
         error,
         duplicate,
       };
     });
-  }, [rawRows, catalog, tyGia, vatPct, profitPct, autoCreate]);
+  }, [rawRows, catalog, tyGia, vatPct, profitPct, retailPct, autoCreate]);
 
   const importable = preview.filter((r) => r.status !== "error");
   const errorCount = preview.length - importable.length;
@@ -292,6 +301,7 @@ export default function ImportExcel({
     tyGia,
     vatPct,
     profitPct,
+    retailPct,
     autoCreate,
     confirmNow,
     rows: importable.map((r) => ({
@@ -438,6 +448,15 @@ export default function ImportExcel({
             className={inputCls}
           />
         </div>
+        <div>
+          <label className={labelCls}>% giá bán lẻ</label>
+          <input
+            type="number"
+            value={retailPct}
+            onChange={(e) => setRetailPct(Number(e.target.value) || 0)}
+            className={inputCls}
+          />
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -519,7 +538,8 @@ export default function ImportExcel({
               <th className={thNumCls}>Đơn giá USD</th>
               <th className={thNumCls}>Đơn giá VND + VAT</th>
               <th className={thNumCls}>Thành tiền</th>
-              <th className={thNumCls}>Giá bán</th>
+              <th className={thNumCls}>Giá đại lý</th>
+              <th className={thNumCls}>Giá lẻ</th>
               <th className={thCls}>Trạng thái</th>
             </tr>
           </thead>
@@ -543,6 +563,9 @@ export default function ImportExcel({
                 </td>
                 <td className={tdNumCls}>
                   {r.salePriceEff > 0 ? formatVND(r.salePriceEff) : "—"}
+                </td>
+                <td className={tdNumCls}>
+                  {r.retailPriceEff > 0 ? formatVND(r.retailPriceEff) : "—"}
                 </td>
                 <td className={tdCls}>
                   {r.status === "existing" && (
@@ -579,6 +602,7 @@ export default function ImportExcel({
               <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdNumCls}>{formatVND(exactTotal)}</td>
+              <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
             </tr>

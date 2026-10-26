@@ -363,9 +363,11 @@ interface ImportPayloadRow {
 /**
  * Import a whole stock-in receipt (PN or NK) from a JSON payload produced by
  * the /import page. Prices are recomputed here — the client's preview is
- * never trusted. Tỷ giá, VAT and % lợi nhuận from the form apply to the
- * whole file: unit cost = GiaUSD × Tỷ giá × (1 + VAT%), selling price =
- * unit cost × (1 + Lợi nhuận%). The receipt also stores rounding_adjustment
+ * never trusted. Tỷ giá, VAT, % lợi nhuận and % giá bán lẻ from the form
+ * apply to the whole file: unit cost = GiaUSD × Tỷ giá × (1 + VAT%),
+ * dealer price = unit cost × (1 + Lợi nhuận%), retail price = unit cost ×
+ * (1 + % giá bán lẻ). Dealer and retail prices become wholesale_price and
+ * retail_price of auto-created products. The receipt also stores rounding_adjustment
  * (migration 0010): round(sum of exact line values) minus sum of rounded
  * lines, so the receipt total matches the accountant's convention while
  * per-line prices stay invoice-compatible. Products are matched by primary
@@ -388,6 +390,7 @@ export async function importStockAction(formData: FormData) {
   const tyGia = Number(payload.tyGia) || 0;
   const vatPct = Number(payload.vatPct) || 0;
   const profitPct = Number(payload.profitPct) || 0;
+  const retailPct = Number(payload.retailPct) || 0;
   const autoCreate = !!payload.autoCreate;
   const confirmNow = !!payload.confirmNow;
   const rawRows: ImportPayloadRow[] = Array.isArray(payload.rows) ? payload.rows : [];
@@ -412,10 +415,14 @@ export async function importStockAction(formData: FormData) {
   // Công thức phía máy chủ (không tin bản xem trước ở client), áp chung
   // cho toàn bộ file: Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%);
   // Giá bán = Đơn giá nhập × (1 + % lợi nhuận).
-  const rowPrices = (r: ImportPayloadRow): { unitCost: number; salePrice: number } => {
+  const rowPrices = (r: ImportPayloadRow): { unitCost: number; salePrice: number; retailPrice: number } => {
     const usd = Number(r.usd) || 0;
     const unitCost = usd > 0 ? Math.round(usd * tyGia * (1 + vatPct / 100)) : 0;
-    return { unitCost, salePrice: Math.round(unitCost * (1 + profitPct / 100)) };
+    return {
+      unitCost,
+      salePrice: Math.round(unitCost * (1 + profitPct / 100)),
+      retailPrice: Math.round(unitCost * (1 + retailPct / 100)),
+    };
   };
   // Chênh lệch làm tròn (khớp kế toán, migration 0010): tổng làm tròn một
   // lần ở cuối từ giá trị chính xác của từng dòng, trừ đi tổng các dòng
@@ -460,7 +467,7 @@ export async function importStockAction(formData: FormData) {
   for (const r of rawRows) {
     const code = String(r.code ?? "").trim();
     const qty = Math.trunc(Number(r.qty) || 0);
-    const { unitCost, salePrice } = rowPrices(r);
+    const { unitCost, salePrice, retailPrice } = rowPrices(r);
     const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
       .map((a) => String(a ?? "").trim())
       .filter(Boolean);
@@ -488,10 +495,11 @@ export async function importStockAction(formData: FormData) {
             name: String(r.name ?? "").trim() || code,
             brand: String(r.brand ?? "").trim() || null,
             unit: String(r.unit ?? "").trim() || "Cái",
-            retail_price: 0,
-            garage_price: 0,
-            // Giá bán sỉ ban đầu của sản phẩm mới = Đơn giá nhập ×
+            // Giá ban đầu của sản phẩm mới: Giá lẻ = Đơn giá nhập ×
+            // (1 + % giá bán lẻ trên form); Giá đại lý = Đơn giá nhập ×
             // (1 + % lợi nhuận trên form).
+            retail_price: retailPrice,
+            garage_price: 0,
             wholesale_price: salePrice,
             min_stock: 0,
           })

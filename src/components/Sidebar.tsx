@@ -205,13 +205,13 @@ export default function Sidebar({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col bg-gradient-to-b from-slate-900 to-slate-950 text-slate-200 transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white text-slate-700 transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-      <div className="border-b border-slate-700 px-5 py-4">
-        <p className="text-lg font-bold tracking-wide text-white">TVK</p>
-        <p className="text-xs text-slate-400">Quản lý kho phụ tùng</p>
+      <div className="border-b border-slate-200 px-5 py-4">
+        <p className="text-lg font-bold tracking-wide text-slate-900">TVK</p>
+        <p className="text-xs text-slate-500">Quản lý kho phụ tùng</p>
       </div>
       <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
         <div className={TOP_FRAME.card}>
@@ -285,17 +285,21 @@ export default function Sidebar({
           </Link>
         </div>
       </nav>
-      <div className="border-t border-slate-700 px-5 py-4">
-        <p className="truncate text-sm font-medium text-white">{userName}</p>
-        <p className="text-xs text-slate-400">{role}</p>
+      <div className="border-t border-slate-200 px-5 py-4">
+        <p className="truncate text-sm font-medium text-slate-900">{userName}</p>
+        <p className="text-xs text-slate-500">{role}</p>
         <form action={signOutAction} className="mt-3">
           <button
             type="submit"
-            className="w-full rounded-md border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100"
           >
             Đăng xuất
           </button>
         </form>
+        <div className="mt-4 border-t border-slate-200 pt-3 text-center">
+          <p className="text-[11px] text-slate-400">TVK management system by Thanh Phan</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">version 1.0</p>
+        </div>
       </div>
       </aside>
     </>

@@ -33,11 +33,23 @@ export default function ItemsRows({
   initialRows = 3,
   addLabel = "+ Thêm dòng",
   codeMap,
+  priceFill,
 }: {
   fields: ItemField[];
   initialRows?: number;
   addLabel?: string;
   codeMap?: Record<string, string>;
+  /**
+   * Tự điền giá: khi ô select `selectName` đổi giá trị, điền giá tương ứng
+   * vào ô `priceField` cùng dòng (chỉ điền khi giá > 0; người dùng vẫn sửa
+   * tay được sau đó). Dùng cho form bán hàng: chọn lô → đơn giá theo loại
+   * giá đang chọn (lẻ / đại lý).
+   */
+  priceFill?: {
+    selectName: string;
+    priceField: string;
+    prices: Record<string, number>;
+  };
 }) {
   const [rows, setRows] = useState<number[]>(() =>
     Array.from({ length: initialRows }, (_, i) => i)
@@ -108,6 +120,19 @@ export default function ItemsRows({
                 className={inputCls}
                 defaultValue={
                   defaults && f.name === "product_id" ? defaults.productId : ""
+                }
+                onChange={
+                  priceFill && f.name === priceFill.selectName
+                    ? (e) => {
+                        const row = e.currentTarget.closest("div.grid");
+                        const input = row?.querySelector<HTMLInputElement>(
+                          `input[name="${priceFill.priceField}"]`
+                        );
+                        const price = priceFill.prices[e.currentTarget.value];
+                        if (input && price !== undefined && price > 0)
+                          input.value = String(price);
+                      }
+                    : undefined
                 }
               >
                 <option value="">— Chọn —</option>

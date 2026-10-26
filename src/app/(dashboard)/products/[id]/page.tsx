@@ -22,9 +22,9 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
       <div className="grid gap-6 lg:grid-cols-3">
         <Card title="Bảng giá">
           <dl className="space-y-2 text-sm">
-            <div className="flex justify-between"><dt className="text-slate-500">Bán lẻ</dt><dd className="font-medium">{formatVND(p.retail_price)}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Giá lẻ</dt><dd className="font-medium">{formatVND(p.retail_price)}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Cho gara</dt><dd className="font-medium">{formatVND(p.garage_price)}</dd></div>
-            <div className="flex justify-between"><dt className="text-slate-500">Bán sỉ</dt><dd className="font-medium">{formatVND(p.wholesale_price)}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Giá đại lý</dt><dd className="font-medium">{formatVND(p.wholesale_price)}</dd></div>
           </dl>
         </Card>
 

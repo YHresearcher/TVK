@@ -97,7 +97,7 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 | Nhóm | Mục | Dùng để |
 |---|---|---|
 | — | **Tổng quan** | Doanh thu 14 ngày, cơ cấu tồn kho, công nợ, hàng bán chạy, cảnh báo (tồn thấp, lệch kiểm soát đối tác…) |
-| **Hàng hoá & Kho** | Sản phẩm | Danh mục sản phẩm, mã OEM/mã tương đương, xe tương thích, giá bán |
+| **Hàng hoá & Kho** | Sản phẩm | Danh mục sản phẩm, mã OEM/mã tương đương, xe tương thích, giá lẻ + giá đại lý |
 | | Tồn kho theo lô | Xem tồn theo từng lô OWN/CONS, vị trí giữ hàng, kiểm kê & điều chỉnh |
 | | Nhập kho | Tạo phiếu PN / NK thủ công, hoặc **Nhập từ Excel** (nút thứ ba trong trang) |
 | **Ký gửi** | Gửi ký gửi | Lập phiếu GK gửi hàng cho đối tác |
@@ -199,9 +199,9 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **Lỗi** (đỏ) | Dòng không hợp lệ (thiếu mã, số lượng ≤ 0, thiếu GiaUSD, hàng mới mà thiếu tên…). **Còn bất kỳ dòng lỗi nào là hệ thống không cho nhập** — sửa trong file Excel rồi tải lại. |
 | **Trùng mã trong file** (vàng) | Mã xuất hiện từ 2 dòng trở lên trong cùng file — cần kiểm tra lại (thường là lỗi soạn file). |
 
-Ngoài trạng thái, bảng xem trước còn cho thấy **kết quả tính toán của từng dòng**: Đơn giá USD, Đơn giá VND + VAT, Thành tiền, và Giá bán; cuối bảng là **Total giá nhập VND** — tổng khớp với kế toán (xem công thức).
+Ngoài trạng thái, bảng xem trước còn cho thấy **kết quả tính toán của từng dòng**: Đơn giá USD, Đơn giá VND + VAT, Thành tiền, Giá đại lý và Giá lẻ; cuối bảng là **Total giá nhập VND** — tổng khớp với kế toán (xem công thức).
 
-**Công thức áp dụng cho mọi dòng (Tỷ giá, VAT, % lợi nhuận trên form áp chung cho cả file):** Đơn giá VND + VAT = GiaUSD × Tỷ giá × (1 + VAT%). Thành tiền = Số lượng × Đơn giá VND + VAT. Giá bán = Đơn giá VND + VAT × (1 + % lợi nhuận) — với hàng mới, giá bán này thành giá bán sỉ ban đầu của sản phẩm. Ví dụ: GiaUSD 100, Tỷ giá 27.000, VAT 8%, Lợi nhuận 35% → Đơn giá VND + VAT 2.916.000; Giá bán 3.936.600; nhập 15 cái → Thành tiền 43.740.000.
+**Công thức áp dụng cho mọi dòng (Tỷ giá, VAT, % lợi nhuận, % giá bán lẻ trên form áp chung cho cả file):** Đơn giá VND + VAT = GiaUSD × Tỷ giá × (1 + VAT%). Thành tiền = Số lượng × Đơn giá VND + VAT. Giá đại lý = Đơn giá VND + VAT × (1 + % lợi nhuận); Giá lẻ = Đơn giá VND + VAT × (1 + % giá bán lẻ) — với hàng mới, hai giá này thành giá đại lý và giá lẻ ban đầu của sản phẩm (mặc định: lợi nhuận 35%, giá lẻ 50%, đổi được ngay trên form). Ví dụ: GiaUSD 100, Tỷ giá 27.000, VAT 8%, Lợi nhuận 35% → Đơn giá VND + VAT 2.916.000; Giá đại lý 3.936.600; Giá lẻ (50%) 4.374.000; nhập 15 cái → Thành tiền 43.740.000.
 
 **Chênh lệch làm tròn (khớp kế toán, lưu ngầm):** đơn giá từng dòng được làm tròn về đồng chẵn (khớp hoá đơn nhà cung cấp), nên tổng các dòng có thể lệch vài chục đồng so với tổng làm tròn một lần ở cuối từ giá trị chính xác — đúng kiểu lệch 47 đồng từng gặp. Để tổng khớp tuyệt đối với kế toán, **Total giá nhập VND** ở cuối bảng = tổng làm tròn một lần (không phải tổng các dòng). Chênh lệch (= Total làm tròn một lần − tổng các dòng, có thể âm) vẫn được tính và lưu cùng phiếu nhập (cột `rounding_adjustment`), cộng vào tổng phiếu khi xác nhận — nhưng không hiện thành dòng riêng ở cuối bảng nữa, bảng chỉ hiện Total cuối cùng.
 
@@ -219,7 +219,7 @@ File bị **từ chối ngay, không xem trước**, kèm lý do cụ thể, khi
 Vào **Ký gửi → Gửi ký gửi**: chọn đối tác, kho xuất, và **chọn theo lô** (bắt buộc chọn đúng lô — vì cùng sản phẩm có thể có nhiều lô khác chủ sở hữu). Hệ thống chặn gửi tiếp lô CONS của nhà cung cấp (ô D) trừ khi nhà cung cấp đó đã bật "Cho phép ký gửi tiếp" trong hồ sơ. Kiểm tra hạn mức ký gửi của đối tác trước khi xác nhận.
 
 ### D2. Bán tại quầy
-Vào **Bán hàng → Bán hàng**: chọn khách/đối tác (nếu có), thêm dòng **theo lô**, nhập số lượng và giá bán. Hệ thống tự tách phần hàng mình → chứng từ **BH** (được áp giảm giá ở đây) và phần hàng ký gửi → chứng từ **KG**. Giảm giá chỉ trừ trên BH.
+Vào **Bán hàng → Bán hàng**: chọn khách/đối tác (nếu có), chọn **Loại giá** (mặc định **Bán đại lý**), thêm dòng **theo lô**, nhập số lượng. Chọn lô sẽ tự điền đơn giá theo loại giá: **Bán lẻ** → giá lẻ của sản phẩm, các lựa chọn khác → giá đại lý (sản phẩm chưa đặt giá thì để trống cho tự nhập; đơn giá tự điền vẫn sửa tay được, đổi loại giá cũng cập nhật lại các dòng đã chọn lô). Hệ thống tự tách phần hàng mình → chứng từ **BH** (được áp giảm giá ở đây) và phần hàng ký gửi → chứng từ **KG**. Giảm giá chỉ trừ trên BH.
 
 ### D3. Tiêu thụ của đối tác & phân bổ
 Khi đối tác báo đã bán được hàng họ đang giữ: vào **Ký gửi → Tiêu thụ của đối tác**, lập **BT** theo từng sản phẩm/số lượng đối tác báo. Hệ thống **phân bổ (PB)** số tiêu thụ vào các lô đối tác đang giữ (mặc định lô cũ trước — FIFO), sinh chứng từ BH/KG tương ứng và các khoản phải thu/phải trả liên quan. Đối tác bán chưa hết: phần còn lại vẫn nằm ở đối tác, không phát sinh tiền (xem A5).

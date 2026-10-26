@@ -47,7 +47,7 @@ export default async function ProductsPage({
               <thead>
                 <tr>
                   <th className={thCls}>SKU</th><th className={thCls}>Tên</th><th className={thCls}>Thương hiệu</th>
-                  <th className={thCls}>Giá bán lẻ</th><th className={thCls}>Của mình</th><th className={thCls}>Ký gửi</th>
+                  <th className={thCls}>Giá lẻ</th><th className={thCls}>Giá đại lý</th><th className={thCls}>Của mình</th><th className={thCls}>Ký gửi</th>
                   <th className={thCls}>Tại đối tác</th><th className={thCls}>Tổng</th>
                 </tr>
               </thead>
@@ -62,6 +62,7 @@ export default async function ProductsPage({
                       <td className={tdCls}>{p.name}</td>
                       <td className={tdCls}>{p.brand ?? "—"}</td>
                       <td className={tdCls}>{formatVND(p.retail_price)}</td>
+                      <td className={tdCls}>{formatVND(p.wholesale_price)}</td>
                       <td className={tdCls}>{formatNumber(s?.owned_at_own_wh ?? 0)}</td>
                       <td className={tdCls}>{formatNumber(s?.consigned_at_own_wh ?? 0)}</td>
                       <td className={tdCls}>{formatNumber(Number(s?.owned_at_partners ?? 0) + Number(s?.consigned_at_partners ?? 0))}</td>
@@ -84,9 +85,9 @@ export default async function ProductsPage({
               <div><label className={labelCls}>Tồn tối thiểu</label><input name="min_stock" type="number" defaultValue="0" className={inputCls} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div><label className={labelCls}>Giá bán lẻ</label><input name="retail_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
+              <div><label className={labelCls}>Giá lẻ</label><input name="retail_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
               <div><label className={labelCls}>Giá cho gara</label><input name="garage_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
-              <div><label className={labelCls}>Giá sỉ</label><input name="wholesale_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
+              <div><label className={labelCls}>Giá đại lý</label><input name="wholesale_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
             </div>
             <div>
               <label className={labelCls}>Mã tra cứu (mỗi dòng một mã, định dạng: MÃ hoặc MÃ|LOẠI — LOẠI: OEM, MANUFACTURER, AFTERMARKET, EQUIVALENT)</label>

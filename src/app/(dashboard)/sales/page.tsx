@@ -1,7 +1,7 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
-import ItemsRows from "@/components/ItemsRows";
+import SalePriceSection from "@/components/SalePriceSection";
 import { createCounterSaleAction } from "@/lib/actions";
-import { getCurrentProfile, listBatchStock, listPartners, listSalesDocuments, listSalesOrders } from "@/lib/queries";
+import { getCurrentProfile, listBatchStock, listPartners, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
 
@@ -12,11 +12,12 @@ export default async function SalesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [orders, documents, partners, batchStock, profile] = await Promise.all([
+  const [orders, documents, partners, batchStock, products, profile] = await Promise.all([
     listSalesOrders(),
     listSalesDocuments(),
     listPartners(),
     listBatchStock(),
+    listProducts(),
     getCurrentProfile(),
   ]);
   const configured = orders.configured;
@@ -33,6 +34,21 @@ export default async function SalesPage({
     value: r.batch_id,
     label: `${r.batch_code} — ${r.product_name} · ${OWNERSHIP_LABELS[r.ownership] ?? r.ownership} · tại ${r.location_name}`,
   }));
+  // Giá theo lô cho ô loại giá: lẻ lấy retail_price, đại lý lấy
+  // wholesale_price của sản phẩm trong lô.
+  const productById = new Map(
+    products.data.map((p) => [p.id, p])
+  );
+  const batchPrices: Record<string, { retail: number; wholesale: number }> = {};
+  for (const r of ownBatches) {
+    const p = productById.get(r.product_id);
+    if (p) {
+      batchPrices[r.batch_id] = {
+        retail: Number(p.retail_price) || 0,
+        wholesale: Number(p.wholesale_price) || 0,
+      };
+    }
+  }
 
   return (
     <>
@@ -57,11 +73,7 @@ export default async function SalesPage({
                 </label>
               </div>
             </div>
-            <ItemsRows fields={[
-              { name: "batch_id", label: "Lô", type: "select", options: batchOptions },
-              { name: "qty", label: "Số lượng", type: "number" },
-              { name: "unit_price", label: "Đơn giá (₫)", type: "number", step: "1000" },
-            ]} initialRows={2} />
+            <SalePriceSection batchOptions={batchOptions} batchPrices={batchPrices} />
             <button type="submit" className={btnCls}>Hoàn tất bán hàng</button>
           </form>
         </Card>
