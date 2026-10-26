@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
-import { formatNumber, formatVND, todayISO } from "@/lib/format";
+import { formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
 import type { AnyRow } from "@/lib/types";
 
 interface CatalogProduct {
@@ -428,8 +428,9 @@ export default function ImportExcel({
       <p className="text-xs text-slate-500">
         Tỷ giá, VAT và % lợi nhuận nhập trên form được áp dụng chung cho toàn
         bộ sản phẩm trong file (thông tin chung tại một thời điểm). Công thức:
-        Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%); Thành tiền = Số lượng
-        × Đơn giá nhập; Giá bán = Đơn giá nhập × (1 + % lợi nhuận).
+        Đơn giá VND + VAT = GiaUSD × Tỷ giá × (1 + VAT%); Thành tiền = Số
+        lượng × Đơn giá VND + VAT; Giá bán = Đơn giá VND + VAT × (1 + %
+        lợi nhuận).
       </p>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -509,7 +510,8 @@ export default function ImportExcel({
               <th className={thCls}>Tên hàng</th>
               <th className={thCls}>ĐVT</th>
               <th className={thCls}>SL</th>
-              <th className={thCls}>Đơn giá nhập VNĐ</th>
+              <th className={thCls}>Đơn giá USD</th>
+              <th className={thCls}>Đơn giá VND + VAT</th>
               <th className={thCls}>Thành tiền</th>
               <th className={thCls}>Giá bán</th>
               <th className={thCls}>Trạng thái</th>
@@ -528,6 +530,7 @@ export default function ImportExcel({
                 </td>
                 <td className={tdCls}>{r.unit || "—"}</td>
                 <td className={tdCls}>{formatNumber(r.qty)}</td>
+                <td className={tdCls}>{r.usd > 0 ? formatUSD(r.usd) : "—"}</td>
                 <td className={tdCls}>{r.unitCost > 0 ? formatVND(r.unitCost) : "—"}</td>
                 <td className={tdCls}>
                   {r.unitCost > 0 ? formatVND(r.qty * r.unitCost) : "—"}
@@ -567,6 +570,7 @@ export default function ImportExcel({
                 Tổng các dòng sẽ nhập ({importable.length} dòng)
               </td>
               <td className={tdCls}>{formatNumber(totalQty)}</td>
+              <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdCls}>{formatVND(totalAmount)}</td>
               <td className={tdCls}></td>

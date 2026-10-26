@@ -173,7 +173,7 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **Số hoá đơn của nhà cung cấp (chỉ PN)** | Như ở C1; để trống nếu là NK. |
 | **Tỷ giá (VNĐ/USD)** | Tỷ giá áp dụng chung cho toàn bộ file để quy đổi giá USD sang VNĐ. Mặc định 27.000 — đổi theo tỷ giá tại thời điểm nhập. |
 | **VAT % (cộng vào giá USD)** | % thuế áp dụng chung cho toàn bộ file, cộng thêm khi quy đổi giá USD (mặc định 8%). |
-| **% lợi nhuận / sản phẩm** | % lợi nhuận áp dụng chung cho toàn bộ file để tính giá bán (mặc định 35%). Công thức giá bán: **Đơn giá nhập × (1 + % lợi nhuận)**. |
+| **% lợi nhuận / sản phẩm** | % lợi nhuận áp dụng chung cho toàn bộ file để tính giá bán (mặc định 35%). Công thức giá bán: **Đơn giá VND + VAT × (1 + % lợi nhuận)**. |
 | **Tự tạo sản phẩm mới nếu mã chưa có** | Bật: mã hàng chưa có trong danh mục sẽ được **tự tạo sản phẩm mới** (kèm mã thay thế + dòng xe trong file). Tắt: dòng nào mã chưa có sẽ báo lỗi và chặn import. |
 | **Xác nhận nhập kho ngay sau khi tạo phiếu** | Bật: phiếu tạo xong được xác nhận luôn (hàng vào kho ngay). Tắt: phiếu ở trạng thái Nháp để kiểm tra lại rồi xác nhận sau ở danh sách phiếu. |
 
@@ -199,9 +199,9 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **Lỗi** (đỏ) | Dòng không hợp lệ (thiếu mã, số lượng ≤ 0, thiếu GiaUSD, hàng mới mà thiếu tên…). **Còn bất kỳ dòng lỗi nào là hệ thống không cho nhập** — sửa trong file Excel rồi tải lại. |
 | **Trùng mã trong file** (vàng) | Mã xuất hiện từ 2 dòng trở lên trong cùng file — cần kiểm tra lại (thường là lỗi soạn file). |
 
-Ngoài trạng thái, bảng xem trước còn cho thấy **kết quả tính toán của từng dòng**: Đơn giá nhập VNĐ, Thành tiền, và Giá bán; cuối bảng là **Total giá nhập VND** (tổng Thành tiền của tất cả các dòng sẽ nhập).
+Ngoài trạng thái, bảng xem trước còn cho thấy **kết quả tính toán của từng dòng**: Đơn giá USD, Đơn giá VND + VAT, Thành tiền, và Giá bán; cuối bảng là **Total giá nhập VND** (tổng Thành tiền của tất cả các dòng sẽ nhập).
 
-**Công thức áp dụng cho mọi dòng (Tỷ giá, VAT, % lợi nhuận trên form áp chung cho cả file):** Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%). Thành tiền = Số lượng × Đơn giá nhập. Giá bán = Đơn giá nhập × (1 + % lợi nhuận) — với hàng mới, giá bán này thành giá bán sỉ ban đầu của sản phẩm. Ví dụ: GiaUSD 100, Tỷ giá 27.000, VAT 8%, Lợi nhuận 35% → Đơn giá nhập 2.916.000; Giá bán 3.936.600; nhập 15 cái → Thành tiền 43.740.000.
+**Công thức áp dụng cho mọi dòng (Tỷ giá, VAT, % lợi nhuận trên form áp chung cho cả file):** Đơn giá VND + VAT = GiaUSD × Tỷ giá × (1 + VAT%). Thành tiền = Số lượng × Đơn giá VND + VAT. Giá bán = Đơn giá VND + VAT × (1 + % lợi nhuận) — với hàng mới, giá bán này thành giá bán sỉ ban đầu của sản phẩm. Ví dụ: GiaUSD 100, Tỷ giá 27.000, VAT 8%, Lợi nhuận 35% → Đơn giá VND + VAT 2.916.000; Giá bán 3.936.600; nhập 15 cái → Thành tiền 43.740.000.
 
 Sau khi bấm **Xác nhận nhập**: hệ thống kiểm tra lại toàn bộ ở máy chủ rồi mới ghi — phiếu tạo thành công sẽ **tự chuyển về đúng danh sách phiếu PN/NK ngay trong trang Nhập kho** để kiểm tra/xác nhận.
 
