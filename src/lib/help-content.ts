@@ -68,7 +68,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Bán hàng tại quầy",
     roles: ["SALES"],
     points: [
-      "Vào Bán hàng → chọn tab Bán lẻ (giá lẻ) hoặc Bán đại lý (giá đại lý), chọn Đối tác (để trống là khách lẻ) hoặc điền Tên khách hàng, tick “Bán chịu (tạo phải thu)” nếu bán nợ, rồi thêm từng dòng: chọn đúng LÔ, nhập số lượng — đơn giá tự điền theo giá của tab, cuối cùng bấm “Hoàn tất bán lẻ” / “Hoàn tất bán đại lý”.",
+      "Vào Bán hàng → chọn tab Bán lẻ (giá lẻ) hoặc Bán đại lý (giá đại lý), chọn Đối tác (để trống là khách lẻ) hoặc điền Tên khách hàng, tick “Bán chịu (tạo phải thu)” nếu bán nợ, rồi thêm từng dòng: chọn đúng LÔ, nhập số lượng — đơn giá tự điền theo giá của tab, cuối cùng bấm “Hoàn tất bán lẻ” / “Hoàn tất bán đại lý”. Tab Bán lẻ có ô quét mã vạch: quét mã hàng để thêm dòng theo lô cũ nhất còn hàng (FIFO), quét lại cùng mã để cộng số lượng.",
       "Chứng từ tự tách theo lô bạn chọn: lô của mình vào chứng từ BH, lô ký gửi vào chứng từ KG và tự động tạo khoản phải trả cho nhà cung cấp của lô đó theo giá ký gửi. Vì vậy chọn đúng lô là bước quan trọng nhất.",
       "Ô “Giảm giá cho phần BH” chỉ trừ vào phần hàng của mình (BH); giảm giá không bao giờ làm thay đổi khoản phải trả cho nhà cung cấp của hàng ký gửi.",
       "Bán xong, tồn kho và công nợ cập nhật ngay — kiểm tra lại ở hai bảng “Đơn hàng gần đây” và “Chứng từ quản lý (BH / KG)” ngay dưới form.",

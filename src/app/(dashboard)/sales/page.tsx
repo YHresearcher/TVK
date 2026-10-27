@@ -1,7 +1,7 @@
 import { EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
 import CounterSaleTabs from "@/components/CounterSaleTabs";
 import { createCounterSaleAction } from "@/lib/actions";
-import { getCurrentProfile, listBatchStock, listPartners, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, listBatchStock, listPartners, listProductCodes, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
 
@@ -12,12 +12,13 @@ export default async function SalesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [orders, documents, partners, batchStock, products, profile] = await Promise.all([
+  const [orders, documents, partners, batchStock, products, productCodes, profile] = await Promise.all([
     listSalesOrders(),
     listSalesDocuments(),
     listPartners(),
     listBatchStock(),
     listProducts(),
+    listProductCodes(),
     getCurrentProfile(),
   ]);
   const configured = orders.configured;
@@ -50,6 +51,64 @@ export default async function SalesPage({
     }
   }
 
+  // Quét mã ở tab Bán lẻ: mã hàng (SKU hoặc mã đã đăng ký) → lô FIFO của
+  // sản phẩm đó: lô cũ nhất (received_date, rồi mã lô) còn hàng tại kho
+  // của mình. Giá quét theo giá lẻ; số lượng quét lại cộng dồn tối đa bằng
+  // tồn kho của lô FIFO. Mã có thật nhưng hết hàng thì báo hết hàng.
+  const codeMap = buildProductCodeMap(products.data, productCodes.data);
+  const ownQtyByBatch = new Map<string, number>();
+  for (const r of batchStock.data) {
+    if (r.location_kind !== "OWN_WAREHOUSE") continue;
+    ownQtyByBatch.set(
+      r.batch_id,
+      (ownQtyByBatch.get(r.batch_id) ?? 0) + (Number(r.qty) || 0)
+    );
+  }
+  const fifoByProduct = new Map<string, (typeof ownBatches)[number]>();
+  for (const r of [...ownBatches].sort(
+    (a, b) =>
+      String(a.received_date).localeCompare(String(b.received_date)) ||
+      String(a.batch_code).localeCompare(String(b.batch_code))
+  )) {
+    if (
+      !fifoByProduct.has(r.product_id) &&
+      (ownQtyByBatch.get(r.batch_id) ?? 0) > 0
+    ) {
+      fifoByProduct.set(r.product_id, r);
+    }
+  }
+  const retailScanPick = {
+    selectField: "batch_id",
+    picks: Object.fromEntries(
+      Object.entries(codeMap)
+        .map(([code, productId]) => {
+          const fifo = fifoByProduct.get(productId);
+          return fifo ? [code, fifo.batch_id] : null;
+        })
+        .filter((e): e is [string, string] => e !== null)
+    ),
+    prices: Object.fromEntries(
+      Object.entries(codeMap)
+        .map(([code, productId]) => {
+          const fifo = fifoByProduct.get(productId);
+          return fifo ? [code, batchPrices[fifo.batch_id]?.retail ?? 0] : null;
+        })
+        .filter((e): e is [string, number] => e !== null)
+    ),
+    priceField: "unit_price",
+    maxQty: Object.fromEntries(
+      Object.entries(codeMap)
+        .map(([code, productId]) => {
+          const fifo = fifoByProduct.get(productId);
+          return fifo
+            ? [code, ownQtyByBatch.get(fifo.batch_id) ?? 0]
+            : null;
+        })
+        .filter((e): e is [string, number] => e !== null)
+    ),
+    known: Object.fromEntries(Object.keys(codeMap).map((k) => [k, true])),
+  };
+
   return (
     <>
       <PageHeader
@@ -65,6 +124,7 @@ export default async function SalesPage({
             batchPrices={batchPrices}
             partnerOptions={partnerOptions}
             action={createCounterSaleAction}
+            retailScanPick={retailScanPick}
           />
         )}
 

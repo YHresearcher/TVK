@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import ItemsRows from "@/components/ItemsRows";
+import ItemsRows, { type ScanPick } from "@/components/ItemsRows";
 import { Card, btnCls, inputCls, labelCls } from "@/components/ui";
 
 type Basis = "retail" | "wholesale";
@@ -18,7 +18,7 @@ const TABS: {
     basis: "retail",
     label: "Bán lẻ",
     title: "Bán lẻ",
-    hint: "Đơn giá tự điền theo giá lẻ của sản phẩm trong lô. Khách lẻ thì để trống đối tác.",
+    hint: "Quét mã vạch (hoặc gõ mã hàng rồi Enter) để thêm dòng theo lô cũ nhất còn hàng; quét lại cùng mã để cộng số lượng. Đơn giá tự điền theo giá lẻ của sản phẩm trong lô. Khách lẻ thì để trống đối tác.",
     priceLabel: "Giá lẻ (₫)",
     submitLabel: "Hoàn tất bán lẻ",
   },
@@ -46,11 +46,14 @@ export default function CounterSaleTabs({
   batchPrices,
   partnerOptions,
   action,
+  retailScanPick,
 }: {
   batchOptions: { value: string; label: string }[];
   batchPrices: Record<string, { retail: number; wholesale: number }>;
   partnerOptions: { value: string; label: string }[];
   action: (formData: FormData) => Promise<void>;
+  /** Barcode scan resolution for the retail tab (FIFO batch + retail price). */
+  retailScanPick?: ScanPick;
 }) {
   // Mặc định mở tab Bán đại lý như ô Loại giá trước đây.
   const [active, setActive] = useState<Basis>("wholesale");
@@ -156,6 +159,7 @@ export default function CounterSaleTabs({
                   priceField: "unit_price",
                   prices: pricesByBasis[t.basis],
                 }}
+                scanPick={t.basis === "retail" ? retailScanPick : undefined}
               />
               <button type="submit" className={btnCls}>
                 {t.submitLabel}
