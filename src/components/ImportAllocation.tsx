@@ -278,7 +278,7 @@ export default function ImportAllocation({
           </select>
         </div>
         <div>
-          <label className={labelCls}>Báo cáo tiêu thụ (không bắt buộc)</label>
+          <label className={labelCls}>Hàng đã bán [Đối tác] (không bắt buộc)</label>
           <select value={reportId} onChange={(e) => setReportId(e.target.value)} className={inputCls}>
             <option value="">— Không —</option>
             {reports.map((r) => (

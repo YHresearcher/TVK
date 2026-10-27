@@ -76,7 +76,7 @@ export default async function PartnerConsumptionPage({
     <>
       <PageHeader
         title="Tiêu thụ của đối tác & Phân bổ"
-        description="Quy trình: đối tác báo tiêu thụ (BT) → phiếu phân bổ gán mọi số lượng vào một nguồn — MUA ĐỨT hoặc KÝ GỬI (PB) → chứng từ BH/KG → hoá đơn GTGT. Phân bổ thực hiện TRƯỚC khi xuất hoá đơn, và mỗi số lượng chỉ được xuất hoá đơn đúng một lần."
+        description="Quy trình: đối tác báo hàng đã bán (BT) → phiếu phân bổ gán mọi số lượng vào một nguồn — MUA ĐỨT hoặc KÝ GỬI (PB) → chứng từ BH/KG → hoá đơn GTGT. Phân bổ thực hiện TRƯỚC khi xuất hoá đơn, và mỗi số lượng chỉ được xuất hoá đơn đúng một lần."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
@@ -84,7 +84,7 @@ export default async function PartnerConsumptionPage({
         <section className="space-y-4">
           {!readOnly && (
           <>
-          <Card title="Báo cáo tiêu thụ mới (BT)">
+          <Card title="Hàng đã bán [Đối tác] (BT)">
             <form action={createConsumptionReportAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-3">
                 <div><label className={labelCls}>Đối tác *</label>
@@ -96,15 +96,15 @@ export default async function PartnerConsumptionPage({
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty_consumed", label: "Số lượng đã tiêu thụ", type: "number" },
               ]} initialRows={2} />
-              <button type="submit" className={btnCls}>Tạo báo cáo nháp</button>
+              <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
             </form>
           </Card>
-          <Card title="Nhập từ Excel (BT)">
+          <Card title="Nhập từ Excel (Hàng đã bán)">
             <ImportConsumptionReport partners={partners.data} products={products.data.map((p) => ({ id: p.id, sku: p.sku, name: p.name }))} codes={productCodes.data.map((c) => ({ code: c.code, product_id: c.product_id }))} action={importConsumptionReportAction} />
           </Card>
           </>
           )}
-          {reports.data.length === 0 ? <EmptyState message="Chưa có báo cáo tiêu thụ." /> : (
+          {reports.data.length === 0 ? <EmptyState message="Chưa có hàng đã bán." /> : (
             <TableWrap>
               <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Kỳ</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
               <tbody>
@@ -119,7 +119,7 @@ export default async function PartnerConsumptionPage({
                         <form action={setConsumptionReportStatusAction}>
                           <input type="hidden" name="id" value={r.id} />
                           <input type="hidden" name="status" value="CONFIRMED" />
-                          <button type="submit" className={btnGhostCls}>Xác nhận báo cáo</button>
+                          <button type="submit" className={btnGhostCls}>Xác nhận phiếu</button>
                         </form>
                       )}
                     </td>
@@ -138,7 +138,7 @@ export default async function PartnerConsumptionPage({
               <div className="grid gap-3 md:grid-cols-2">
                 <div><label className={labelCls}>Đối tác *</label>
                   <select name="partner_id" required className={inputCls}><option value="">— Chọn —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-                <div><label className={labelCls}>Báo cáo tiêu thụ (không bắt buộc)</label>
+                <div><label className={labelCls}>Hàng đã bán [Đối tác] (không bắt buộc)</label>
                   <select name="report_id" className={inputCls}><option value="">— Không —</option>{reportOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
               </div>
               <ItemsRows codeMap={codeMap} fields={[
