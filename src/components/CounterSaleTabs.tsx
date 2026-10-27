@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import ItemsRows, { type ScanPick } from "@/components/ItemsRows";
+import ImportDealerSale, { type DealerBatchCatalogRow } from "@/components/ImportDealerSale";
 import { Card, btnCls, inputCls, labelCls } from "@/components/ui";
 
 type Basis = "retail" | "wholesale";
@@ -47,6 +48,8 @@ export default function CounterSaleTabs({
   partnerOptions,
   action,
   retailScanPick,
+  dealerImportCatalog,
+  dealerImportAction,
 }: {
   batchOptions: { value: string; label: string }[];
   batchPrices: Record<string, { retail: number; wholesale: number }>;
@@ -54,6 +57,9 @@ export default function CounterSaleTabs({
   action: (formData: FormData) => Promise<void>;
   /** Barcode scan resolution for the retail tab (FIFO batch + retail price). */
   retailScanPick?: ScanPick;
+  /** Excel import for the wholesale tab (one file = one dealer order). */
+  dealerImportCatalog?: DealerBatchCatalogRow[];
+  dealerImportAction?: (formData: FormData) => Promise<void>;
 }) {
   // Mặc định mở tab Bán đại lý như ô Loại giá trước đây.
   const [active, setActive] = useState<Basis>("wholesale");
@@ -166,6 +172,20 @@ export default function CounterSaleTabs({
               </button>
             </form>
           </Card>
+          {t.basis === "wholesale" && dealerImportCatalog && dealerImportAction && (
+            <Card title="Nhập từ Excel (Bán đại lý)" className="mt-4">
+              <p className="mb-4 text-sm text-slate-500">
+                Một file là một đơn bán đại lý cho một đối tác (hoặc khách lẻ).
+                Đơn giá để trống thì lấy giá đại lý. Đơn tạo xong xác nhận ngay
+                như nhập tay — lô của mình vào BH, lô ký gửi vào KG.
+              </p>
+              <ImportDealerSale
+                partners={partnerOptions}
+                catalog={dealerImportCatalog}
+                action={dealerImportAction}
+              />
+            </Card>
+          )}
         </div>
       ))}
     </div>

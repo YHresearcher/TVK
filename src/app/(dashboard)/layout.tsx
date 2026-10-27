@@ -24,10 +24,10 @@ export default async function DashboardLayout({
       // Signed in but no profile row: show a clear dead end instead of
       // redirecting to /login, which would bounce straight back here.
       return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-xl">
-            <h1 className="text-xl font-bold text-slate-900">Tài khoản chưa sẵn sàng</h1>
-            <p className="mt-2 text-sm text-slate-600">
+        <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4">
+          <div className="w-full max-w-md rounded-xl border border-stone-200 bg-white p-8 shadow-xl">
+            <h1 className="text-xl font-bold text-stone-900">Tài khoản chưa sẵn sàng</h1>
+            <p className="mt-2 text-sm text-stone-600">
               Bạn đã đăng nhập, nhưng chưa có hồ sơ TVK nào gắn với tài khoản
               này. Hãy nhờ chủ cửa hàng tạo hồ sơ cho bạn (Cài đặt → Người dùng
               &amp; vai trò), rồi đăng nhập lại.
@@ -35,7 +35,7 @@ export default async function DashboardLayout({
             <form action={signOutAction} className="mt-5">
               <button
                 type="submit"
-                className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                className="w-full rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800"
               >
                 Đăng xuất
               </button>

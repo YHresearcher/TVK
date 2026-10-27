@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-100 text-slate-900 antialiased;
+  @apply bg-stone-100 text-stone-900 antialiased;
 }
 
 /* In tem mã vạch: khi in chỉ hiện tờ tem, ẩn toàn bộ giao diện.

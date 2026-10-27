@@ -1,6 +1,6 @@
 import { EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
 import CounterSaleTabs from "@/components/CounterSaleTabs";
-import { createCounterSaleAction } from "@/lib/actions";
+import { createCounterSaleAction, importDealerSaleAction } from "@/lib/actions";
 import { buildProductCodeMap, getCurrentProfile, listBatchStock, listPartners, listProductCodes, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
@@ -64,6 +64,16 @@ export default async function SalesPage({
       (ownQtyByBatch.get(r.batch_id) ?? 0) + (Number(r.qty) || 0)
     );
   }
+  // Danh mục lô cho import bán đại lý: tồn gộp tại các kho của mình +
+  // giá đại lý của sản phẩm trong lô (giá mặc định khi file để trống giá).
+  const dealerImportCatalog = ownBatches.map((r) => ({
+    batch_id: r.batch_id,
+    batch_code: r.batch_code,
+    product_name: r.product_name,
+    ownership: OWNERSHIP_LABELS[r.ownership] ?? r.ownership,
+    own_qty: ownQtyByBatch.get(r.batch_id) ?? 0,
+    wholesale_price: batchPrices[r.batch_id]?.wholesale ?? 0,
+  }));
   const fifoByProduct = new Map<string, (typeof ownBatches)[number]>();
   for (const r of [...ownBatches].sort(
     (a, b) =>
@@ -125,6 +135,8 @@ export default async function SalesPage({
             partnerOptions={partnerOptions}
             action={createCounterSaleAction}
             retailScanPick={retailScanPick}
+            dealerImportCatalog={dealerImportCatalog}
+            dealerImportAction={importDealerSaleAction}
           />
         )}
 

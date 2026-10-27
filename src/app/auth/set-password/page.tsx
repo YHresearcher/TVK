@@ -103,10 +103,10 @@ export default function SetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-xl">
-        <h1 className="text-2xl font-bold text-slate-900">TVK</h1>
-        <p className="mt-1 text-sm text-slate-500">Đặt mật khẩu</p>
+    <div className="flex min-h-screen items-center justify-center bg-stone-100 px-4">
+      <div className="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-8 shadow-xl">
+        <h1 className="text-2xl font-bold text-stone-900">TVK</h1>
+        <p className="mt-1 text-sm text-stone-500">Tân Vạn Khang · Đặt mật khẩu</p>
 
         {!configured || phase === "invalid" ? (
           <div className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">

@@ -252,6 +252,65 @@ export async function createPartnerAction(formData: FormData) {
   redirect("/partners?ok=1");
 }
 
+export async function updateSupplierAction(formData: FormData) {
+  const supabase = await db();
+  const uid = await userId();
+  if (!uid) throw new Error("Chưa đăng nhập.");
+  const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+  if (!prof || !["OWNER", "ACCOUNTING"].includes(prof.role))
+    throw new Error("Vai trò của bạn không được sửa nhà cung cấp.");
+  const id = str(formData, "id");
+  const name = str(formData, "name");
+  if (!id || !name) throw new Error("Thiếu mã hoặc tên nhà cung cấp.");
+  done(
+    await supabase.from("suppliers").update({
+      name,
+      contact_name: optStr(formData, "contact_name"),
+      phone: optStr(formData, "phone"),
+      email: optStr(formData, "email"),
+      address: optStr(formData, "address"),
+      tax_code: optStr(formData, "tax_code"),
+      consignment_pay_days: Math.trunc(num(formData, "consignment_pay_days") || 30),
+      consignment_return_days: Math.trunc(num(formData, "consignment_return_days") || 90),
+      allow_sub_consignment: formData.get("allow_sub_consignment") === "on",
+      notes: optStr(formData, "notes"),
+    }).eq("id", id),
+    "Cập nhật nhà cung cấp"
+  );
+  revalidatePath("/suppliers");
+  redirect("/suppliers?ok=1");
+}
+
+export async function updatePartnerAction(formData: FormData) {
+  const supabase = await db();
+  const uid = await userId();
+  if (!uid) throw new Error("Chưa đăng nhập.");
+  const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+  if (!prof || !["OWNER", "ACCOUNTING", "SALES"].includes(prof.role))
+    throw new Error("Vai trò của bạn không được sửa đối tác.");
+  const id = str(formData, "id");
+  const name = str(formData, "name");
+  if (!id || !name) throw new Error("Thiếu mã hoặc tên đối tác.");
+  done(
+    await supabase.from("partners").update({
+      name,
+      partner_kind: str(formData, "partner_kind") || "GARAGE",
+      contact_name: optStr(formData, "contact_name"),
+      phone: optStr(formData, "phone"),
+      email: optStr(formData, "email"),
+      address: optStr(formData, "address"),
+      tax_code: optStr(formData, "tax_code"),
+      payment_days: Math.trunc(num(formData, "payment_days")),
+      credit_limit: num(formData, "credit_limit"),
+      consignment_limit: num(formData, "consignment_limit"),
+      notes: optStr(formData, "notes"),
+    }).eq("id", id),
+    "Cập nhật đối tác"
+  );
+  revalidatePath("/partners");
+  redirect("/partners?ok=1");
+}
+
 export async function createWarehouseAction(formData: FormData) {
   const supabase = await db();
   done(
@@ -976,6 +1035,104 @@ export async function createCounterSaleAction(formData: FormData) {
   revalidatePath("/payables");
   revalidatePath("/receivables");
   redirect("/sales?ok=1");
+}
+
+/**
+ * Import đơn bán đại lý từ Excel. Một file = một đơn, đi đúng luồng bán
+ * tại quầy (tạo đơn, tách BH/KG theo tính chất lô, xác nhận ngay, cập
+ * nhật tồn + công nợ). Giá trống → giá đại lý của sản phẩm trong lô, do
+ * server tự tra lại — bản xem trước ở client không được tin. Kiểm tra
+ * toàn bộ file trước khi ghi — dòng lỗi nào cũng từ chối cả import.
+ */
+export async function importDealerSaleAction(formData: FormData) {
+  const supabase = await db();
+  let payload: AnyRow;
+  try {
+    payload = JSON.parse(str(formData, "payload"));
+  } catch {
+    throw new Error("Dữ liệu import không hợp lệ.");
+  }
+  const partnerId = String(payload.partnerId ?? "").trim();
+  const rawRows: AnyRow[] = Array.isArray(payload.rows) ? payload.rows : [];
+  if (!rawRows.length) throw new Error("File không có dòng nào để bán.");
+
+  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
+  const batchCodes = Array.from(new Set(rawRows.map((r) => String(r.batchCode ?? "").trim()))).filter(Boolean);
+  const { data: batches } = await supabase
+    .from("stock_batches")
+    .select("id, batch_code, product_id, ownership")
+    .in("batch_code", batchCodes);
+  const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [norm(b.batch_code), b]));
+  const batchIds = Array.from(batchByCode.values()).map((b) => b.id as string);
+  const productIds = Array.from(new Set(Array.from(batchByCode.values()).map((b) => b.product_id as string))).filter(Boolean);
+  const { data: products } = productIds.length
+    ? await supabase.from("products").select("id, wholesale_price").in("id", productIds)
+    : { data: [] as AnyRow[] };
+  const wholesaleByProduct = new Map(((products ?? []) as AnyRow[]).map((p) => [p.id as string, Number(p.wholesale_price) || 0]));
+  // Tồn tại vị trí kho mình giữ nhiều nhất — đúng vị trí phiếu sẽ trừ
+  // (cùng logic mainOwnLocationOfBatch).
+  const { data: batchLocs } = batchIds.length
+    ? await supabase
+        .from("batch_locations")
+        .select("batch_id, location_id, qty, locations(location_kind)")
+        .in("batch_id", batchIds)
+    : { data: [] as AnyRow[] };
+  const mainOwn = new Map<string, number>();
+  for (const bl of (batchLocs ?? []) as AnyRow[]) {
+    if ((bl.locations as AnyRow)?.location_kind !== "OWN_WAREHOUSE") continue;
+    const prev = mainOwn.get(bl.batch_id as string) ?? 0;
+    if (Number(bl.qty) > prev) mainOwn.set(bl.batch_id as string, Number(bl.qty));
+  }
+
+  const invalid: string[] = [];
+  const perBatchQty = new Map<string, number>();
+  const lines: { batch_id: string; qty: number; unit_price: number }[] = [];
+  for (const r of rawRows) {
+    const code = String(r.batchCode ?? "").trim();
+    const qty = Math.trunc(Number(r.qty) || 0);
+    if (!code || qty <= 0) {
+      invalid.push(code || "(dòng thiếu mã lô)");
+      continue;
+    }
+    const batch = batchByCode.get(norm(code));
+    if (!batch) {
+      invalid.push(code);
+      continue;
+    }
+    const priceRaw =
+      r.price === null || r.price === undefined || r.price === "" ? null : Number(r.price);
+    if (priceRaw !== null && !(priceRaw >= 0)) {
+      invalid.push(`${code} (giá không hợp lệ)`);
+      continue;
+    }
+    const unitPrice = priceRaw ?? (wholesaleByProduct.get(batch.product_id as string) ?? 0);
+    perBatchQty.set(batch.id as string, (perBatchQty.get(batch.id as string) ?? 0) + qty);
+    if ((perBatchQty.get(batch.id as string) ?? 0) > (mainOwn.get(batch.id as string) ?? 0)) {
+      invalid.push(`${code} (vượt tồn tại kho mình)`);
+      continue;
+    }
+    lines.push({ batch_id: batch.id as string, qty, unit_price: unitPrice });
+  }
+  if (invalid.length)
+    throw new Error(
+      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
+        .slice(0, 5)
+        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
+    );
+
+  // Ủy quyền cho đúng luồng bán tại quầy: tạo đơn, tách BH/KG theo tính
+  // chất lô, xác nhận ngay, cập nhật tồn + công nợ.
+  const fd = new FormData();
+  if (partnerId) fd.set("partner_id", partnerId);
+  fd.set("customer_name", String(payload.customerName ?? ""));
+  fd.set("discount_amount", String(Number(payload.discountAmount) || 0));
+  if (payload.isCredit) fd.set("is_credit", "on");
+  for (const l of lines) {
+    fd.append("batch_id", l.batch_id);
+    fd.append("qty", String(l.qty));
+    fd.append("unit_price", String(l.unit_price));
+  }
+  return createCounterSaleAction(fd);
 }
 
 // ------------------------------------------------- partner consumption

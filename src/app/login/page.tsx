@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { flagPasswordResetRequestedAction } from "@/lib/actions";
 
+const BRONZE = "#A78B5B";
+
 const inputCls =
-  "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200";
-const labelCls = "block text-sm font-medium text-slate-700 mb-1.5";
+  "w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-500 focus:outline-none focus:ring-2 focus:ring-stone-200";
+const labelCls = "block text-sm font-medium text-stone-600 mb-1.5";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -88,40 +90,40 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4 py-10">
-      {/* Backdrop: dot pattern, amber glow, faint watermark */}
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-stone-100 px-4 py-10">
+      {/* Backdrop: faint dot pattern, soft warm glow, faint watermark */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           backgroundImage:
-            "radial-gradient(rgba(255,255,255,0.09) 1px, transparent 1px)",
+            "radial-gradient(rgba(120,113,108,0.14) 1px, transparent 1px)",
           backgroundSize: "22px 22px",
         }}
       />
-      <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-amber-500 opacity-20 blur-3xl" />
-      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap text-[16rem] font-black leading-none text-white/[0.04]">
+      <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-stone-200 opacity-60 blur-3xl" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none whitespace-nowrap text-[16rem] font-black leading-none text-stone-900/[0.04]">
         TVK
       </div>
 
       <div className="relative w-full max-w-md">
-        <div className="rounded-2xl bg-white p-8 shadow-2xl sm:p-10">
+        <div className="rounded-2xl border border-stone-200 bg-white p-8 shadow-[0_20px_50px_-20px_rgba(28,25,23,0.25)] sm:p-10">
           <div className="text-center">
-            <p className="text-5xl font-black tracking-tight text-slate-950">
-              TVK<span className="text-amber-500">.</span>
+            <p className="text-5xl font-black tracking-tight text-stone-900">
+              TVK<span style={{ color: BRONZE }}>.</span>
             </p>
-            <p className="mt-1 text-xs font-medium uppercase tracking-[0.25em] text-slate-500">
-              Phụ tùng ô tô
+            <p className="mt-2 text-xs font-medium uppercase tracking-[0.3em] text-stone-500">
+              Tân Vạn Khang
             </p>
-            <p className="mt-4 text-sm leading-relaxed text-slate-500">
+            <p className="mt-4 text-sm leading-relaxed text-stone-500">
               Quản lý kho phụ tùng ô tô — hàng của mình, hàng ký gửi, rõ ràng
               từng lô.
             </p>
           </div>
 
-          <h1 className="mt-8 text-xl font-bold tracking-tight text-slate-900">
+          <h1 className="mt-8 text-xl font-bold tracking-tight text-stone-900">
             {mode === "login" ? "Đăng nhập" : "Quên mật khẩu"}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-stone-500">
             {mode === "login"
               ? "Chào mừng trở lại — đăng nhập để tiếp tục."
               : "Nhập email hoặc tên đăng nhập, hệ thống sẽ gửi liên kết đặt lại về email của bạn."}
@@ -167,7 +169,7 @@ export default function LoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500 hover:text-slate-800"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-stone-500 hover:text-stone-800"
                     >
                       {showPassword ? "Ẩn" : "Hiện"}
                     </button>
@@ -187,7 +189,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-xl bg-amber-500 py-3 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 disabled:opacity-50"
+                className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-50"
               >
                 {loading
                   ? mode === "login"
@@ -206,7 +208,7 @@ export default function LoginPage() {
                       setError("");
                       setNotice("");
                     }}
-                    className="font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
+                    className="font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900"
                   >
                     Quên mật khẩu?
                   </button>
@@ -218,7 +220,7 @@ export default function LoginPage() {
                       setError("");
                       setNotice("");
                     }}
-                    className="font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
+                    className="font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900"
                   >
                     ← Quay lại đăng nhập
                   </button>
@@ -226,11 +228,11 @@ export default function LoginPage() {
               </p>
             </form>
           )}
-          <p className="mt-8 text-center text-xs text-slate-400">
+          <p className="mt-8 text-center text-xs text-stone-400">
             Chưa có tài khoản? Liên hệ quản trị viên để được cấp.
           </p>
         </div>
-        <p className="mt-6 text-center text-xs text-slate-500">
+        <p className="mt-6 text-center text-xs text-stone-400">
           TVK management system by Thanh Phan · version 1.0
         </p>
       </div>

@@ -33,6 +33,17 @@ const templates = [
       ["AZ1664440069-SMS-30705", "OWN-2610-0002", "Mua đứt", 10, 800000],
     ],
   },
+  {
+    // DonGiaVND để trống = giá đại lý của sản phẩm trong lô (dòng 1);
+    // ghi số = bán đúng giá đó (dòng 2). Mã lô là mã lô thật đang có
+    // tại kho của mình — xem trước sẽ phân giải được ngay.
+    file: "public/mau-import-ban-dai-ly.xlsx",
+    rows: [
+      ["MaLo", "SoLuong", "DonGiaVND"],
+      ["OWN-2610-0001", 10, ""],
+      ["OWN-2610-0002", 5, 1200000],
+    ],
+  },
 ];
 
 for (const t of templates) {
