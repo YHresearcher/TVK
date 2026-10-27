@@ -189,6 +189,25 @@ export async function createFitmentAction(productId: string, formData: FormData)
   revalidatePath(`/products/${productId}`);
 }
 
+export async function updateProductPricesAction(productId: string, formData: FormData) {
+  const supabase = await db();
+  const uid = await userId();
+  if (!uid) throw new Error("Chưa đăng nhập.");
+  const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+  if (prof?.role === "CEO") throw new Error("Vai trò chỉ xem không được sửa giá.");
+  const price = (name: string) => Math.max(0, Math.trunc(num(formData, name)));
+  done(
+    await supabase.from("products").update({
+      retail_price: price("retail_price"),
+      garage_price: price("garage_price"),
+      wholesale_price: price("wholesale_price"),
+    }).eq("id", productId),
+    "Cập nhật giá sản phẩm"
+  );
+  revalidatePath(`/products/${productId}`);
+  revalidatePath("/products");
+}
+
 // ------------------------------------------------------------- partners
 export async function createSupplierAction(formData: FormData) {
   const supabase = await db();

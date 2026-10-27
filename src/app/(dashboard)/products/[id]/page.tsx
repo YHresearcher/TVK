@@ -1,5 +1,6 @@
 import { BackLink, Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, tdCls, thCls } from "@/components/ui";
-import { createFitmentAction, createProductCodeAction } from "@/lib/actions";
+import PriceEditForm from "@/components/PriceEditForm";
+import { createFitmentAction, createProductCodeAction, updateProductPricesAction } from "@/lib/actions";
 import { getCurrentProfile, getProductDetail } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { CODE_KINDS, CODE_KIND_LABELS, OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
@@ -14,6 +15,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
   const readOnly = isReadOnlyRole(profile.data?.role);
   const addCode = createProductCodeAction.bind(null, p.id);
   const addFitment = createFitmentAction.bind(null, p.id);
+  const updatePrices = updateProductPricesAction.bind(null, p.id);
 
   return (
     <>
@@ -26,6 +28,14 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
             <div className="flex justify-between"><dt className="text-slate-500">Cho gara</dt><dd className="font-medium">{formatVND(p.garage_price)}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Giá đại lý</dt><dd className="font-medium">{formatVND(p.wholesale_price)}</dd></div>
           </dl>
+          {!readOnly && (
+            <PriceEditForm
+              action={updatePrices}
+              retailPrice={Number(p.retail_price ?? 0)}
+              garagePrice={Number(p.garage_price ?? 0)}
+              wholesalePrice={Number(p.wholesale_price ?? 0)}
+            />
+          )}
         </Card>
 
         <Card title="Mã tra cứu">
