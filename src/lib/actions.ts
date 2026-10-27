@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { todayISO } from "@/lib/format";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AnyRow } from "@/lib/types";
@@ -33,6 +34,13 @@ function num(formData: FormData, name: string): number {
 }
 function optDate(formData: FormData, name: string): string | null {
   return optStr(formData, name);
+}
+
+/** Ngày YYYY-MM-DD hợp lệ theo lịch thì giữ, còn lại trả null. */
+function validDate(s: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s ? null : s;
 }
 
 /** Zip repeated form fields into row objects, dropping fully-empty rows. */
@@ -962,6 +970,10 @@ export async function createCounterSaleAction(formData: FormData) {
   const batchMap = new Map((batches ?? []).map((b: AnyRow) => [b.id, b]));
 
   const partnerId = optStr(formData, "partner_id");
+  // Ngày bán do import Excel truyền vào; form tay không gửi thì mặc định
+  // ngày hiện tại của DB. RPC xác nhận dùng doc_date để tính hạn nợ nên
+  // ngày này phải xuống cả đơn và chứng từ.
+  const saleDate = validDate(optStr(formData, "sale_date") ?? "");
   const order = must(
     await supabase
       .from("sales_orders")
@@ -969,6 +981,7 @@ export async function createCounterSaleAction(formData: FormData) {
         partner_id: partnerId,
         customer_name: optStr(formData, "customer_name"),
         created_by: await userId(),
+        ...(saleDate ? { order_date: saleDate } : {}),
       })
       .select("id")
       .single(),
@@ -1008,6 +1021,7 @@ export async function createCounterSaleAction(formData: FormData) {
           is_credit: formData.get("is_credit") === "on",
           discount_amount: discount,
           created_by: await userId(),
+          ...(saleDate ? { doc_date: saleDate } : {}),
         })
         .select("id")
         .single(),
@@ -1040,8 +1054,10 @@ export async function createCounterSaleAction(formData: FormData) {
 /**
  * Import đơn bán đại lý từ Excel. Một file = một đơn, đi đúng luồng bán
  * tại quầy (tạo đơn, tách BH/KG theo tính chất lô, xác nhận ngay, cập
- * nhật tồn + công nợ). Giá trống → giá đại lý của sản phẩm trong lô, do
- * server tự tra lại — bản xem trước ở client không được tin. Kiểm tra
+ * nhật tồn + công nợ) vào đúng ngày bán của file. File chỉ ghi MÃ HÀNG —
+ * server tự phân bổ FIFO: lô cũ nhất còn hàng tại kho của mình trước,
+ * một dòng có thể tách ra nhiều lô. Giá trống → giá đại lý của sản phẩm,
+ * do server tự tra lại — bản xem trước ở client không được tin. Kiểm tra
  * toàn bộ file trước khi ghi — dòng lỗi nào cũng từ chối cả import.
  */
 export async function importDealerSaleAction(formData: FormData) {
@@ -1053,24 +1069,35 @@ export async function importDealerSaleAction(formData: FormData) {
     throw new Error("Dữ liệu import không hợp lệ.");
   }
   const partnerId = String(payload.partnerId ?? "").trim();
+  const saleDate = validDate(String(payload.saleDate ?? "").trim()) ?? todayISO();
   const rawRows: AnyRow[] = Array.isArray(payload.rows) ? payload.rows : [];
   if (!rawRows.length) throw new Error("File không có dòng nào để bán.");
 
+  // Phân giải mã hàng: SKU trước, mã đã đăng ký sau (cùng mẫu import BT).
   const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
-  const batchCodes = Array.from(new Set(rawRows.map((r) => String(r.batchCode ?? "").trim()))).filter(Boolean);
-  const { data: batches } = await supabase
-    .from("stock_batches")
-    .select("id, batch_code, product_id, ownership")
-    .in("batch_code", batchCodes);
-  const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [norm(b.batch_code), b]));
-  const batchIds = Array.from(batchByCode.values()).map((b) => b.id as string);
-  const productIds = Array.from(new Set(Array.from(batchByCode.values()).map((b) => b.product_id as string))).filter(Boolean);
-  const { data: products } = productIds.length
-    ? await supabase.from("products").select("id, wholesale_price").in("id", productIds)
+  const { data: allProducts } = await supabase.from("products").select("id, sku, wholesale_price").limit(5000);
+  const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
+  const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [norm(p.sku), p.id as string]));
+  const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [norm(c.code), c.product_id as string]));
+  const wholesaleByProduct = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [p.id as string, Number(p.wholesale_price) || 0]));
+  const productIds = Array.from(
+    new Set(
+      rawRows
+        .map((r) => bySku.get(norm(r.code)) ?? byCode.get(norm(r.code)))
+        .filter((v): v is string => !!v)
+    )
+  );
+
+  // Hàng đợi FIFO theo sản phẩm: lô cũ nhất (received_date, rồi mã lô)
+  // trước; tồn khả dụng của mỗi lô = tồn tại vị trí kho mình giữ nhiều
+  // nhất — đúng vị trí phiếu sẽ trừ (cùng logic mainOwnLocationOfBatch).
+  const { data: batches } = productIds.length
+    ? await supabase
+        .from("stock_batches")
+        .select("id, batch_code, product_id, ownership, received_date")
+        .in("product_id", productIds)
     : { data: [] as AnyRow[] };
-  const wholesaleByProduct = new Map(((products ?? []) as AnyRow[]).map((p) => [p.id as string, Number(p.wholesale_price) || 0]));
-  // Tồn tại vị trí kho mình giữ nhiều nhất — đúng vị trí phiếu sẽ trừ
-  // (cùng logic mainOwnLocationOfBatch).
+  const batchIds = ((batches ?? []) as AnyRow[]).map((b) => b.id as string);
   const { data: batchLocs } = batchIds.length
     ? await supabase
         .from("batch_locations")
@@ -1083,19 +1110,35 @@ export async function importDealerSaleAction(formData: FormData) {
     const prev = mainOwn.get(bl.batch_id as string) ?? 0;
     if (Number(bl.qty) > prev) mainOwn.set(bl.batch_id as string, Number(bl.qty));
   }
+  const fifoByProduct = new Map<string, { id: string; qty: number }[]>();
+  for (const b of ((batches ?? []) as AnyRow[]).sort(
+    (x, y) =>
+      String(x.received_date).localeCompare(String(y.received_date)) ||
+      String(x.batch_code).localeCompare(String(y.batch_code))
+  )) {
+    const q = mainOwn.get(b.id as string) ?? 0;
+    if (q <= 0) continue;
+    const list = fifoByProduct.get(b.product_id as string) ?? [];
+    list.push({ id: b.id as string, qty: q });
+    fifoByProduct.set(b.product_id as string, list);
+  }
 
+  // Phân bổ tuần tự theo thứ tự dòng trong file; tồn còn lại của lô
+  // được trừ dần qua các dòng (kể cả khi cùng mã hàng lặp lại).
+  const remaining = new Map<string, number>();
+  for (const list of Array.from(fifoByProduct.values()))
+    for (const b of list) remaining.set(b.id, b.qty);
   const invalid: string[] = [];
-  const perBatchQty = new Map<string, number>();
   const lines: { batch_id: string; qty: number; unit_price: number }[] = [];
   for (const r of rawRows) {
-    const code = String(r.batchCode ?? "").trim();
+    const code = String(r.code ?? "").trim();
     const qty = Math.trunc(Number(r.qty) || 0);
     if (!code || qty <= 0) {
-      invalid.push(code || "(dòng thiếu mã lô)");
+      invalid.push(code || "(dòng thiếu mã hàng)");
       continue;
     }
-    const batch = batchByCode.get(norm(code));
-    if (!batch) {
+    const productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
+    if (!productId) {
       invalid.push(code);
       continue;
     }
@@ -1105,13 +1148,20 @@ export async function importDealerSaleAction(formData: FormData) {
       invalid.push(`${code} (giá không hợp lệ)`);
       continue;
     }
-    const unitPrice = priceRaw ?? (wholesaleByProduct.get(batch.product_id as string) ?? 0);
-    perBatchQty.set(batch.id as string, (perBatchQty.get(batch.id as string) ?? 0) + qty);
-    if ((perBatchQty.get(batch.id as string) ?? 0) > (mainOwn.get(batch.id as string) ?? 0)) {
-      invalid.push(`${code} (vượt tồn tại kho mình)`);
-      continue;
+    const unitPrice = priceRaw ?? (wholesaleByProduct.get(productId) ?? 0);
+    let need = qty;
+    for (const b of fifoByProduct.get(productId) ?? []) {
+      if (need <= 0) break;
+      const avail = remaining.get(b.id) ?? 0;
+      const take = Math.min(need, avail);
+      if (take > 0) {
+        lines.push({ batch_id: b.id, qty: take, unit_price: unitPrice });
+        remaining.set(b.id, avail - take);
+        need -= take;
+      }
     }
-    lines.push({ batch_id: batch.id as string, qty, unit_price: unitPrice });
+    if (need > 0)
+      invalid.push(`${code} (không đủ hàng theo FIFO, còn ${qty - need})`);
   }
   if (invalid.length)
     throw new Error(
@@ -1121,12 +1171,13 @@ export async function importDealerSaleAction(formData: FormData) {
     );
 
   // Ủy quyền cho đúng luồng bán tại quầy: tạo đơn, tách BH/KG theo tính
-  // chất lô, xác nhận ngay, cập nhật tồn + công nợ.
+  // chất lô, xác nhận ngay, cập nhật tồn + công nợ, vào đúng ngày bán.
   const fd = new FormData();
   if (partnerId) fd.set("partner_id", partnerId);
   fd.set("customer_name", String(payload.customerName ?? ""));
   fd.set("discount_amount", String(Number(payload.discountAmount) || 0));
   if (payload.isCredit) fd.set("is_credit", "on");
+  fd.set("sale_date", saleDate);
   for (const l of lines) {
     fd.append("batch_id", l.batch_id);
     fd.append("qty", String(l.qty));

@@ -64,16 +64,43 @@ export default async function SalesPage({
       (ownQtyByBatch.get(r.batch_id) ?? 0) + (Number(r.qty) || 0)
     );
   }
-  // Danh mục lô cho import bán đại lý: tồn gộp tại các kho của mình +
-  // giá đại lý của sản phẩm trong lô (giá mặc định khi file để trống giá).
-  const dealerImportCatalog = ownBatches.map((r) => ({
-    batch_id: r.batch_id,
-    batch_code: r.batch_code,
-    product_name: r.product_name,
-    ownership: OWNERSHIP_LABELS[r.ownership] ?? r.ownership,
-    own_qty: ownQtyByBatch.get(r.batch_id) ?? 0,
-    wholesale_price: batchPrices[r.batch_id]?.wholesale ?? 0,
-  }));
+  // Tra cứu mã hàng cho import bán đại lý: mọi mã/SKU đã đăng ký
+  // (chuẩn hoá trim + hoa, như buildProductCodeMap) → sản phẩm + giá đại lý.
+  const dealerCodeMap: Record<string, { productId: string; productName: string; wholesalePrice: number }> = {};
+  for (const [code, productId] of Object.entries(codeMap)) {
+    const p = productById.get(productId);
+    if (p) {
+      dealerCodeMap[code] = {
+        productId,
+        productName: p.name,
+        wholesalePrice: Number(p.wholesale_price) || 0,
+      };
+    }
+  }
+  // Hàng đợi FIFO cho import bán đại lý: theo từng sản phẩm, lô cũ nhất
+  // trước; mỗi lô mang tồn tại vị trí kho mình giữ nhiều nhất (đúng vị
+  // trí phiếu sẽ trừ — cùng logic mainOwnLocationOfBatch phía server).
+  const mainOwnQtyByBatch = new Map<string, number>();
+  for (const r of batchStock.data) {
+    if (r.location_kind !== "OWN_WAREHOUSE") continue;
+    const prev = mainOwnQtyByBatch.get(r.batch_id) ?? 0;
+    if (Number(r.qty) > prev) mainOwnQtyByBatch.set(r.batch_id, Number(r.qty));
+  }
+  const dealerFifoBatches: Record<string, { batch_id: string; batch_code: string; ownership: string; mainOwnQty: number }[]> = {};
+  for (const r of [...ownBatches].sort(
+    (a, b) =>
+      String(a.received_date).localeCompare(String(b.received_date)) ||
+      String(a.batch_code).localeCompare(String(b.batch_code))
+  )) {
+    const q = mainOwnQtyByBatch.get(r.batch_id) ?? 0;
+    if (q <= 0) continue;
+    (dealerFifoBatches[r.product_id] ??= []).push({
+      batch_id: r.batch_id,
+      batch_code: r.batch_code,
+      ownership: OWNERSHIP_LABELS[r.ownership] ?? r.ownership,
+      mainOwnQty: q,
+    });
+  }
   const fifoByProduct = new Map<string, (typeof ownBatches)[number]>();
   for (const r of [...ownBatches].sort(
     (a, b) =>
@@ -135,7 +162,8 @@ export default async function SalesPage({
             partnerOptions={partnerOptions}
             action={createCounterSaleAction}
             retailScanPick={retailScanPick}
-            dealerImportCatalog={dealerImportCatalog}
+            dealerCodeMap={dealerCodeMap}
+            dealerFifoBatches={dealerFifoBatches}
             dealerImportAction={importDealerSaleAction}
           />
         )}

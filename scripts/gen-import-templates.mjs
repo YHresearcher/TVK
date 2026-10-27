@@ -34,14 +34,14 @@ const templates = [
     ],
   },
   {
-    // DonGiaVND để trống = giá đại lý của sản phẩm trong lô (dòng 1);
-    // ghi số = bán đúng giá đó (dòng 2). Mã lô là mã lô thật đang có
-    // tại kho của mình — xem trước sẽ phân giải được ngay.
+    // DonGiaVND để trống = giá đại lý của sản phẩm (dòng 1); ghi số =
+    // bán đúng giá đó (dòng 2). Mã hàng là SKU thật đã đăng ký — hệ
+    // thống tự phân bổ FIFO theo lô, không nhập mã lô.
     file: "public/mau-import-ban-dai-ly.xlsx",
     rows: [
-      ["MaLo", "SoLuong", "DonGiaVND"],
-      ["OWN-2610-0001", 10, ""],
-      ["OWN-2610-0002", 5, 1200000],
+      ["MaHang", "SoLuong", "DonGiaVND"],
+      ["AZ1664430120-SMS-30759", 10, ""],
+      ["AZ1664440069-SMS-30705", 5, 1200000],
     ],
   },
 ];
