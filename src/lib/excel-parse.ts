@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 /** Lowercase, strip Vietnamese diacritics, drop every non-alphanumeric char. */
 export function normalizeHeader(h: unknown): string {
   return String(h ?? "")
@@ -28,8 +26,13 @@ export function toNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Read the first sheet of a workbook as an array of rows (header row first). */
-export function readFirstSheetAOA(buf: ArrayBuffer): unknown[][] {
+/**
+ * Read the first sheet of a workbook as an array of rows (header row first).
+ * The xlsx library is loaded on demand (only when a file is picked) so the
+ * import pages stay light on first load.
+ */
+export async function readFirstSheetAOA(buf: ArrayBuffer): Promise<unknown[][]> {
+  const XLSX = await import("xlsx");
   const wb = XLSX.read(buf);
   const ws = wb.Sheets[wb.SheetNames[0]];
   return XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: "" });

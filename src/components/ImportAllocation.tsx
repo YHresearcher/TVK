@@ -130,7 +130,7 @@ export default function ImportAllocation({
     setParseError("");
     setFormatProblems([]);
     try {
-      const aoa = readFirstSheetAOA(await file.arrayBuffer());
+      const aoa = await readFirstSheetAOA(await file.arrayBuffer());
       if (!aoa.length) throw new Error("File không có dữ liệu.");
       const { fieldCol, problems } = mapHeaderColumns(aoa[0], FIELD_ALIASES, [
         { field: "code", label: "MaHang" },

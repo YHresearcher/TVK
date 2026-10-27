@@ -71,18 +71,44 @@ function done(result: { error: AnyRow | null }, what: string) {
   if (result.error) throw new Error(`${what}: ${result.error.message}`);
 }
 
-/** Location currently holding the most of a batch inside our own warehouses. */
-async function mainOwnLocationOfBatch(supabase: AnyRow, batchId: string) {
+/** Chuẩn hoá mã tra cứu: bỏ khoảng trắng hai đầu, viết hoa hết. */
+function normKey(v: unknown): string {
+  return String(v ?? "").trim().toUpperCase();
+}
+
+/** Từ chối cả file import khi có dòng không hợp lệ (không nhập một phần). */
+function rejectImport(invalid: string[]): never {
+  throw new Error(
+    `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
+      .slice(0, 5)
+      .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
+  );
+}
+
+/**
+ * Vị trí kho mình đang giữ nhiều nhất của mỗi lô, lấy trong MỘT query cho
+ * nhiều lô — dùng chung cho form tay (hết N+1 gọi từng lô) và import.
+ */
+async function mainOwnLocations(
+  supabase: AnyRow,
+  batchIds: string[]
+): Promise<Map<string, { locationId: string; qty: number }>> {
+  const uniq = Array.from(new Set(batchIds.filter(Boolean)));
+  const map = new Map<string, { locationId: string; qty: number }>();
+  if (!uniq.length) return map;
   const { data, error } = await supabase
     .from("batch_locations")
-    .select("location_id, qty, locations(location_kind)")
-    .eq("batch_id", batchId)
+    .select("batch_id, location_id, qty, locations(location_kind)")
+    .in("batch_id", uniq)
     .order("qty", { ascending: false });
   if (error) throw new Error(error.message);
-  const own = (data ?? []).filter(
-    (r: AnyRow) => (r.locations as AnyRow)?.location_kind === "OWN_WAREHOUSE"
-  );
-  return own[0]?.location_id as string | undefined;
+  for (const r of (data ?? []) as AnyRow[]) {
+    if ((r.locations as AnyRow)?.location_kind !== "OWN_WAREHOUSE") continue;
+    const id = r.batch_id as string;
+    if (map.has(id)) continue; // đã có vị trí giữ nhiều nhất (qty giảm dần)
+    map.set(id, { locationId: r.location_id as string, qty: Number(r.qty) || 0 });
+  }
+  return map;
 }
 
 async function partnerLocationId(supabase: AnyRow, partnerId: string) {
@@ -485,15 +511,14 @@ export async function importStockAction(formData: FormData) {
   // Catalog snapshots for matching (case-insensitive, trimmed).
   const { data: allProducts } = await supabase.from("products").select("id, sku").limit(5000);
   const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
-  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
   const bySku = new Map<string, string>(
     ((allProducts ?? []) as AnyRow[]).map(
-      (p): [string, string] => [norm(p.sku), p.id as string]
+      (p): [string, string] => [normKey(p.sku), p.id as string]
     )
   );
   const byCode = new Map<string, string>(
     ((allCodes ?? []) as AnyRow[]).map(
-      (c): [string, string] => [norm(c.code), c.product_id as string]
+      (c): [string, string] => [normKey(c.code), c.product_id as string]
     )
   );
 
@@ -533,10 +558,10 @@ export async function importStockAction(formData: FormData) {
     const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
       .map((a) => String(a ?? "").trim())
       .filter(Boolean);
-    let found = bySku.get(norm(code)) ?? byCode.get(norm(code));
+    let found = bySku.get(normKey(code)) ?? byCode.get(normKey(code));
     if (!found) {
       for (const alt of altCodes) {
-        found = bySku.get(norm(alt)) ?? byCode.get(norm(alt));
+        found = bySku.get(normKey(alt)) ?? byCode.get(normKey(alt));
         if (found) break;
       }
     }
@@ -544,11 +569,28 @@ export async function importStockAction(formData: FormData) {
       invalid.push(code);
   }
   if (invalid.length)
-    throw new Error(
-      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
-        .slice(0, 5)
-        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
-    );
+    rejectImport(invalid);
+
+  // Ghi hàng loạt: gom sản phẩm mới, mã và dòng xe rồi chèn một lần thay
+  // cho từng câu insert nối tiếp — thứ tự dòng, công thức giá và cách xử
+  // lý mã trùng giữ nguyên như trước. Sản phẩm mới được ghi tạm bằng ref
+  // "pending:<mã>" trong các map tra cứu, rồi đổi sang id thật sau câu
+  // insert hàng loạt.
+  const pendingKeys = new Set<string>();
+  const pendingRows: {
+    sku: string;
+    name: string;
+    brand: string | null;
+    unit: string;
+    retail_price: number;
+    garage_price: number;
+    wholesale_price: number;
+    min_stock: number;
+  }[] = [];
+  const codeRows: { productRef: string; code: string; code_kind: string }[] = [];
+  const fitmentReqs: { productRef: string; fitment: string }[] = [];
+  const pendingItems: { productRef: string; qty: number; unit_cost: number }[] = [];
+  const pendingRef = (sku: string) => `pending:${normKey(sku)}`;
 
   for (const r of rawRows) {
     const code = String(r.code ?? "").trim();
@@ -562,103 +604,143 @@ export async function importStockAction(formData: FormData) {
     linesSum += qty * unitCost;
     exactSum += qty * (Number(r.usd) || 0) * tyGia * (1 + vatPct / 100);
 
-    let productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
-    if (!productId) {
+    let productRef = bySku.get(normKey(code)) ?? byCode.get(normKey(code));
+    if (!productRef) {
       for (const alt of altCodes) {
-        productId = bySku.get(norm(alt)) ?? byCode.get(norm(alt));
-        if (productId) break;
+        productRef = bySku.get(normKey(alt)) ?? byCode.get(normKey(alt));
+        if (productRef) break;
       }
     }
 
-    if (!productId) {
+    if (!productRef) {
       if (!autoCreate) continue; // đã chặn ở vòng kiểm tra trước
       if (!String(r.name ?? "").trim()) continue; // đã chặn ở vòng kiểm tra trước
-      const created = must(
-        await supabase
-          .from("products")
-          .insert({
-            sku: code,
-            name: String(r.name ?? "").trim() || code,
-            brand: String(r.brand ?? "").trim() || null,
-            unit: String(r.unit ?? "").trim() || "Cái",
-            // Giá ban đầu của sản phẩm mới: Giá lẻ = Đơn giá nhập ×
-            // (1 + % giá bán lẻ trên form); Giá đại lý = Đơn giá nhập ×
-            // (1 + % lợi nhuận trên form).
-            retail_price: retailPrice,
-            garage_price: 0,
-            wholesale_price: salePrice,
-            min_stock: 0,
-          })
-          .select("id")
-          .single(),
-        "Tạo sản phẩm từ import"
-      );
-      productId = created.id as string;
-      bySku.set(norm(code), productId);
+      const ref = pendingRef(code);
+      if (!pendingKeys.has(normKey(code))) {
+        pendingKeys.add(normKey(code));
+        pendingRows.push({
+          sku: code,
+          name: String(r.name ?? "").trim() || code,
+          brand: String(r.brand ?? "").trim() || null,
+          unit: String(r.unit ?? "").trim() || "Cái",
+          // Giá ban đầu của sản phẩm mới: Giá lẻ = Đơn giá nhập ×
+          // (1 + % giá bán lẻ trên form); Giá đại lý = Đơn giá nhập ×
+          // (1 + % lợi nhuận trên form).
+          retail_price: retailPrice,
+          garage_price: 0,
+          wholesale_price: salePrice,
+          min_stock: 0,
+        });
+      }
+      productRef = ref;
+      bySku.set(normKey(code), ref);
 
-      // Primary code as OEM + every equivalent code; conflicts are ignored
-      // (the code may already be registered to this product).
-      const codeRows = [
-        { product_id: productId, code, code_kind: "OEM" },
+      // Primary code as OEM + every equivalent code; a code already
+      // registered (to any product) stays as-is — same outcome as the
+      // old per-row insert whose conflict was ignored.
+      for (const cr of [
+        { code, code_kind: "OEM" },
         ...altCodes
-          .filter((a) => norm(a) !== norm(code))
-          .map((a) => ({ product_id: productId, code: a, code_kind: "EQUIVALENT" })),
-      ];
-      const seenCodes = new Set<string>();
-      for (const cr of codeRows) {
-        const key = `${norm(cr.code)}|${cr.code_kind}`;
-        if (seenCodes.has(key)) continue;
-        seenCodes.add(key);
-        if (byCode.get(norm(cr.code)) === productId) continue;
-        await supabase.from("product_codes").insert(cr);
-        byCode.set(norm(cr.code), productId);
+          .filter((a) => normKey(a) !== normKey(code))
+          .map((a) => ({ code: a, code_kind: "EQUIVALENT" })),
+      ]) {
+        const key = normKey(cr.code);
+        if (byCode.has(key)) continue;
+        byCode.set(key, ref);
+        codeRows.push({ productRef: ref, code: cr.code, code_kind: cr.code_kind });
       }
 
       // Fitment: the free-text "Dòng xe" goes into vehicles.model, mirroring
       // createFitmentAction's vehicle + product_fitments inserts.
       const fitment = String(r.fitment ?? "").trim();
-      if (fitment) {
-        const vehicle = {
-          make: "",
-          model: fitment,
-          year_from: null,
-          year_to: null,
-          engine: null,
-        };
-        let vehicleId: string | undefined;
-        const inserted = await supabase
-          .from("vehicles")
-          .insert(vehicle)
-          .select("id")
-          .single();
-        if (!inserted.error) {
-          vehicleId = inserted.data.id;
-        } else {
-          const { data } = await supabase
-            .from("vehicles")
-            .select("id")
-            .eq("make", vehicle.make)
-            .eq("model", vehicle.model)
-            .limit(1)
-            .maybeSingle();
-          vehicleId = data?.id;
-        }
-        if (vehicleId) {
-          await supabase
-            .from("product_fitments")
-            .insert({ product_id: productId, vehicle_id: vehicleId });
-        }
-      }
-    } else if (!byCode.has(norm(code)) && bySku.get(norm(code)) !== productId) {
+      if (fitment) fitmentReqs.push({ productRef: ref, fitment });
+    } else if (!byCode.has(normKey(code)) && bySku.get(normKey(code)) !== productRef) {
       // Matched via an equivalent code: register the row's primary code too.
-      await supabase
-        .from("product_codes")
-        .insert({ product_id: productId, code, code_kind: "OEM" });
-      byCode.set(norm(code), productId);
+      byCode.set(normKey(code), productRef);
+      codeRows.push({ productRef, code, code_kind: "OEM" });
     }
 
-    items.push({ product_id: productId, qty, unit_cost: unitCost });
+    pendingItems.push({ productRef, qty, unit_cost: unitCost });
   }
+
+  // Chèn hàng loạt: sản phẩm mới trước (lấy id thật), rồi mã và dòng xe.
+  const refToId = new Map<string, string>();
+  if (pendingRows.length) {
+    const created = must(
+      await supabase.from("products").insert(pendingRows).select("id, sku"),
+      "Tạo sản phẩm từ import"
+    );
+    for (const p of created as AnyRow[])
+      refToId.set(pendingRef(p.sku as string), p.id as string);
+  }
+  const resolveRef = (ref: string) => refToId.get(ref) ?? ref;
+  if (codeRows.length) {
+    done(
+      await supabase.from("product_codes").insert(
+        codeRows.map((cr) => ({
+          product_id: resolveRef(cr.productRef),
+          code: cr.code,
+          code_kind: cr.code_kind,
+        }))
+      ),
+      "Đăng ký mã hàng từ import"
+    );
+  }
+  if (fitmentReqs.length) {
+    const models = Array.from(new Set(fitmentReqs.map((f) => f.fitment)));
+    const { data: existingVehicles } = await supabase
+      .from("vehicles")
+      .select("id, model")
+      .eq("make", "")
+      .in("model", models);
+    const vehicleByModel = new Map(
+      ((existingVehicles ?? []) as AnyRow[]).map((v) => [v.model as string, v.id as string])
+    );
+    const missing = models.filter((m) => !vehicleByModel.has(m));
+    if (missing.length) {
+      const inserted = await supabase
+        .from("vehicles")
+        .insert(
+          missing.map((model) => ({
+            make: "",
+            model,
+            year_from: null,
+            year_to: null,
+            engine: null,
+          }))
+        )
+        .select("id, model");
+      if (inserted.error) {
+        // Đua với một import khác tạo cùng dòng xe: đọc lại là đủ.
+        const { data: reread } = await supabase
+          .from("vehicles")
+          .select("id, model")
+          .eq("make", "")
+          .in("model", missing);
+        for (const v of (reread ?? []) as AnyRow[])
+          vehicleByModel.set(v.model as string, v.id as string);
+      } else {
+        for (const v of (inserted.data ?? []) as AnyRow[])
+          vehicleByModel.set(v.model as string, v.id as string);
+      }
+    }
+    const seenFitment = new Set<string>();
+    const fitmentRows: { product_id: string; vehicle_id: string }[] = [];
+    for (const f of fitmentReqs) {
+      const vehicleId = vehicleByModel.get(f.fitment);
+      if (!vehicleId) continue;
+      const productId = resolveRef(f.productRef);
+      const key = `${productId}|${vehicleId}`;
+      if (seenFitment.has(key)) continue;
+      seenFitment.add(key);
+      fitmentRows.push({ product_id: productId, vehicle_id: vehicleId });
+    }
+    if (fitmentRows.length)
+      await supabase.from("product_fitments").insert(fitmentRows);
+  }
+
+  for (const pi of pendingItems)
+    items.push({ product_id: resolveRef(pi.productRef), qty: pi.qty, unit_cost: pi.unit_cost });
 
   if (!items.length)
     throw new Error(
@@ -766,9 +848,13 @@ export async function createConsignmentOutAction(formData: FormData) {
     (r) => r.batch_id && Number(r.qty) > 0
   );
   if (!raw.length) throw new Error("Phiếu cần ít nhất một dòng lô hàng.");
+  const ownLocs = await mainOwnLocations(
+    supabase,
+    raw.map((r) => r.batch_id as string)
+  );
   const items = [];
   for (const r of raw) {
-    const fromLocation = await mainOwnLocationOfBatch(supabase, r.batch_id);
+    const fromLocation = ownLocs.get(r.batch_id as string)?.locationId;
     if (!fromLocation)
       throw new Error("Một lô đã chọn không còn hàng tại kho của mình.");
     items.push({
@@ -815,29 +901,15 @@ export async function importConsignmentOutAction(formData: FormData) {
   const rawRows: AnyRow[] = Array.isArray(payload.rows) ? payload.rows : [];
   if (!rawRows.length) throw new Error("File không có dòng nào để gửi.");
 
-  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
   const batchCodes = Array.from(new Set(rawRows.map((r) => String(r.batchCode ?? "").trim()))).filter(Boolean);
   const { data: batches } = await supabase
     .from("stock_batches")
     .select("id, batch_code, ownership, supplier_id, unit_cost")
     .in("batch_code", batchCodes);
-  const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [norm(b.batch_code), b]));
+  const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [normKey(b.batch_code), b]));
   const batchIds = Array.from(batchByCode.values()).map((b) => b.id as string);
-  const { data: batchLocs } = batchIds.length
-    ? await supabase
-        .from("batch_locations")
-        .select("batch_id, location_id, qty, locations(location_kind)")
-        .in("batch_id", batchIds)
-    : { data: [] as AnyRow[] };
-  // Vị trí kho mình giữ nhiều nhất của mỗi lô — đúng vị trí phiếu sẽ trừ
-  // (cùng logic mainOwnLocationOfBatch).
-  const mainOwn = new Map<string, { locationId: string; qty: number }>();
-  for (const bl of (batchLocs ?? []) as AnyRow[]) {
-    if ((bl.locations as AnyRow)?.location_kind !== "OWN_WAREHOUSE") continue;
-    const prev = mainOwn.get(bl.batch_id as string);
-    if (!prev || Number(bl.qty) > prev.qty)
-      mainOwn.set(bl.batch_id as string, { locationId: bl.location_id as string, qty: Number(bl.qty) });
-  }
+  // Vị trí kho mình giữ nhiều nhất của mỗi lô — đúng vị trí phiếu sẽ trừ.
+  const mainOwn = await mainOwnLocations(supabase, batchIds);
   const supplierIds = Array.from(new Set(Array.from(batchByCode.values()).map((b) => b.supplier_id as string))).filter(Boolean);
   const { data: suppliers } = supplierIds.length
     ? await supabase.from("suppliers").select("id, allow_sub_consignment").in("id", supplierIds)
@@ -860,7 +932,7 @@ export async function importConsignmentOutAction(formData: FormData) {
       invalid.push(code || "(dòng thiếu mã lô)");
       continue;
     }
-    const batch = batchByCode.get(norm(code));
+    const batch = batchByCode.get(normKey(code));
     if (!batch) {
       invalid.push(code);
       continue;
@@ -907,11 +979,7 @@ export async function importConsignmentOutAction(formData: FormData) {
       invalid.push(`Vượt hạn mức ký gửi của đối tác (đang giữ ${atPartner}, đợt này thêm ${thisValue})`);
   }
   if (invalid.length)
-    throw new Error(
-      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
-        .slice(0, 5)
-        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
-    );
+    rejectImport(invalid);
 
   const me = await userId();
   const slip = must(
@@ -931,7 +999,7 @@ export async function importConsignmentOutAction(formData: FormData) {
   done(
     await supabase.from("consignment_out_items").insert(
       rawRows.map((r) => {
-        const batch = batchByCode.get(norm(String(r.batchCode ?? "").trim())) as AnyRow;
+        const batch = batchByCode.get(normKey(String(r.batchCode ?? "").trim())) as AnyRow;
         return {
           slip_id: slip.id,
           batch_id: batch.id,
@@ -988,11 +1056,15 @@ export async function createCounterSaleAction(formData: FormData) {
     "Tạo đơn bán hàng"
   );
 
+  const ownLocs = await mainOwnLocations(
+    supabase,
+    lines.map((l) => l.batch_id as string)
+  );
   const groups: Record<string, AnyRow[]> = { BH: [], KG: [] };
   for (const l of lines) {
     const batch = batchMap.get(l.batch_id);
     if (!batch) throw new Error("Không tìm thấy lô hàng.");
-    const fromLocation = await mainOwnLocationOfBatch(supabase, l.batch_id);
+    const fromLocation = ownLocs.get(l.batch_id as string)?.locationId;
     if (!fromLocation) throw new Error("Một lô đã chọn không còn hàng tại kho của mình.");
     groups[batch.ownership === "OWNED" ? "BH" : "KG"].push({
       product_id: batch.product_id,
@@ -1074,23 +1146,22 @@ export async function importDealerSaleAction(formData: FormData) {
   if (!rawRows.length) throw new Error("File không có dòng nào để bán.");
 
   // Phân giải mã hàng: SKU trước, mã đã đăng ký sau (cùng mẫu import BT).
-  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
   const { data: allProducts } = await supabase.from("products").select("id, sku, wholesale_price").limit(5000);
   const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
-  const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [norm(p.sku), p.id as string]));
-  const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [norm(c.code), c.product_id as string]));
+  const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [normKey(p.sku), p.id as string]));
+  const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [normKey(c.code), c.product_id as string]));
   const wholesaleByProduct = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [p.id as string, Number(p.wholesale_price) || 0]));
   const productIds = Array.from(
     new Set(
       rawRows
-        .map((r) => bySku.get(norm(r.code)) ?? byCode.get(norm(r.code)))
+        .map((r) => bySku.get(normKey(r.code)) ?? byCode.get(normKey(r.code)))
         .filter((v): v is string => !!v)
     )
   );
 
   // Hàng đợi FIFO theo sản phẩm: lô cũ nhất (received_date, rồi mã lô)
   // trước; tồn khả dụng của mỗi lô = tồn tại vị trí kho mình giữ nhiều
-  // nhất — đúng vị trí phiếu sẽ trừ (cùng logic mainOwnLocationOfBatch).
+  // nhất — đúng vị trí phiếu sẽ trừ.
   const { data: batches } = productIds.length
     ? await supabase
         .from("stock_batches")
@@ -1098,25 +1169,14 @@ export async function importDealerSaleAction(formData: FormData) {
         .in("product_id", productIds)
     : { data: [] as AnyRow[] };
   const batchIds = ((batches ?? []) as AnyRow[]).map((b) => b.id as string);
-  const { data: batchLocs } = batchIds.length
-    ? await supabase
-        .from("batch_locations")
-        .select("batch_id, location_id, qty, locations(location_kind)")
-        .in("batch_id", batchIds)
-    : { data: [] as AnyRow[] };
-  const mainOwn = new Map<string, number>();
-  for (const bl of (batchLocs ?? []) as AnyRow[]) {
-    if ((bl.locations as AnyRow)?.location_kind !== "OWN_WAREHOUSE") continue;
-    const prev = mainOwn.get(bl.batch_id as string) ?? 0;
-    if (Number(bl.qty) > prev) mainOwn.set(bl.batch_id as string, Number(bl.qty));
-  }
+  const ownLocs = await mainOwnLocations(supabase, batchIds);
   const fifoByProduct = new Map<string, { id: string; qty: number }[]>();
   for (const b of ((batches ?? []) as AnyRow[]).sort(
     (x, y) =>
       String(x.received_date).localeCompare(String(y.received_date)) ||
       String(x.batch_code).localeCompare(String(y.batch_code))
   )) {
-    const q = mainOwn.get(b.id as string) ?? 0;
+    const q = ownLocs.get(b.id as string)?.qty ?? 0;
     if (q <= 0) continue;
     const list = fifoByProduct.get(b.product_id as string) ?? [];
     list.push({ id: b.id as string, qty: q });
@@ -1137,7 +1197,7 @@ export async function importDealerSaleAction(formData: FormData) {
       invalid.push(code || "(dòng thiếu mã hàng)");
       continue;
     }
-    const productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
+    const productId = bySku.get(normKey(code)) ?? byCode.get(normKey(code));
     if (!productId) {
       invalid.push(code);
       continue;
@@ -1164,11 +1224,7 @@ export async function importDealerSaleAction(formData: FormData) {
       invalid.push(`${code} (không đủ hàng theo FIFO, còn ${qty - need})`);
   }
   if (invalid.length)
-    throw new Error(
-      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
-        .slice(0, 5)
-        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
-    );
+    rejectImport(invalid);
 
   // Ủy quyền cho đúng luồng bán tại quầy: tạo đơn, tách BH/KG theo tính
   // chất lô, xác nhận ngay, cập nhật tồn + công nợ, vào đúng ngày bán.
@@ -1290,11 +1346,10 @@ export async function importConsumptionReportAction(formData: FormData) {
   const rawRows: AnyRow[] = Array.isArray(payload.rows) ? payload.rows : [];
   if (!rawRows.length) throw new Error("File không có dòng nào để báo.");
 
-  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
   const { data: allProducts } = await supabase.from("products").select("id, sku").limit(5000);
   const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
-  const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [norm(p.sku), p.id as string]));
-  const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [norm(c.code), c.product_id as string]));
+  const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [normKey(p.sku), p.id as string]));
+  const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [normKey(c.code), c.product_id as string]));
 
   const invalid: string[] = [];
   const items: { product_id: string; qty_consumed: number }[] = [];
@@ -1305,7 +1360,7 @@ export async function importConsumptionReportAction(formData: FormData) {
       invalid.push(code || "(dòng thiếu mã hàng)");
       continue;
     }
-    const productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
+    const productId = bySku.get(normKey(code)) ?? byCode.get(normKey(code));
     if (!productId) {
       invalid.push(code);
       continue;
@@ -1313,11 +1368,7 @@ export async function importConsumptionReportAction(formData: FormData) {
     items.push({ product_id: productId, qty_consumed: qty });
   }
   if (invalid.length)
-    throw new Error(
-      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
-        .slice(0, 5)
-        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
-    );
+    rejectImport(invalid);
 
   const me = await userId();
   const report = must(
@@ -1384,17 +1435,16 @@ export async function importAllocationAction(formData: FormData) {
   const partnerLoc = await partnerLocationId(supabase, partnerId);
   if (!partnerLoc) throw new Error("Đối tác chưa có kho ảo (chưa từng nhận ký gửi).");
 
-  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
   const { data: allProducts } = await supabase.from("products").select("id, sku").limit(5000);
   const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
-  const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [norm(p.sku), p.id as string]));
-  const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [norm(c.code), c.product_id as string]));
+  const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [normKey(p.sku), p.id as string]));
+  const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [normKey(c.code), c.product_id as string]));
   const batchCodes = Array.from(new Set(rawRows.map((r) => String(r.batchCode ?? "").trim()))).filter(Boolean);
   const { data: batches } = await supabase
     .from("stock_batches")
     .select("id, batch_code, product_id")
     .in("batch_code", batchCodes);
-  const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [norm(b.batch_code), b]));
+  const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [normKey(b.batch_code), b]));
   const batchIds = Array.from(batchByCode.values()).map((b) => b.id as string);
   const { data: batchLocs } = batchIds.length
     ? await supabase
@@ -1420,12 +1470,12 @@ export async function importAllocationAction(formData: FormData) {
       invalid.push(batchCode || code || "(dòng thiếu mã)");
       continue;
     }
-    const productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
+    const productId = bySku.get(normKey(code)) ?? byCode.get(normKey(code));
     if (!productId) {
       invalid.push(code);
       continue;
     }
-    const batch = batchByCode.get(norm(batchCode));
+    const batch = batchByCode.get(normKey(batchCode));
     if (!batch) {
       invalid.push(batchCode);
       continue;
@@ -1475,11 +1525,7 @@ export async function importAllocationAction(formData: FormData) {
     }
   }
   if (invalid.length)
-    throw new Error(
-      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
-        .slice(0, 5)
-        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
-    );
+    rejectImport(invalid);
 
   const me = await userId();
   const slip = must(
@@ -1690,6 +1736,13 @@ export async function createReturnAction(formData: FormData) {
   );
   if (!raw.length) throw new Error("Phiếu trả cần ít nhất một dòng lô hàng.");
   const defaultWh = await defaultWarehouseId(supabase);
+  const ownLocs =
+    kind === "SUPPLIER_RETURN"
+      ? await mainOwnLocations(
+          supabase,
+          raw.map((r) => r.batch_id as string)
+        )
+      : new Map<string, { locationId: string; qty: number }>();
   const items = [];
   for (const r of raw) {
     let fromLocation: string | null = null;
@@ -1701,7 +1754,7 @@ export async function createReturnAction(formData: FormData) {
       fromLocation = (await partnerLocationId(supabase, partnerId)) ?? null;
       toLocation = defaultWh ?? null;
     } else if (kind === "SUPPLIER_RETURN") {
-      fromLocation = (await mainOwnLocationOfBatch(supabase, r.batch_id)) ?? null;
+      fromLocation = ownLocs.get(r.batch_id as string)?.locationId ?? null;
     }
     items.push({
       return_id: doc.id,

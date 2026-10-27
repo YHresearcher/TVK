@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import * as XLSX from "xlsx";
+import { mapHeaderColumns, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
 
@@ -47,17 +47,7 @@ interface PreviewRow extends RawRow {
   duplicate?: boolean;
 }
 
-/** Lowercase, strip Vietnamese diacritics, drop every non-alphanumeric char. */
-function normalizeHeader(h: unknown): string {
-  return String(h ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9]/g, "");
-}
-
-const FIELD_ALIASES: Record<keyof RawRow, string[]> = {
+const FIELD_ALIASES: Record<string, string[]> = {
   code: ["mahang", "maso", "ma", "sku", "code", "mahanghoa"],
   altCodes: ["mathaythe", "mathay", "altcodes", "matuongduong"],
   name: ["tenhang", "tenphutung", "ten", "name"],
@@ -69,24 +59,6 @@ const FIELD_ALIASES: Record<keyof RawRow, string[]> = {
   usd: ["giausd", "dongiausd", "usd", "priceusd"],
   note: ["ghichu", "note"],
 };
-
-function toStr(v: unknown): string {
-  return String(v ?? "").trim();
-}
-
-function toNum(v: unknown): number {
-  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
-  let s = String(v ?? "").trim().replace(/\s/g, "");
-  if (!s) return 0;
-  // Vietnamese thousand separators: 2.916.000 or 2.916.000,5
-  if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
-    s = s.replace(/\./g, "").replace(",", ".");
-  } else {
-    s = s.replace(/,/g, "");
-  }
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export default function ImportExcel({
   suppliers,
@@ -138,45 +110,19 @@ export default function ImportExcel({
     setParseError("");
     setFormatProblems([]);
     try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const aoa = XLSX.utils.sheet_to_json<unknown[]>(ws, {
-        header: 1,
-        defval: "",
-      });
+      const aoa = await readFirstSheetAOA(await file.arrayBuffer());
       if (!aoa.length) throw new Error("File không có dữ liệu.");
-      const fieldCol: Partial<Record<keyof RawRow, number>> = {};
-      const headerNorms: string[] = [];
-      (aoa[0] as unknown[]).forEach((h, idx) => {
-        const n = normalizeHeader(h);
-        headerNorms.push(n);
-        (Object.keys(FIELD_ALIASES) as (keyof RawRow)[]).forEach((field) => {
-          if (FIELD_ALIASES[field].includes(n) && fieldCol[field] === undefined) {
-            fieldCol[field] = idx;
-          }
-        });
-      });
       // Kiểm soát định dạng: thiếu cột bắt buộc, trùng tiêu đề, thiếu cột
       // giá → từ chối file và hướng dẫn lại chuẩn (không xem trước).
-      const problems: string[] = [];
-      const seenH = new Set<string>();
-      const dupH = new Set<string>();
-      for (const n of headerNorms) {
-        if (!n) continue;
-        if (seenH.has(n)) dupH.add(n);
-        seenH.add(n);
-      }
-      if (dupH.size)
-        problems.push(
-          `Tiêu đề cột bị trùng lặp: ${Array.from(dupH).join(", ")}. Mỗi cột chỉ được xuất hiện một lần.`
-        );
-      const missing: string[] = [];
-      if (fieldCol.code === undefined) missing.push("MaHang");
-      if (fieldCol.name === undefined) missing.push("TenHang");
-      if (fieldCol.qty === undefined) missing.push("SoLuong");
-      if (missing.length)
-        problems.push(`Thiếu cột bắt buộc: ${missing.join(", ")}.`);
+      const { fieldCol, problems } = mapHeaderColumns(
+        aoa[0] as unknown[],
+        FIELD_ALIASES,
+        [
+          { field: "code", label: "MaHang" },
+          { field: "name", label: "TenHang" },
+          { field: "qty", label: "SoLuong" },
+        ]
+      );
       if (fieldCol.usd === undefined)
         problems.push("Thiếu cột giá: cần cột GiaUSD.");
       const val = (cells: unknown[], field: keyof RawRow) => {
