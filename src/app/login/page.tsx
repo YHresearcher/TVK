@@ -4,12 +4,55 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { flagPasswordResetRequestedAction } from "@/lib/actions";
-import { btnCls, inputCls, labelCls } from "@/components/ui";
+
+const inputCls =
+  "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200";
+const labelCls = "block text-sm font-medium text-slate-700 mb-1.5";
+
+function BrandMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <div>
+      <p
+        className={`font-black tracking-tight text-white ${
+          compact ? "text-3xl" : "text-6xl"
+        }`}
+      >
+        TVK<span className="text-amber-400">.</span>
+      </p>
+      <p
+        className={`mt-1 font-medium uppercase tracking-[0.25em] text-slate-400 ${
+          compact ? "text-[10px]" : "text-xs"
+        }`}
+      >
+        Phụ tùng ô tô
+      </p>
+    </div>
+  );
+}
+
+function FeatureList() {
+  const items = [
+    "Hàng của mình & hàng ký gửi — tách bạch theo từng lô",
+    "Ký gửi hai chiều — nhận từ nhà cung cấp, gửi cho đối tác",
+    "Đối soát theo lô, xuất hoá đơn GTGT đúng phân bổ",
+  ];
+  return (
+    <ul className="space-y-4">
+      {items.map((t) => (
+        <li key={t} className="flex items-start gap-3">
+          <span className="mt-1.5 h-2 w-2 shrink-0 rotate-45 bg-amber-400" />
+          <span className="text-sm leading-relaxed text-slate-200">{t}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -84,97 +127,168 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-xl">
-        <h1 className="text-2xl font-bold text-slate-900">TVK</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Quản lý kho phụ tùng ô tô — đăng nhập để tiếp tục
-        </p>
-        {!configured ? (
-          <div className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
-            Supabase chưa được cấu hình. Hãy đặt{" "}
-            <code>NEXT_PUBLIC_SUPABASE_URL</code> và{" "}
-            <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> trong{" "}
-            <code>.env.local</code> trước (xem <code>supabase/README.md</code>).
+    <div className="min-h-screen bg-white lg:grid lg:grid-cols-[1.05fr_1fr]">
+      {/* Brand panel — desktop */}
+      <div className="relative hidden overflow-hidden bg-slate-950 lg:flex lg:flex-col lg:justify-between lg:px-14 lg:py-12">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(255,255,255,0.09) 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
+          }}
+        />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-amber-500 opacity-20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 -left-16 select-none text-[16rem] font-black leading-none text-white/[0.04]">
+          TVK
+        </div>
+        <div className="relative">
+          <span className="inline-block rounded-full border border-white/15 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-slate-300">
+            Hệ thống quản lý kho
+          </span>
+        </div>
+        <div className="relative max-w-md">
+          <BrandMark />
+          <p className="mt-5 text-base leading-relaxed text-slate-300">
+            Quản lý kho phụ tùng ô tô — hàng của mình, hàng ký gửi, rõ ràng
+            từng lô, đối soát từng đồng.
+          </p>
+          <div className="mt-10">
+            <FeatureList />
           </div>
-        ) : (
-          <form
-            onSubmit={mode === "login" ? onSubmit : onForgot}
-            className="mt-6 space-y-4"
-          >
-            <div>
-              <label className={labelCls}>Email hoặc tên đăng nhập</label>
-              <input
-                type="text"
-                autoComplete="username"
-                required
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                className={inputCls}
-                placeholder="you@company.vn hoặc tên đăng nhập"
-              />
-            </div>
-            {mode === "login" && (
-              <div>
-                <label className={labelCls}>Mật khẩu</label>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={inputCls}
-                  placeholder="••••••••"
-                />
-              </div>
-            )}
-            {error && (
-              <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
-                {error}
-              </p>
-            )}
-            {notice && (
-              <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                {notice}
-              </p>
-            )}
-            <button type="submit" disabled={loading} className={`${btnCls} w-full`}>
-              {loading
-                ? mode === "login"
-                  ? "Đang đăng nhập…"
-                  : "Đang gửi…"
-                : mode === "login"
-                  ? "Đăng nhập"
-                  : "Gửi liên kết đặt lại"}
-            </button>
-            <p className="text-center text-sm">
-              {mode === "login" ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("forgot");
-                    setError("");
-                    setNotice("");
-                  }}
-                  className="text-slate-500 underline hover:text-slate-700"
-                >
-                  Quên mật khẩu?
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("login");
-                    setError("");
-                    setNotice("");
-                  }}
-                  className="text-slate-500 underline hover:text-slate-700"
-                >
-                  ← Quay lại đăng nhập
-                </button>
-              )}
+        </div>
+        <div className="relative text-xs leading-relaxed text-slate-500">
+          <p>TVK management system by Thanh Phan</p>
+          <p>version 1.0</p>
+        </div>
+      </div>
+
+      {/* Form column */}
+      <div className="flex flex-col">
+        {/* Compact brand strip — mobile */}
+        <div className="bg-slate-950 px-6 py-6 lg:hidden">
+          <BrandMark compact />
+          <p className="mt-2 text-sm text-slate-400">
+            Quản lý kho phụ tùng ô tô — hàng của mình, hàng ký gửi, rõ ràng
+            từng lô.
+          </p>
+        </div>
+
+        <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-8">
+          <div className="w-full max-w-md">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+              {mode === "login" ? "Đăng nhập" : "Quên mật khẩu"}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              {mode === "login"
+                ? "Chào mừng trở lại — đăng nhập để tiếp tục quản lý kho."
+                : "Nhập email hoặc tên đăng nhập, hệ thống sẽ gửi liên kết đặt lại về email của bạn."}
             </p>
-          </form>
-        )}
+            {!configured ? (
+              <div className="mt-8 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-800">
+                Supabase chưa được cấu hình. Hãy đặt{" "}
+                <code>NEXT_PUBLIC_SUPABASE_URL</code> và{" "}
+                <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> trong{" "}
+                <code>.env.local</code> trước (xem <code>supabase/README.md</code>
+                ).
+              </div>
+            ) : (
+              <form
+                onSubmit={mode === "login" ? onSubmit : onForgot}
+                className="mt-8 space-y-5"
+              >
+                <div>
+                  <label className={labelCls}>Email hoặc tên đăng nhập</label>
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    required
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    className={inputCls}
+                    placeholder="you@company.vn hoặc tên đăng nhập"
+                  />
+                </div>
+                {mode === "login" && (
+                  <div>
+                    <label className={labelCls}>Mật khẩu</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`${inputCls} pr-16`}
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500 hover:text-slate-800"
+                      >
+                        {showPassword ? "Ẩn" : "Hiện"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {error && (
+                  <p className="rounded-xl border-l-4 border-red-500 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </p>
+                )}
+                {notice && (
+                  <p className="rounded-xl border-l-4 border-emerald-500 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {notice}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-xl bg-amber-500 py-3 text-sm font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 disabled:opacity-50"
+                >
+                  {loading
+                    ? mode === "login"
+                      ? "Đang đăng nhập…"
+                      : "Đang gửi…"
+                    : mode === "login"
+                      ? "Đăng nhập"
+                      : "Gửi liên kết đặt lại"}
+                </button>
+                <p className="text-center text-sm">
+                  {mode === "login" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("forgot");
+                        setError("");
+                        setNotice("");
+                      }}
+                      className="font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
+                    >
+                      Quên mật khẩu?
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("login");
+                        setError("");
+                        setNotice("");
+                      }}
+                      className="font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
+                    >
+                      ← Quay lại đăng nhập
+                    </button>
+                  )}
+                </p>
+              </form>
+            )}
+            <p className="mt-10 text-center text-xs text-slate-400">
+              Chưa có tài khoản? Liên hệ quản trị viên để được cấp.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
