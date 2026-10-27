@@ -4,7 +4,8 @@ import { useMemo, useRef, useState } from "react";
 import { Card, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { formatVND } from "@/lib/format";
 import { normalizeHeader } from "@/lib/excel-parse";
-import { OWNERSHIP_LABELS } from "@/lib/types";
+import { tierPriceOf } from "@/lib/product-match";
+import { OWNERSHIP_LABELS, PRICE_TIER_LABELS, priceTierForKind, type PriceTier } from "@/lib/types";
 
 export interface PosPartner {
   id: string;
@@ -29,27 +30,12 @@ export interface PosBatch {
   mainOwnQty: number;
 }
 
-type Tier = "retail" | "garage" | "wholesale";
-
-const TIER_LABELS: Record<Tier, string> = {
-  retail: "Giá lẻ",
-  garage: "Giá gara",
-  wholesale: "Giá đại lý",
-};
-
-/** Giá theo loại đối tác: Gara thì giá gara, đối tác còn lại thì giá đại lý, khách lẻ thì giá lẻ. */
-function tierFor(kind: string | null): Tier {
-  if (!kind || kind === "RETAIL") return "retail";
-  if (kind === "GARAGE") return "garage";
-  return "wholesale";
-}
-
-function priceOf(p: PosProduct, tier: Tier): number {
-  return tier === "retail" ? p.retailPrice : tier === "garage" ? p.garagePrice : p.wholesalePrice;
+function priceOf(p: PosProduct, tier: PriceTier): number {
+  return tierPriceOf(p, tier);
 }
 
 /** Giá điền sẵn: có giá thì điền, chưa có giá thì để trống cho tự nhập. */
-function priceInput(p: PosProduct, tier: Tier): string {
+function priceInput(p: PosProduct, tier: PriceTier): string {
   const v = priceOf(p, tier);
   return v > 0 ? String(v) : "";
 }
@@ -99,7 +85,7 @@ export default function PosSaleForm({
   const keyRef = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const tier = tierFor(partner?.kind ?? null);
+  const tier = priceTierForKind(partner?.kind ?? null);
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
   const codesByProduct = useMemo(() => {
@@ -145,7 +131,7 @@ export default function PosSaleForm({
     setPartner(p);
     setPartnerQuery(p ? p.name : "");
     setPartnerOpen(false);
-    const nextTier = tierFor(p?.kind ?? null);
+    const nextTier = priceTierForKind(p?.kind ?? null);
     setLines((ls) =>
       ls.map((l) => {
         const prod = productById.get(l.productId);
@@ -327,7 +313,7 @@ export default function PosSaleForm({
           </div>
         </div>
         <p className="text-sm text-slate-500">
-          Giá áp dụng: <span className="font-medium text-slate-800">{TIER_LABELS[tier]}</span>
+          Giá áp dụng: <span className="font-medium text-slate-800">{PRICE_TIER_LABELS[tier]}</span>
           {partner ? ` — ${partner.name}` : " — khách lẻ"}. Giảm giá chỉ trừ trên phần hàng của
           mình (BH).
         </p>

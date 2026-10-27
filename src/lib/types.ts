@@ -69,6 +69,22 @@ export const PARTNER_KIND_LABELS: Record<string, string> = {
   OTHER: "Khác",
 };
 
+/** Bậc giá áp dụng cho một khách hàng: lẻ / gara / đại lý. */
+export type PriceTier = "retail" | "garage" | "wholesale";
+
+export const PRICE_TIER_LABELS: Record<PriceTier, string> = {
+  retail: "Giá lẻ",
+  garage: "Giá gara",
+  wholesale: "Giá đại lý",
+};
+
+/** Gara thì giá gara, đối tác còn lại thì giá đại lý, khách lẻ (không có loại) thì giá lẻ. */
+export function priceTierForKind(kind: string | null | undefined): PriceTier {
+  if (!kind || kind === "RETAIL") return "retail";
+  if (kind === "GARAGE") return "garage";
+  return "wholesale";
+}
+
 export const CODE_KIND_LABELS: Record<string, string> = {
   OEM: "OEM",
   MANUFACTURER: "Hãng sản xuất",

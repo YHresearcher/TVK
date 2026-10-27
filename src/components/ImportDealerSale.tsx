@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { formatNumber, formatVND, todayISO } from "@/lib/format";
 import { mapHeaderColumns, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
+import { matchByNameVehicle, tierPriceOf } from "@/lib/product-match";
+import { PRICE_TIER_LABELS, priceTierForKind } from "@/lib/types";
+import type { PosProduct } from "@/components/PosSaleForm";
 
 /** Cột tiền: căn phải để dễ dò số. */
 const thNumCls = `${thCls} text-right`;
@@ -13,7 +16,7 @@ const tdNumCls = `${tdCls} text-right`;
 export interface DealerProductRow {
   productId: string;
   productName: string;
-  /** Giá đại lý — giá mặc định khi ô DonGiaVND để trống. */
+  /** Giá đại lý — chỉ còn dùng khi tra cứu theo mã hàng. */
   wholesalePrice: number;
 }
 
@@ -27,9 +30,13 @@ export interface DealerFifoBatchRow {
 }
 
 interface RawRow {
+  /** STT chỉ để đếm, không dùng để khớp hàng. */
+  vehicle: string;
+  name: string;
+  /** Cột MaHang tùy chọn — chỉ cần khi tên + dòng xe trùng nhiều món. */
   code: string;
   qty: number;
-  /** null = ô giá để trống → lấy giá đại lý của sản phẩm. */
+  /** null = ô giá để trống → lấy giá theo loại khách đã chọn ở form. */
   price: number | null;
 }
 
@@ -45,29 +52,36 @@ interface AllocLine {
 interface PreviewRow {
   stt: number;
   status: "ok" | "error";
+  vehicle: string;
+  name: string;
   code: string;
   productName?: string;
   error?: string;
-  duplicate?: boolean;
   allocs: AllocLine[];
 }
 
 const FIELD_ALIASES: Record<string, string[]> = {
+  vehicle: ["dongxe", "dong", "maxe", "fitment"],
+  name: ["tenphutung", "tenhang", "ten", "name"],
   code: ["mahang", "mahanghoa", "maso", "sku", "code", "productcode", "maphutung"],
   qty: ["soluong", "sl", "qty", "quantity"],
-  price: ["dongiavnd", "dongia", "giaban", "giavnd", "giabandai", "unitprice"],
+  price: ["dongia", "dongiavnd", "giaban", "giavnd", "giabandai", "unitprice"],
 };
 
 const normCode = (v: string) => v.trim().toUpperCase();
 
 export default function ImportDealerSale({
   partners,
+  products,
   codeMap,
   fifoBatches,
   action,
 }: {
-  partners: { value: string; label: string }[];
-  /** Mã hàng đã chuẩn hoá (trim + hoa) → sản phẩm. */
+  /** Đối tác kèm loại — loại quyết định bậc giá mặc định của đơn. */
+  partners: { value: string; label: string; kind: string }[];
+  /** Toàn bộ sản phẩm kèm dòng xe và 3 bậc giá, để khớp tên + dòng xe. */
+  products: PosProduct[];
+  /** Mã hàng đã chuẩn hoá (trim + hoa) → sản phẩm (cột MaHang tùy chọn). */
   codeMap: Record<string, DealerProductRow>;
   /** productId → các lô FIFO còn hàng tại kho của mình. */
   fifoBatches: Record<string, DealerFifoBatchRow[]>;
@@ -83,6 +97,11 @@ export default function ImportDealerSale({
   const [parseError, setParseError] = useState("");
   const [formatProblems, setFormatProblems] = useState<string[]>([]);
 
+  const selectedPartner = partners.find((o) => o.value === partnerId);
+  const tier = priceTierForKind(selectedPartner?.kind ?? null);
+  const effectiveCustomerName = selectedPartner ? selectedPartner.label : customerName;
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+
   async function handleFile(file: File | undefined) {
     if (!file) return;
     setParseError("");
@@ -91,8 +110,8 @@ export default function ImportDealerSale({
       const aoa = await readFirstSheetAOA(await file.arrayBuffer());
       if (!aoa.length) throw new Error("File không có dữ liệu.");
       const { fieldCol, problems } = mapHeaderColumns(aoa[0], FIELD_ALIASES, [
-        { field: "code", label: "MaHang" },
-        { field: "qty", label: "SoLuong" },
+        { field: "name", label: "Tên phụ tùng" },
+        { field: "qty", label: "Số lượng" },
       ]);
       const val = (cells: unknown[], field: string) => {
         const i = fieldCol[field];
@@ -103,6 +122,8 @@ export default function ImportDealerSale({
         if (cells.every((c) => toStr(c) === "")) continue;
         const priceCell = val(cells, "price");
         rows.push({
+          vehicle: toStr(val(cells, "vehicle")),
+          name: toStr(val(cells, "name")),
           code: toStr(val(cells, "code")),
           qty: toNum(val(cells, "qty")),
           price: toStr(priceCell) === "" ? null : toNum(priceCell),
@@ -131,61 +152,83 @@ export default function ImportDealerSale({
   // từ lô cũ nhất còn hàng; tồn còn lại của lô được trừ dần qua các dòng.
   const preview: PreviewRow[] = useMemo(() => {
     if (!rawRows) return [];
-    const seen = new Set<string>();
     const remaining = new Map<string, number>();
     for (const list of Object.values(fifoBatches)) {
       for (const b of list) remaining.set(b.batch_id, b.mainOwnQty);
     }
     return rawRows.map((r, i) => {
-      const key = normCode(r.code);
-      const duplicate = !!key && seen.has(key);
-      if (key) seen.add(key);
-      const product = key ? codeMap[key] : undefined;
-      const unitPrice = r.price ?? product?.wholesalePrice ?? 0;
-      const priceFromCatalog = r.price === null;
       const allocs: AllocLine[] = [];
       let error: string | undefined;
-      if (!r.code) error = "Thiếu mã hàng";
-      else if (!product) error = "Mã hàng chưa có trong hệ thống";
-      else if (!(r.qty > 0)) error = "Số lượng phải lớn hơn 0";
-      else if (r.price !== null && r.price < 0) error = "Đơn giá không được âm";
-      else {
-        let need = r.qty;
-        const available = (fifoBatches[product.productId] ?? []).reduce(
-          (a, b) => a + (remaining.get(b.batch_id) ?? 0),
-          0
-        );
-        for (const b of fifoBatches[product.productId] ?? []) {
-          if (need <= 0) break;
-          const avail = remaining.get(b.batch_id) ?? 0;
-          const take = Math.min(need, avail);
-          if (take > 0) {
-            allocs.push({
-              batchCode: b.batch_code,
-              ownership: b.ownership,
-              batchStock: b.mainOwnQty,
-              qty: take,
-              unitPrice,
-              priceFromCatalog,
-            });
-            remaining.set(b.batch_id, avail - take);
-            need -= take;
-          }
+      let productId: string | undefined;
+      let productName: string | undefined;
+      const codeKey = normCode(r.code);
+      if (!r.name && !codeKey) {
+        error = "Thiếu tên phụ tùng";
+      } else if (codeKey) {
+        const byCode = codeMap[codeKey];
+        if (!byCode) error = "Mã hàng chưa có trong hệ thống";
+        else {
+          productId = byCode.productId;
+          productName = byCode.productName;
         }
-        if (need > 0)
-          error = `Không đủ hàng theo FIFO (còn ${formatNumber(available)}; thiếu ${formatNumber(need)})`;
+      } else {
+        const matched = matchByNameVehicle(products, r.name, r.vehicle);
+        if ("error" in matched) {
+          const where = r.vehicle ? ` (dòng xe ${r.vehicle})` : "";
+          error =
+            matched.error === "ambiguous"
+              ? `Tên “${r.name}”${where} trùng nhiều món — ghi thêm cột Mã hàng để phân biệt`
+              : `Không tìm thấy “${r.name}”${where} trong hệ thống`;
+        } else {
+          productId = matched.productId;
+          productName = productById.get(productId)?.name;
+        }
+      }
+      const product = productId ? productById.get(productId) : undefined;
+      const unitPrice = r.price ?? (product ? tierPriceOf(product, tier) : 0);
+      const priceFromCatalog = r.price === null;
+      if (!error) {
+        if (!(r.qty > 0)) error = "Số lượng phải lớn hơn 0";
+        else if (r.price !== null && r.price < 0) error = "Đơn giá không được âm";
+        else if (productId) {
+          let need = r.qty;
+          const available = (fifoBatches[productId] ?? []).reduce(
+            (a, b) => a + (remaining.get(b.batch_id) ?? 0),
+            0
+          );
+          for (const b of fifoBatches[productId] ?? []) {
+            if (need <= 0) break;
+            const avail = remaining.get(b.batch_id) ?? 0;
+            const take = Math.min(need, avail);
+            if (take > 0) {
+              allocs.push({
+                batchCode: b.batch_code,
+                ownership: b.ownership,
+                batchStock: b.mainOwnQty,
+                qty: take,
+                unitPrice,
+                priceFromCatalog,
+              });
+              remaining.set(b.batch_id, avail - take);
+              need -= take;
+            }
+          }
+          if (need > 0)
+            error = `Không đủ hàng theo FIFO (còn ${formatNumber(available)}; thiếu ${formatNumber(need)})`;
+        }
       }
       return {
         stt: i + 1,
         status: error ? "error" : "ok",
+        vehicle: r.vehicle,
+        name: r.name,
         code: r.code,
-        productName: product?.productName,
+        productName,
         error,
-        duplicate,
         allocs,
       };
     });
-  }, [rawRows, codeMap, fifoBatches]);
+  }, [rawRows, codeMap, fifoBatches, products, productById, tier]);
 
   const okRows = preview.filter((r) => r.status !== "error");
   const errorCount = preview.length - okRows.length;
@@ -202,10 +245,16 @@ export default function ImportDealerSale({
   const payloadRows = preview
     .map((pr, idx) => ({ pr, raw: rawRows![idx] }))
     .filter(({ pr }) => pr.status !== "error")
-    .map(({ raw }) => ({ code: raw.code, qty: raw.qty, price: raw.price }));
+    .map(({ raw }) => ({
+      name: raw.name,
+      vehicle: raw.vehicle,
+      code: raw.code,
+      qty: raw.qty,
+      price: raw.price,
+    }));
   const payload = {
     partnerId,
-    customerName,
+    customerName: effectiveCustomerName,
     discountAmount,
     isCredit,
     saleDate,
@@ -217,7 +266,7 @@ export default function ImportDealerSale({
       <input type="hidden" name="payload" value={JSON.stringify(payload)} />
       <div className="rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/70 px-4 py-4">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-blue-950">File bán đại lý (.xlsx / .csv)</label>
+          <label className="text-sm font-semibold text-blue-950">File bán sỉ/lẻ (.xlsx / .csv)</label>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <input
@@ -235,11 +284,12 @@ export default function ImportDealerSale({
           </a>
         </div>
         <p className="mt-2 text-xs text-blue-900/70">
-          Tải file mẫu về, xoá các dòng ví dụ rồi điền mã hàng cần bán — một
-          file là một đơn bán đại lý. Không cần nhớ mã lô: hệ thống tự lấy
-          hàng theo lô cũ nhất còn tại kho của mình (FIFO). Đơn giá để trống
-          thì lấy giá đại lý của sản phẩm. Hệ thống kiểm tra định dạng và cho
-          xem trước ở bên dưới trước khi tạo đơn.
+          Tải file mẫu về, xoá các dòng ví dụ rồi điền hàng cần bán — một
+          file là một đơn bán hàng. Không cần nhớ mã hàng hay mã lô: hệ thống
+          tự tìm hàng theo tên + dòng xe rồi lấy theo lô cũ nhất còn tại kho
+          của mình (FIFO). Đơn giá để trống thì lấy giá theo loại khách đã
+          chọn ở form dưới. Hệ thống kiểm tra định dạng và cho xem trước ở
+          bên dưới trước khi tạo đơn.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-4">
@@ -263,7 +313,12 @@ export default function ImportDealerSale({
         </div>
         <div>
           <label className={labelCls}>Tên khách hàng</label>
-          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputCls} />
+          <input
+            value={effectiveCustomerName}
+            readOnly={!!selectedPartner}
+            onChange={(e) => setCustomerName(e.target.value)}
+            className={inputCls}
+          />
         </div>
         <div>
           <label className={labelCls}>Giảm giá cho phần BH (₫)</label>
@@ -276,6 +331,10 @@ export default function ImportDealerSale({
           />
         </div>
       </div>
+      <p className="text-sm text-slate-500">
+        Giá áp dụng khi đơn giá để trống:{" "}
+        <span className="font-medium text-slate-800">{PRICE_TIER_LABELS[tier]}</span>.
+      </p>
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={isCredit} onChange={(e) => setIsCredit(e.target.checked)} className="h-4 w-4" />
         Ghi nợ (tạo phải thu)
@@ -290,18 +349,19 @@ export default function ImportDealerSale({
             ))}
           </ul>
           <div className="rounded-md bg-white/70 px-3 py-2 text-xs leading-relaxed text-slate-700">
-            <p className="font-semibold">Định dạng chuẩn của file bán đại lý:</p>
-            <p className="mt-1 font-mono text-[11px]">MaHang* · SoLuong* · DonGiaVND</p>
+            <p className="font-semibold">Định dạng chuẩn của file bán sỉ/lẻ:</p>
+            <p className="mt-1 font-mono text-[11px]">STT · Dòng xe · Tên phụ tùng* · Số lượng* · Đơn giá</p>
             <p className="mt-1">
-              Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là bắt
-              buộc). MaHang là mã hàng hoặc SKU đã đăng ký (vd.
-              AZ1664440069-SMS-30705) — không nhập mã lô, hệ thống tự phân bổ
-              theo lô cũ nhất còn hàng tại kho của mình (FIFO), một dòng có
-              thể tách ra nhiều lô. DonGiaVND tính bằng VNĐ — để trống thì lấy
-              giá đại lý của sản phẩm, ghi số thì bán đúng giá đó. Ngày bán
-              chọn ở form trên, áp dụng cho cả đơn. File .csv phải lưu ở mã
-              hoá UTF-8. Dễ nhất: bấm “Tải file mẫu” ở trên, xoá dòng ví dụ
-              rồi điền vào.
+              Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là
+              bắt buộc). STT chỉ để đếm. Hệ thống tìm hàng theo tên phụ tùng
+              + dòng xe (dòng xe để trống thì tìm theo tên); tên trùng nhau
+              mà dòng xe không phân biệt được thì thêm cột MaHang (mã hàng
+              hoặc SKU đã đăng ký) để chỉ rõ món nào. Đơn giá tính bằng VNĐ —
+              để trống thì lấy giá theo loại khách đã chọn ở form (khách lẻ:
+              giá lẻ; Gara: giá gara; đối tác khác: giá đại lý), ghi số thì
+              bán đúng giá đó. Ngày bán chọn ở form trên, áp dụng cho cả
+              đơn. File .csv phải lưu ở mã hoá UTF-8. Dễ nhất: bấm “Tải
+              file mẫu” ở trên, xoá dòng ví dụ rồi điền vào.
             </p>
           </div>
         </div>
@@ -325,7 +385,8 @@ export default function ImportDealerSale({
           <thead>
             <tr>
               <th className={thCls}>STT</th>
-              <th className={thCls}>Mã hàng</th>
+              <th className={thCls}>Dòng xe</th>
+              <th className={thCls}>Tên phụ tùng</th>
               <th className={thCls}>Sản phẩm</th>
               <th className={thCls}>Lô (FIFO)</th>
               <th className={thCls}>Tính chất</th>
@@ -342,7 +403,8 @@ export default function ImportDealerSale({
               return lines.map((l, j) => (
                 <tr key={`${r.stt}-${j}`} className="border-t border-slate-100">
                   <td className={tdCls}>{j === 0 ? r.stt : ""}</td>
-                  <td className={`${tdCls} font-mono text-xs`}>{j === 0 ? r.code || "—" : ""}</td>
+                  <td className={tdCls}>{j === 0 ? r.vehicle || "—" : ""}</td>
+                  <td className={tdCls}>{j === 0 ? r.name || "—" : ""}</td>
                   <td className={tdCls}>{j === 0 ? r.productName ?? "—" : ""}</td>
                   <td className={`${tdCls} font-mono text-xs`}>{l?.batchCode ?? "—"}</td>
                   <td className={tdCls}>{l?.ownership ?? "—"}</td>
@@ -353,7 +415,9 @@ export default function ImportDealerSale({
                       <>
                         {formatVND(l.unitPrice)}
                         {l.priceFromCatalog && (
-                          <span className="block text-[11px] font-normal text-slate-400">giá đại lý</span>
+                          <span className="block text-[11px] font-normal text-slate-400">
+                            {PRICE_TIER_LABELS[tier]}
+                          </span>
                         )}
                       </>
                     ) : (
@@ -369,9 +433,6 @@ export default function ImportDealerSale({
                         ) : (
                           <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Lỗi</span>
                         )}
-                        {r.duplicate && (
-                          <span className="ml-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Trùng mã trong file</span>
-                        )}
                         {r.error && <span className="block text-xs text-red-600">{r.error}</span>}
                       </>
                     )}
@@ -382,7 +443,7 @@ export default function ImportDealerSale({
           </tbody>
           <tfoot>
             <tr className="border-t border-slate-200 bg-slate-50 font-bold">
-              <td className={tdCls} colSpan={6}>Tổng</td>
+              <td className={tdCls} colSpan={7}>Tổng</td>
               <td className={tdCls}>{formatNumber(totalQty)}</td>
               <td className={tdCls}></td>
               <td className={tdNumCls}>{formatVND(totalAmount)}</td>
@@ -393,7 +454,7 @@ export default function ImportDealerSale({
       )}
 
       <button type="submit" disabled={!canSubmit} className={btnCls}>
-        Tạo đơn bán đại lý
+        Tạo đơn bán hàng
       </button>
       {!canSubmit && rawRows !== null && (
         <p className="text-xs text-slate-500">

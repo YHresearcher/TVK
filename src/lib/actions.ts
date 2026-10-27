@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { todayISO } from "@/lib/format";
+import { matchByNameVehicle, tierPriceOf } from "@/lib/product-match";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AnyRow } from "@/lib/types";
+import { priceTierForKind, type PriceTier } from "@/lib/types";
 
 async function db() {
   const supabase = await createClient();
@@ -1145,19 +1147,103 @@ export async function importDealerSaleAction(formData: FormData) {
   const rawRows: AnyRow[] = Array.isArray(payload.rows) ? payload.rows : [];
   if (!rawRows.length) throw new Error("File không có dòng nào để bán.");
 
-  // Phân giải mã hàng: SKU trước, mã đã đăng ký sau (cùng mẫu import BT).
-  const { data: allProducts } = await supabase.from("products").select("id, sku, wholesale_price").limit(5000);
+  // Bậc giá theo loại đối tác — tra cứu phía server, không tin client.
+  let tier: PriceTier = priceTierForKind(null);
+  if (partnerId) {
+    const { data: partner } = await supabase
+      .from("partners")
+      .select("partner_kind")
+      .eq("id", partnerId)
+      .maybeSingle();
+    if (!partner) throw new Error("Không tìm thấy đối tác.");
+    tier = priceTierForKind(partner.partner_kind as string);
+  }
+
+  // Phân giải hàng: mã hàng (cột MaHang tùy chọn) trước, tên + dòng xe
+  // sau — cùng luật khớp với bản xem trước ở client.
+  const { data: allProducts } = await supabase
+    .from("products")
+    .select("id, name, sku, retail_price, garage_price, wholesale_price")
+    .limit(5000);
   const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
+  const { data: allFitments } = await supabase
+    .from("product_fitments")
+    .select("product_id, vehicles(model)")
+    .limit(5000);
+  const fitmentsByProduct = new Map<string, string[]>();
+  for (const f of (allFitments ?? []) as AnyRow[]) {
+    const models = Array.isArray(f.vehicles) ? f.vehicles : [f.vehicles];
+    const names = models.map((v: AnyRow) => String(v?.model ?? "")).filter(Boolean);
+    if (names.length) fitmentsByProduct.set(f.product_id as string, names);
+  }
+  const matchables = ((allProducts ?? []) as AnyRow[]).map((p) => ({
+    id: p.id as string,
+    name: String(p.name ?? ""),
+    fitments: fitmentsByProduct.get(p.id as string) ?? [],
+  }));
   const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [normKey(p.sku), p.id as string]));
   const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [normKey(c.code), c.product_id as string]));
-  const wholesaleByProduct = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [p.id as string, Number(p.wholesale_price) || 0]));
-  const productIds = Array.from(
-    new Set(
-      rawRows
-        .map((r) => bySku.get(normKey(r.code)) ?? byCode.get(normKey(r.code)))
-        .filter((v): v is string => !!v)
-    )
+  const tierPriceByProduct = new Map(
+    ((allProducts ?? []) as AnyRow[]).map((p) => [
+      p.id as string,
+      tierPriceOf(
+        {
+          retailPrice: Number(p.retail_price) || 0,
+          garagePrice: Number(p.garage_price) || 0,
+          wholesalePrice: Number(p.wholesale_price) || 0,
+        },
+        tier
+      ),
+    ])
   );
+
+  // Vòng 1: phân giải từng dòng (tên/mã, số lượng, giá); dòng nào sai
+  // thì ghi lại — cả file bị từ chối, không bán một phần.
+  const invalid: string[] = [];
+  const resolved: { productId: string; label: string; qty: number; unitPrice: number }[] = [];
+  for (const r of rawRows) {
+    const name = String(r.name ?? "").trim();
+    const vehicle = String(r.vehicle ?? "").trim();
+    const code = String(r.code ?? "").trim();
+    const qty = Math.trunc(Number(r.qty) || 0);
+    const label = name || code || "(dòng thiếu tên)";
+    const priceRaw =
+      r.price === null || r.price === undefined || r.price === "" ? null : Number(r.price);
+    let productId: string | undefined;
+    if (code) {
+      productId = bySku.get(normKey(code)) ?? byCode.get(normKey(code));
+      if (!productId) {
+        invalid.push(`${code} (mã hàng chưa có trong hệ thống)`);
+        continue;
+      }
+    } else if (name) {
+      const matched = matchByNameVehicle(matchables, name, vehicle);
+      if ("error" in matched) {
+        invalid.push(matched.error === "ambiguous" ? `${name} (trùng tên)` : `${name} (không tìm thấy)`);
+        continue;
+      }
+      productId = matched.productId;
+    } else {
+      invalid.push("(dòng thiếu tên)");
+      continue;
+    }
+    if (!(qty > 0)) {
+      invalid.push(`${label} (số lượng không hợp lệ)`);
+      continue;
+    }
+    if (priceRaw !== null && !(priceRaw >= 0)) {
+      invalid.push(`${label} (giá không hợp lệ)`);
+      continue;
+    }
+    resolved.push({
+      productId,
+      label,
+      qty,
+      unitPrice: priceRaw ?? (tierPriceByProduct.get(productId) ?? 0),
+    });
+  }
+  if (invalid.length) rejectImport(invalid);
+  const productIds = Array.from(new Set(resolved.map((r) => r.productId)));
 
   // Hàng đợi FIFO theo sản phẩm: lô cũ nhất (received_date, rồi mã lô)
   // trước; tồn khả dụng của mỗi lô = tồn tại vị trí kho mình giữ nhiều
@@ -1183,45 +1269,26 @@ export async function importDealerSaleAction(formData: FormData) {
     fifoByProduct.set(b.product_id as string, list);
   }
 
-  // Phân bổ tuần tự theo thứ tự dòng trong file; tồn còn lại của lô
-  // được trừ dần qua các dòng (kể cả khi cùng mã hàng lặp lại).
+  // Vòng 2: phân bổ FIFO tuần tự theo thứ tự dòng trong file; tồn còn
+  // lại của lô được trừ dần qua các dòng (kể cả khi cùng món lặp lại).
   const remaining = new Map<string, number>();
   for (const list of Array.from(fifoByProduct.values()))
     for (const b of list) remaining.set(b.id, b.qty);
-  const invalid: string[] = [];
   const lines: { batch_id: string; qty: number; unit_price: number }[] = [];
-  for (const r of rawRows) {
-    const code = String(r.code ?? "").trim();
-    const qty = Math.trunc(Number(r.qty) || 0);
-    if (!code || qty <= 0) {
-      invalid.push(code || "(dòng thiếu mã hàng)");
-      continue;
-    }
-    const productId = bySku.get(normKey(code)) ?? byCode.get(normKey(code));
-    if (!productId) {
-      invalid.push(code);
-      continue;
-    }
-    const priceRaw =
-      r.price === null || r.price === undefined || r.price === "" ? null : Number(r.price);
-    if (priceRaw !== null && !(priceRaw >= 0)) {
-      invalid.push(`${code} (giá không hợp lệ)`);
-      continue;
-    }
-    const unitPrice = priceRaw ?? (wholesaleByProduct.get(productId) ?? 0);
-    let need = qty;
-    for (const b of fifoByProduct.get(productId) ?? []) {
+  for (const r of resolved) {
+    let need = r.qty;
+    for (const b of fifoByProduct.get(r.productId) ?? []) {
       if (need <= 0) break;
       const avail = remaining.get(b.id) ?? 0;
       const take = Math.min(need, avail);
       if (take > 0) {
-        lines.push({ batch_id: b.id, qty: take, unit_price: unitPrice });
+        lines.push({ batch_id: b.id, qty: take, unit_price: r.unitPrice });
         remaining.set(b.id, avail - take);
         need -= take;
       }
     }
     if (need > 0)
-      invalid.push(`${code} (không đủ hàng theo FIFO, còn ${qty - need})`);
+      invalid.push(`${r.label} (không đủ hàng theo FIFO, còn ${r.qty - need})`);
   }
   if (invalid.length)
     rejectImport(invalid);

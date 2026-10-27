@@ -34,14 +34,16 @@ const templates = [
     ],
   },
   {
-    // DonGiaVND để trống = giá đại lý của sản phẩm (dòng 1); ghi số =
-    // bán đúng giá đó (dòng 2). Mã hàng là SKU thật đã đăng ký — hệ
-    // thống tự phân bổ FIFO theo lô, không nhập mã lô.
+    // STT chỉ để đếm. Khớp hàng theo tên + dòng xe (dòng xe để trống
+    // thì khớp theo tên). Đơn giá để trống = giá theo loại khách chọn ở
+    // form (dòng 1); ghi số = bán đúng giá đó (dòng 2). Tên hàng và
+    // dòng xe là giá trị thật đã đăng ký — hệ thống tự phân bổ FIFO
+    // theo lô, không nhập mã hàng hay mã lô.
     file: "public/mau-import-ban-dai-ly.xlsx",
     rows: [
-      ["MaHang", "SoLuong", "DonGiaVND"],
-      ["AZ1664430120-SMS-30759", 10, ""],
-      ["AZ1664440069-SMS-30705", 5, 1200000],
+      ["STT", "Dòng xe", "Tên phụ tùng", "Số lượng", "Đơn giá"],
+      [1, "420", "Bầu hơi cabin trước", 10, ""],
+      [2, "420", "Bầu hơi cabin sau", 5, 1200000],
     ],
   },
 ];

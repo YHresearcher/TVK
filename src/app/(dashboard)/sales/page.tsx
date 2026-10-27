@@ -26,7 +26,7 @@ export default async function SalesPage({
   ]);
   const configured = orders.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
-  const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
+  const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name, kind: p.partner_kind }));
   const posPartners: PosPartner[] = partners.data.map((p) => ({
     id: p.id,
     name: p.name,
@@ -126,16 +126,18 @@ export default async function SalesPage({
           />
         )}
         {!readOnly && (
-          <Card title="Nhập từ Excel (Bán đại lý)">
+          <Card title="Nhập từ Excel (Bán hàng)">
             <p className="mb-4 text-sm text-slate-500">
-              Một file là một đơn bán đại lý cho một đối tác (hoặc khách lẻ),
-              vào đúng ngày bán đã chọn. Nhập theo mã hàng — hệ thống tự
-              phân bổ theo lô cũ nhất còn hàng (FIFO). Đơn giá để trống thì
-              lấy giá đại lý. Đơn tạo xong xác nhận ngay như nhập tay — lô
-              của mình vào BH, lô ký gửi vào KG.
+              Một file là một đơn bán hàng sỉ hoặc lẻ (chọn đối tác hoặc
+              khách lẻ ở form), vào đúng ngày bán đã chọn. Nhập theo tên
+              phụ tùng + dòng xe — hệ thống tự tìm hàng rồi phân bổ theo
+              lô cũ nhất còn hàng (FIFO). Đơn giá để trống thì lấy giá theo
+              loại khách đã chọn. Đơn tạo xong xác nhận ngay như nhập tay
+              — lô của mình vào BH, lô ký gửi vào KG.
             </p>
             <ImportDealerSale
               partners={partnerOptions}
+              products={posProducts}
               codeMap={dealerCodeMap}
               fifoBatches={dealerFifoBatches}
               action={importDealerSaleAction}
