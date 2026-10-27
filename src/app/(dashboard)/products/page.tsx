@@ -10,18 +10,20 @@ export const dynamic = "force-dynamic";
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: { q?: string; ok?: string };
+  searchParams: { q?: string; ok?: string; noRetail?: string };
 }) {
   const [products, stock, profile] = await Promise.all([listProducts(), listProductStock(), getCurrentProfile()]);
   const configured = products.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const stockMap = new Map(stock.data.map((s) => [s.product_id, s]));
   const q = (searchParams.q ?? "").toLowerCase();
+  const onlyNoRetail = searchParams.noRetail === "1";
   const rows = products.data.filter(
     (p) =>
-      !q ||
-      p.name.toLowerCase().includes(q) ||
-      p.sku.toLowerCase().includes(q)
+      (!q ||
+        p.name.toLowerCase().includes(q) ||
+        p.sku.toLowerCase().includes(q)) &&
+      (!onlyNoRetail || !Number(p.retail_price ?? 0))
   );
 
   return (
@@ -36,8 +38,12 @@ export default async function ProductsPage({
       )}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <form method="get" className="mb-4 flex gap-2">
+          <form method="get" className="mb-4 flex flex-wrap items-center gap-2">
             <input name="q" defaultValue={searchParams.q ?? ""} placeholder="Tìm theo tên hoặc SKU…" className={inputCls} />
+            <label className="flex items-center gap-1.5 text-sm text-slate-700">
+              <input type="checkbox" name="noRetail" value="1" defaultChecked={onlyNoRetail} />
+              Chỉ hiện hàng chưa có giá lẻ
+            </label>
             <button className={btnCls} type="submit">Tìm kiếm</button>
           </form>
           {rows.length === 0 ? (
@@ -47,13 +53,21 @@ export default async function ProductsPage({
               <thead>
                 <tr>
                   <th className={thCls}>SKU</th><th className={thCls}>Tên</th><th className={thCls}>Thương hiệu</th>
-                  <th className={thCls}>Giá lẻ</th><th className={thCls}>Giá đại lý</th><th className={thCls}>Của mình</th><th className={thCls}>Ký gửi</th>
+                  <th className={`${thCls} text-right`}>Giá lẻ</th><th className={`${thCls} text-right`}>Giá đại lý</th><th className={thCls}>Của mình</th><th className={thCls}>Ký gửi</th>
                   <th className={thCls}>Tại đối tác</th><th className={thCls}>Tổng</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((p) => {
                   const s = stockMap.get(p.id);
+                  const totalQty = Number(s?.total_qty ?? 0);
+                  const minStock = Number(p.min_stock ?? 0);
+                  const stockChip =
+                    totalQty <= 0
+                      ? { label: "Hết", cls: "bg-red-100 text-red-700" }
+                      : minStock > 0 && totalQty < minStock
+                        ? { label: "Dưới tối thiểu", cls: "bg-amber-100 text-amber-800" }
+                        : { label: "Đủ", cls: "bg-green-100 text-green-700" };
                   return (
                     <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50">
                       <td className={tdCls}>
@@ -61,12 +75,21 @@ export default async function ProductsPage({
                       </td>
                       <td className={tdCls}>{p.name}</td>
                       <td className={tdCls}>{p.brand ?? "—"}</td>
-                      <td className={tdCls}>{formatVND(p.retail_price)}</td>
-                      <td className={tdCls}>{formatVND(p.wholesale_price)}</td>
+                      <td className={`${tdCls} text-right`}>
+                        {!Number(p.retail_price ?? 0) ? (
+                          <span className="font-semibold text-amber-700">Chưa có giá</span>
+                        ) : (
+                          formatVND(p.retail_price)
+                        )}
+                      </td>
+                      <td className={`${tdCls} text-right`}>{formatVND(p.wholesale_price)}</td>
                       <td className={tdCls}>{formatNumber(s?.owned_at_own_wh ?? 0)}</td>
                       <td className={tdCls}>{formatNumber(s?.consigned_at_own_wh ?? 0)}</td>
                       <td className={tdCls}>{formatNumber(Number(s?.owned_at_partners ?? 0) + Number(s?.consigned_at_partners ?? 0))}</td>
-                      <td className={`${tdCls} font-medium`}>{formatNumber(s?.total_qty ?? 0)}</td>
+                      <td className={`${tdCls} font-medium`}>
+                        {formatNumber(totalQty)}
+                        <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${stockChip.cls}`}>{stockChip.label}</span>
+                      </td>
                     </tr>
                   );
                 })}
