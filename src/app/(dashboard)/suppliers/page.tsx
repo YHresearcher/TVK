@@ -52,7 +52,7 @@ export default async function SuppliersPage({
         </div>
         {!readOnly && (
         <Card title={editing ? "Sửa nhà cung cấp" : "Nhà cung cấp mới"} className="h-fit">
-          <form action={editing ? updateSupplierAction : createSupplierAction} className="space-y-3">
+          <form key={editing?.id ?? "new"} action={editing ? updateSupplierAction : createSupplierAction} className="space-y-3">
             {editing && <input type="hidden" name="id" value={editing.id} />}
             <div><label className={labelCls}>Tên *</label><input name="name" required defaultValue={editing?.name ?? ""} className={inputCls} /></div>
             <div className="grid grid-cols-2 gap-3">

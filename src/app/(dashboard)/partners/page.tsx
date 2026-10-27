@@ -54,7 +54,7 @@ export default async function PartnersPage({
         </div>
         {!readOnly && (
         <Card title={editing ? "Sửa đối tác" : "Đối tác mới"} className="h-fit">
-          <form action={editing ? updatePartnerAction : createPartnerAction} className="space-y-3">
+          <form key={editing?.id ?? "new"} action={editing ? updatePartnerAction : createPartnerAction} className="space-y-3">
             {editing && <input type="hidden" name="id" value={editing.id} />}
             <div><label className={labelCls}>Tên *</label><input name="name" required defaultValue={editing?.name ?? ""} className={inputCls} /></div>
             <div><label className={labelCls}>Loại</label>
