@@ -728,6 +728,164 @@ export async function confirmConsignmentOutAction(formData: FormData) {
   revalidatePath("/inventory");
 }
 
+/**
+ * Import phiếu gửi ký gửi (GK) từ Excel. Một file = một phiếu cho một đối
+ * tác. Giá chuyển giao tính bằng VNĐ, nhập trực tiếp (không quy đổi).
+ * Kiểm soát chặt như import kho: kiểm tra TOÀN BỘ file trước khi ghi bất
+ * cứ thứ gì — bất kỳ dòng nào không hợp lệ cũng từ chối cả import.
+ */
+export async function importConsignmentOutAction(formData: FormData) {
+  const supabase = await db();
+  let payload: AnyRow;
+  try {
+    payload = JSON.parse(str(formData, "payload"));
+  } catch {
+    throw new Error("Dữ liệu import không hợp lệ.");
+  }
+  const partnerId = String(payload.partnerId ?? "");
+  if (!partnerId) throw new Error("Cần chọn đối tác.");
+  const confirmNow = !!payload.confirmNow;
+  const rawRows: AnyRow[] = Array.isArray(payload.rows) ? payload.rows : [];
+  if (!rawRows.length) throw new Error("File không có dòng nào để gửi.");
+
+  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
+  const batchCodes = Array.from(new Set(rawRows.map((r) => String(r.batchCode ?? "").trim()))).filter(Boolean);
+  const { data: batches } = await supabase
+    .from("stock_batches")
+    .select("id, batch_code, ownership, supplier_id, unit_cost")
+    .in("batch_code", batchCodes);
+  const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [norm(b.batch_code), b]));
+  const batchIds = Array.from(batchByCode.values()).map((b) => b.id as string);
+  const { data: batchLocs } = batchIds.length
+    ? await supabase
+        .from("batch_locations")
+        .select("batch_id, location_id, qty, locations(location_kind)")
+        .in("batch_id", batchIds)
+    : { data: [] as AnyRow[] };
+  // Vị trí kho mình giữ nhiều nhất của mỗi lô — đúng vị trí phiếu sẽ trừ
+  // (cùng logic mainOwnLocationOfBatch).
+  const mainOwn = new Map<string, { locationId: string; qty: number }>();
+  for (const bl of (batchLocs ?? []) as AnyRow[]) {
+    if ((bl.locations as AnyRow)?.location_kind !== "OWN_WAREHOUSE") continue;
+    const prev = mainOwn.get(bl.batch_id as string);
+    if (!prev || Number(bl.qty) > prev.qty)
+      mainOwn.set(bl.batch_id as string, { locationId: bl.location_id as string, qty: Number(bl.qty) });
+  }
+  const supplierIds = Array.from(new Set(Array.from(batchByCode.values()).map((b) => b.supplier_id as string))).filter(Boolean);
+  const { data: suppliers } = supplierIds.length
+    ? await supabase.from("suppliers").select("id, allow_sub_consignment").in("id", supplierIds)
+    : { data: [] as AnyRow[] };
+  const subOk = new Map(((suppliers ?? []) as AnyRow[]).map((s) => [s.id as string, !!s.allow_sub_consignment]));
+  const { data: partner } = await supabase
+    .from("partners")
+    .select("id, consignment_limit")
+    .eq("id", partnerId)
+    .single();
+  if (!partner) throw new Error("Không tìm thấy đối tác.");
+
+  const invalid: string[] = [];
+  const perBatchQty = new Map<string, number>();
+  for (const r of rawRows) {
+    const code = String(r.batchCode ?? "").trim();
+    const qty = Math.trunc(Number(r.qty) || 0);
+    const price = Number(r.price) || 0;
+    if (!code || qty <= 0 || price < 0) {
+      invalid.push(code || "(dòng thiếu mã lô)");
+      continue;
+    }
+    const batch = batchByCode.get(norm(code));
+    if (!batch) {
+      invalid.push(code);
+      continue;
+    }
+    if (batch.ownership === "CONSIGNED" && !subOk.get(batch.supplier_id as string)) {
+      invalid.push(`${code} (NCC chưa cho ký gửi tiếp)`);
+      continue;
+    }
+    const own = mainOwn.get(batch.id as string);
+    if (!own) {
+      invalid.push(`${code} (không còn hàng tại kho của mình)`);
+      continue;
+    }
+    perBatchQty.set(batch.id as string, (perBatchQty.get(batch.id as string) ?? 0) + qty);
+    if ((perBatchQty.get(batch.id as string) ?? 0) > own.qty) invalid.push(`${code} (vượt tồn tại kho mình)`);
+  }
+  // Hạn mức ký gửi (cùng công thức RPC xác nhận): giá trị hàng đang nằm
+  // tại đối tác + giá trị đợt này (chỉ tính dòng Ký gửi).
+  const limit = Number((partner as AnyRow).consignment_limit) || 0;
+  if (limit > 0) {
+    const { data: partnerLoc } = await supabase
+      .from("locations")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .eq("location_kind", "PARTNER_VIRTUAL")
+      .maybeSingle();
+    let atPartner = 0;
+    if (partnerLoc) {
+      const { data: held } = await supabase
+        .from("batch_locations")
+        .select("batch_id, qty")
+        .eq("location_id", (partnerLoc as AnyRow).id);
+      const { data: allBatches } = await supabase.from("stock_batches").select("id, unit_cost").limit(5000);
+      const costById = new Map(((allBatches ?? []) as AnyRow[]).map((b) => [b.id as string, Number(b.unit_cost) || 0]));
+      for (const h of (held ?? []) as AnyRow[])
+        atPartner += Number(h.qty) * (costById.get(h.batch_id as string) ?? 0);
+    }
+    let thisValue = 0;
+    for (const r of rawRows) {
+      if ((r.term === "PURCHASE" ? "PURCHASE" : "CONSIGNMENT") !== "CONSIGNMENT") continue;
+      thisValue += Math.trunc(Number(r.qty) || 0) * (Number(r.price) || 0);
+    }
+    if (atPartner + thisValue > limit)
+      invalid.push(`Vượt hạn mức ký gửi của đối tác (đang giữ ${atPartner}, đợt này thêm ${thisValue})`);
+  }
+  if (invalid.length)
+    throw new Error(
+      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
+        .slice(0, 5)
+        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
+    );
+
+  const me = await userId();
+  const slip = must(
+    await supabase
+      .from("consignment_out_slips")
+      .insert({
+        partner_id: partnerId,
+        slip_date: String(payload.slipDate ?? "").trim() || undefined,
+        settlement_due_date: String(payload.settlementDueDate ?? "").trim() || null,
+        return_by_date: String(payload.returnByDate ?? "").trim() || null,
+        created_by: me,
+      })
+      .select("id")
+      .single(),
+    "Tạo phiếu gửi ký gửi"
+  );
+  done(
+    await supabase.from("consignment_out_items").insert(
+      rawRows.map((r) => {
+        const batch = batchByCode.get(norm(String(r.batchCode ?? "").trim())) as AnyRow;
+        return {
+          slip_id: slip.id,
+          batch_id: batch.id,
+          from_location_id: (mainOwn.get(batch.id as string) as { locationId: string }).locationId,
+          qty: Math.trunc(Number(r.qty) || 0),
+          term: r.term === "PURCHASE" ? "PURCHASE" : "CONSIGNMENT",
+          transfer_price: Number(r.price) || 0,
+        };
+      })
+    ),
+    "Thêm dòng phiếu"
+  );
+  if (confirmNow) {
+    const { error } = await supabase.rpc("confirm_consignment_out", { p_slip_id: slip.id });
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath("/consignment-out");
+  revalidatePath("/inventory");
+  redirect("/consignment-out?ok=1");
+}
+
 // ------------------------------------------------------------------ sales
 export async function createCounterSaleAction(formData: FormData) {
   const supabase = await db();
@@ -900,6 +1058,242 @@ export async function confirmAllocationAction(formData: FormData) {
   });
   if (error) throw new Error(error.message);
   revalidatePath("/partner-consumption");
+}
+
+/**
+ * Import báo cáo tiêu thụ (BT) từ Excel. Một file = một báo cáo cho một
+ * đối tác trong một kỳ. Báo cáo chỉ ghi nhận số lượng, không có giá.
+ * Kiểm tra toàn bộ file trước khi ghi — dòng lỗi nào cũng từ chối cả import.
+ */
+export async function importConsumptionReportAction(formData: FormData) {
+  const supabase = await db();
+  let payload: AnyRow;
+  try {
+    payload = JSON.parse(str(formData, "payload"));
+  } catch {
+    throw new Error("Dữ liệu import không hợp lệ.");
+  }
+  const partnerId = String(payload.partnerId ?? "");
+  const periodFrom = String(payload.periodFrom ?? "").trim();
+  const periodTo = String(payload.periodTo ?? "").trim();
+  if (!partnerId) throw new Error("Cần chọn đối tác.");
+  if (!periodFrom || !periodTo) throw new Error("Cần chọn kỳ báo cáo (từ ngày, đến ngày).");
+  const confirmNow = !!payload.confirmNow;
+  const rawRows: AnyRow[] = Array.isArray(payload.rows) ? payload.rows : [];
+  if (!rawRows.length) throw new Error("File không có dòng nào để báo.");
+
+  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
+  const { data: allProducts } = await supabase.from("products").select("id, sku").limit(5000);
+  const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
+  const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [norm(p.sku), p.id as string]));
+  const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [norm(c.code), c.product_id as string]));
+
+  const invalid: string[] = [];
+  const items: { product_id: string; qty_consumed: number }[] = [];
+  for (const r of rawRows) {
+    const code = String(r.code ?? "").trim();
+    const qty = Math.trunc(Number(r.qty) || 0);
+    if (!code || qty <= 0) {
+      invalid.push(code || "(dòng thiếu mã hàng)");
+      continue;
+    }
+    const productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
+    if (!productId) {
+      invalid.push(code);
+      continue;
+    }
+    items.push({ product_id: productId, qty_consumed: qty });
+  }
+  if (invalid.length)
+    throw new Error(
+      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
+        .slice(0, 5)
+        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
+    );
+
+  const me = await userId();
+  const report = must(
+    await supabase
+      .from("consumption_reports")
+      .insert({
+        partner_id: partnerId,
+        period_from: periodFrom,
+        period_to: periodTo,
+        created_by: me,
+      })
+      .select("id")
+      .single(),
+    "Tạo báo cáo tiêu thụ"
+  );
+  done(
+    await supabase.from("consumption_report_items").insert(
+      items.map((i) => ({ report_id: report.id, ...i }))
+    ),
+    "Thêm dòng báo cáo"
+  );
+  if (confirmNow) {
+    done(
+      await supabase
+        .from("consumption_reports")
+        .update({ status: "CONFIRMED" })
+        .eq("id", report.id),
+      "Xác nhận báo cáo"
+    );
+  }
+  revalidatePath("/partner-consumption");
+  redirect("/partner-consumption?ok=1");
+}
+
+/**
+ * Import phiếu phân bổ (PB) từ Excel. Một file = một phiếu cho một đối
+ * tác. Đơn giá tính bằng VNĐ, nhập trực tiếp. Kiểm tra trước toàn bộ file,
+ * gồm cả 3 chốt của RPC xác nhận (lượng đã báo, hạn mức theo tính chất,
+ * tồn tại kho đối tác) — dòng lỗi nào cũng từ chối cả import.
+ */
+export async function importAllocationAction(formData: FormData) {
+  const supabase = await db();
+  let payload: AnyRow;
+  try {
+    payload = JSON.parse(str(formData, "payload"));
+  } catch {
+    throw new Error("Dữ liệu import không hợp lệ.");
+  }
+  const partnerId = String(payload.partnerId ?? "");
+  if (!partnerId) throw new Error("Cần chọn đối tác.");
+  const reportId = String(payload.reportId ?? "").trim() || null;
+  const confirmNow = !!payload.confirmNow;
+  const rawRows: AnyRow[] = Array.isArray(payload.rows) ? payload.rows : [];
+  if (!rawRows.length) throw new Error("File không có dòng nào để phân bổ.");
+
+  if (reportId) {
+    const { data: report } = await supabase
+      .from("consumption_reports")
+      .select("id")
+      .eq("id", reportId)
+      .maybeSingle();
+    if (!report) throw new Error("Không tìm thấy báo cáo tiêu thụ đã chọn.");
+  }
+  const partnerLoc = await partnerLocationId(supabase, partnerId);
+  if (!partnerLoc) throw new Error("Đối tác chưa có kho ảo (chưa từng nhận ký gửi).");
+
+  const norm = (v: unknown) => String(v ?? "").trim().toUpperCase();
+  const { data: allProducts } = await supabase.from("products").select("id, sku").limit(5000);
+  const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
+  const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [norm(p.sku), p.id as string]));
+  const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [norm(c.code), c.product_id as string]));
+  const batchCodes = Array.from(new Set(rawRows.map((r) => String(r.batchCode ?? "").trim()))).filter(Boolean);
+  const { data: batches } = await supabase
+    .from("stock_batches")
+    .select("id, batch_code, product_id")
+    .in("batch_code", batchCodes);
+  const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [norm(b.batch_code), b]));
+  const batchIds = Array.from(batchByCode.values()).map((b) => b.id as string);
+  const { data: batchLocs } = batchIds.length
+    ? await supabase
+        .from("batch_locations")
+        .select("batch_id, qty")
+        .eq("location_id", partnerLoc)
+        .in("batch_id", batchIds)
+    : { data: [] as AnyRow[] };
+  const qtyAtPartner = new Map(
+    ((batchLocs ?? []) as AnyRow[]).map((bl) => [bl.batch_id as string, Number(bl.qty)])
+  );
+
+  const invalid: string[] = [];
+  const lines: { product_id: string; batch_id: string; nature: string; qty: number; unit_price: number }[] = [];
+  const perBatchQty = new Map<string, number>();
+  for (const r of rawRows) {
+    const code = String(r.code ?? "").trim();
+    const batchCode = String(r.batchCode ?? "").trim();
+    const qty = Math.trunc(Number(r.qty) || 0);
+    const nature = r.nature === "PURCHASED" ? "PURCHASED" : "CONSIGNED";
+    const price = Number(r.price) || 0;
+    if (!code || !batchCode || qty <= 0 || price < 0) {
+      invalid.push(batchCode || code || "(dòng thiếu mã)");
+      continue;
+    }
+    const productId = bySku.get(norm(code)) ?? byCode.get(norm(code));
+    if (!productId) {
+      invalid.push(code);
+      continue;
+    }
+    const batch = batchByCode.get(norm(batchCode));
+    if (!batch) {
+      invalid.push(batchCode);
+      continue;
+    }
+    if ((batch.product_id as string) !== productId) {
+      invalid.push(`${batchCode} (không thuộc sản phẩm ${code})`);
+      continue;
+    }
+    perBatchQty.set(batch.id as string, (perBatchQty.get(batch.id as string) ?? 0) + qty);
+    if ((perBatchQty.get(batch.id as string) ?? 0) > (qtyAtPartner.get(batch.id as string) ?? 0))
+      invalid.push(`${batchCode} (vượt tồn tại kho đối tác)`);
+    lines.push({ product_id: productId, batch_id: batch.id as string, nature, qty, unit_price: price });
+  }
+  // Chốt 1 (nếu gắn báo cáo): theo từng sản phẩm, không vượt lượng chưa phân bổ.
+  if (reportId) {
+    const perProduct = new Map<string, number>();
+    for (const l of lines) perProduct.set(l.product_id, (perProduct.get(l.product_id) ?? 0) + l.qty);
+    for (const [productId, q] of Array.from(perProduct.entries())) {
+      const { data: prog } = await supabase
+        .from("v_consumption_progress")
+        .select("qty_not_yet_allocated")
+        .eq("report_id", reportId)
+        .eq("product_id", productId)
+        .maybeSingle();
+      if (!prog || q > Number((prog as AnyRow).qty_not_yet_allocated))
+        invalid.push(`Vượt lượng đã báo tiêu thụ của một sản phẩm`);
+    }
+  }
+  // Chốt 2: theo từng (sản phẩm, tính chất), không vượt hạn mức còn lại.
+  {
+    const perKey = new Map<string, { product_id: string; nature: string; qty: number }>();
+    for (const l of lines) {
+      const k = `${l.product_id}|${l.nature}`;
+      const prev = perKey.get(k);
+      perKey.set(k, { product_id: l.product_id, nature: l.nature, qty: (prev?.qty ?? 0) + l.qty });
+    }
+    for (const { product_id, nature, qty } of Array.from(perKey.values())) {
+      const { data: bal } = await supabase
+        .from("v_partner_term_balance")
+        .select("qty_remaining_allocatable")
+        .eq("partner_id", partnerId)
+        .eq("product_id", product_id)
+        .eq("nature", nature)
+        .maybeSingle();
+      if (!bal || qty > Number((bal as AnyRow).qty_remaining_allocatable))
+        invalid.push(`Vượt hạn mức ${nature === "PURCHASED" ? "mua đứt" : "ký gửi"} của một sản phẩm`);
+    }
+  }
+  if (invalid.length)
+    throw new Error(
+      `Import bị từ chối: ${invalid.length} dòng không hợp lệ (${invalid
+        .slice(0, 5)
+        .join(", ")}${invalid.length > 5 ? "…" : ""}). Hãy sửa file Excel theo đúng định dạng chuẩn rồi tải lại — hệ thống không nhập một phần.`
+    );
+
+  const me = await userId();
+  const slip = must(
+    await supabase
+      .from("allocation_slips")
+      .insert({ report_id: reportId, partner_id: partnerId, created_by: me })
+      .select("id")
+      .single(),
+    "Tạo phiếu phân bổ"
+  );
+  done(
+    await supabase.from("allocation_lines").insert(
+      lines.map((l) => ({ allocation_id: slip.id, ...l }))
+    ),
+    "Thêm dòng phân bổ"
+  );
+  if (confirmNow) {
+    const { error } = await supabase.rpc("confirm_allocation", { p_allocation_id: slip.id });
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath("/partner-consumption");
+  redirect(`/partner-consumption/allocations/${slip.id}?ok=1`);
 }
 
 /** Turn a CONFIRMED allocation into BH/KG documents (one per nature), then confirm them. */

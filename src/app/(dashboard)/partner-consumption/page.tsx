@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import ItemsRows from "@/components/ItemsRows";
+import ImportAllocation from "@/components/ImportAllocation";
+import ImportConsumptionReport from "@/components/ImportConsumptionReport";
 import {
   createAllocationAction,
   createConsumptionReportAction,
+  importAllocationAction,
+  importConsumptionReportAction,
   setConsumptionReportStatusAction,
 } from "@/lib/actions";
 import { buildProductCodeMap, getCurrentProfile, listAllocations, listBatchStock, listConsumptionReports, listPartners, listProductCodes, listProducts } from "@/lib/queries";
@@ -43,6 +47,26 @@ export default async function PartnerConsumptionPage({
         .map((r) => [r.batch_id, r])
     ).values()
   );
+  // Tất cả dòng lô tại kho đối tác (không gộp theo lô — một lô có thể nằm
+  // ở kho của nhiều đối tác cùng lúc) cho import phân bổ.
+  const partnerBatchRows = batchStock.data
+    .filter((r) => r.location_kind === "PARTNER_VIRTUAL")
+    .map((r) => ({
+      batch_id: r.batch_id,
+      batch_code: r.batch_code,
+      product_id: r.product_id,
+      product_name: r.product_name,
+      location_name: r.location_name,
+      partner_id: r.partner_id,
+      qty: Number(r.qty),
+    }));
+  const reportOptionsData = reports.data.map((r) => ({
+    id: r.id,
+    doc_code: r.doc_code,
+    partner_id: r.partner_id,
+    period_from: r.period_from ?? null,
+    period_to: r.period_to ?? null,
+  }));
   const batchOptions = partnerBatches.map((r) => ({
     value: r.batch_id,
     label: `${r.batch_code} — ${r.product_name} · tại ${r.location_name}`,
@@ -59,6 +83,7 @@ export default async function PartnerConsumptionPage({
       <div className="space-y-8">
         <section className="space-y-4">
           {!readOnly && (
+          <>
           <Card title="Báo cáo tiêu thụ mới (BT)">
             <form action={createConsumptionReportAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-3">
@@ -74,6 +99,10 @@ export default async function PartnerConsumptionPage({
               <button type="submit" className={btnCls}>Tạo báo cáo nháp</button>
             </form>
           </Card>
+          <Card title="Nhập từ Excel (BT)">
+            <ImportConsumptionReport partners={partners.data} products={products.data.map((p) => ({ id: p.id, sku: p.sku, name: p.name }))} codes={productCodes.data.map((c) => ({ code: c.code, product_id: c.product_id }))} action={importConsumptionReportAction} />
+          </Card>
+          </>
           )}
           {reports.data.length === 0 ? <EmptyState message="Chưa có báo cáo tiêu thụ." /> : (
             <TableWrap>
@@ -103,6 +132,7 @@ export default async function PartnerConsumptionPage({
 
         <section className="space-y-4">
           {!readOnly && (
+          <>
           <Card title="Phiếu phân bổ mới (PB)">
             <form action={createAllocationAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
@@ -125,6 +155,10 @@ export default async function PartnerConsumptionPage({
               <button type="submit" className={btnCls}>Tạo phiếu phân bổ nháp</button>
             </form>
           </Card>
+          <Card title="Nhập từ Excel (PB)">
+            <ImportAllocation partners={partners.data} products={products.data.map((p) => ({ id: p.id, sku: p.sku, name: p.name }))} codes={productCodes.data.map((c) => ({ code: c.code, product_id: c.product_id }))} partnerBatches={partnerBatchRows} reports={reportOptionsData} action={importAllocationAction} />
+          </Card>
+          </>
           )}
           {allocations.data.length === 0 ? <EmptyState message="Chưa có phiếu phân bổ." /> : (
             <TableWrap>

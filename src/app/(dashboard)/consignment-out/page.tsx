@@ -1,6 +1,7 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import ItemsRows from "@/components/ItemsRows";
-import { confirmConsignmentOutAction, createConsignmentOutAction } from "@/lib/actions";
+import ImportConsignmentOut from "@/components/ImportConsignmentOut";
+import { confirmConsignmentOutAction, createConsignmentOutAction, importConsignmentOutAction } from "@/lib/actions";
 import { getCurrentProfile, listBatchStock, listConsignmentOutSlips, listPartners } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
 import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
@@ -33,6 +34,22 @@ export default async function ConsignmentOutPage({
     value: r.batch_id,
     label: `${r.batch_code} — ${r.product_name} (${OWNERSHIP_LABELS[r.ownership] ?? r.ownership}${r.supplier_name ? " / " + r.supplier_name : ""})`,
   }));
+  // Danh mục lô tại kho mình cho import Excel: mỗi lô một dòng, lấy vị trí
+  // kho mình giữ nhiều nhất (đúng vị trí phiếu sẽ trừ khi xác nhận).
+  const ownByBatch = new Map<string, (typeof batchStock.data)[number]>();
+  for (const r of batchStock.data) {
+    if (r.location_kind !== "OWN_WAREHOUSE") continue;
+    const prev = ownByBatch.get(r.batch_id);
+    if (!prev || Number(r.qty) > Number(prev.qty)) ownByBatch.set(r.batch_id, r);
+  }
+  const ownBatchCatalog = Array.from(ownByBatch.values()).map((r) => ({
+    batch_id: r.batch_id,
+    batch_code: r.batch_code,
+    product_name: r.product_name,
+    ownership: r.ownership,
+    supplier_name: r.supplier_name ?? null,
+    own_qty: Number(r.qty),
+  }));
 
   return (
     <>
@@ -44,6 +61,7 @@ export default async function ConsignmentOutPage({
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="space-y-6">
         {!readOnly && (
+        <>
         <Card title="Phiếu gửi ký gửi / giao hàng mới">
           <form action={createConsignmentOutAction} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-4">
@@ -66,6 +84,10 @@ export default async function ConsignmentOutPage({
             <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
           </form>
         </Card>
+        <Card title="Nhập từ Excel (GK)">
+          <ImportConsignmentOut partners={partners.data} ownBatches={ownBatchCatalog} action={importConsignmentOutAction} />
+        </Card>
+        </>
         )}
 
         {slips.data.length === 0 ? <EmptyState message="Chưa có phiếu gửi." /> : (

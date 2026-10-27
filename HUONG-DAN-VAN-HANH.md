@@ -100,8 +100,8 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 | **Hàng hoá & Kho** | Sản phẩm | Danh mục sản phẩm, mã OEM/mã tương đương, xe tương thích, giá lẻ + giá đại lý |
 | | Tồn kho theo lô | Xem tồn theo từng lô OWN/CONS, vị trí giữ hàng, kiểm kê & điều chỉnh |
 | | Nhập kho | Tạo phiếu PN / NK thủ công, hoặc **Nhập từ Excel** (nút thứ ba trong trang) |
-| **Ký gửi** | Gửi ký gửi | Lập phiếu GK gửi hàng cho đối tác |
-| | Tiêu thụ của đối tác | Nhập báo cáo tiêu thụ BT, xem phân bổ PB → BH/KG |
+| **Ký gửi** | Gửi ký gửi | Lập phiếu GK gửi hàng cho đối tác (có nhập từ Excel) |
+| | Tiêu thụ của đối tác | Nhập báo cáo tiêu thụ BT, xem phân bổ PB → BH/KG (BT và PB đều có nhập từ Excel) |
 | **Bán hàng & Hoá đơn** | Bán hàng | Bán tại quầy, chọn theo lô |
 | | Hoá đơn GTGT | Phát hành/huỷ hoá đơn từ các dòng BH/KG đã xác nhận |
 | | Trả hàng & bảo hành | Lập phiếu trả hàng TH |
@@ -218,11 +218,15 @@ File bị **từ chối ngay, không xem trước**, kèm lý do cụ thể, khi
 ### D1. Gửi ký gửi cho đối tác (GK)
 Vào **Ký gửi → Gửi ký gửi**: chọn đối tác, kho xuất, và **chọn theo lô** (bắt buộc chọn đúng lô — vì cùng sản phẩm có thể có nhiều lô khác chủ sở hữu). Hệ thống chặn gửi tiếp lô CONS của nhà cung cấp (ô D) trừ khi nhà cung cấp đó đã bật "Cho phép ký gửi tiếp" trong hồ sơ. Kiểm tra hạn mức ký gửi của đối tác trước khi xác nhận.
 
+**Nhập GK từ Excel:** cuối trang có mục **Nhập từ Excel (GK)** với nút **Tải file mẫu (.xlsx)**. Một file là một phiếu GK cho một đối tác. Cột: `MaLo*` (mã lô đang ở kho của mình) · `SoLuong*` · `DieuKhoan` (“Ký gửi”/“Mua đứt”, để trống = Ký gửi) · `GiaChuyenGiaoVND` (VNĐ, để trống = 0; dùng để kiểm tra hạn mức ký gửi khi xác nhận). Hệ thống xem trước, kiểm tra tồn tại kho mình + khoá ô D + hạn mức, rồi mới tạo phiếu (có tick “Xác nhận ngay” như phiếu tay). Dòng lỗi nào cũng chặn cả file — không nhập một phần.
+
 ### D2. Bán tại quầy
 Vào **Bán hàng → Bán hàng**: chọn khách/đối tác (nếu có), chọn **Loại giá** (mặc định **Bán đại lý**), thêm dòng **theo lô**, nhập số lượng. Chọn lô sẽ tự điền đơn giá theo loại giá: **Bán lẻ** → giá lẻ của sản phẩm, các lựa chọn khác → giá đại lý (sản phẩm chưa đặt giá thì để trống cho tự nhập; đơn giá tự điền vẫn sửa tay được, đổi loại giá cũng cập nhật lại các dòng đã chọn lô). Hệ thống tự tách phần hàng mình → chứng từ **BH** (được áp giảm giá ở đây) và phần hàng ký gửi → chứng từ **KG**. Giảm giá chỉ trừ trên BH.
 
 ### D3. Tiêu thụ của đối tác & phân bổ
 Khi đối tác báo đã bán được hàng họ đang giữ: vào **Ký gửi → Tiêu thụ của đối tác**, lập **BT** theo từng sản phẩm/số lượng đối tác báo. Hệ thống **phân bổ (PB)** số tiêu thụ vào các lô đối tác đang giữ (mặc định lô cũ trước — FIFO), sinh chứng từ BH/KG tương ứng và các khoản phải thu/phải trả liên quan. Đối tác bán chưa hết: phần còn lại vẫn nằm ở đối tác, không phát sinh tiền (xem A5).
+
+**Nhập BT/PB từ Excel:** mỗi mục đều có **Nhập từ Excel** với nút **Tải file mẫu (.xlsx)**. BT: một file là một báo cáo cho một đối tác trong một kỳ, cột `MaHang*` · `SoLuongTieuThu*` (báo cáo chỉ ghi số lượng, không có giá). PB: một file là một phiếu phân bổ cho một đối tác, cột `MaHang*` · `MaLo*` (lô đang ở kho đối tác đó, phải thuộc đúng sản phẩm) · `NguonHang` (“Mua đứt”/“Ký gửi”, để trống = Ký gửi) · `SoLuong*` · `DonGiaVND` (VNĐ, để trống = 0). PB kiểm tra trước cả 3 chốt xác nhận (lượng đã báo, hạn mức theo tính chất, tồn tại kho đối tác). Cả hai đều có tick “Xác nhận ngay”; dòng lỗi nào cũng chặn cả file.
 
 ### D4. Hoá đơn GTGT
 Vào **Bán hàng & Hoá đơn → Hoá đơn GTGT**: tick các dòng chứng từ BH/KG đã xác nhận chưa xuất hoá đơn, chọn đối tác, nhập số hoá đơn/ký hiệu/ngày. **Ngay trên form có ô chọn "Gộp thành 1 hoá đơn GTGT"**: tick = xuất **1 hoá đơn** chứa cả hai phần; bỏ tick = **tách 2 hoá đơn** (hoá đơn BH dùng số/ký hiệu chính; hoá đơn KG phải nhập thêm số/ký hiệu ở hai ô "phần ký gửi"). Ô chọn được đặt sẵn theo mặc định ở Cài đặt (mục dưới), đổi tại form chỉ áp dụng cho lần xuất đó. Huỷ hoá đơn chỉ mở lại đúng các dòng thuộc hoá đơn đó.
