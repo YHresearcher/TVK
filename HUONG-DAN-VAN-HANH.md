@@ -242,7 +242,10 @@ Vào **Bán hàng & Hoá đơn → Trả hàng & bảo hành**: chọn loại tr
 ### D7. Kiểm kê & điều chỉnh tồn
 Ở **Tồn kho theo lô**: đối chiếu số hệ thống với số đếm thực tế theo từng lô. Chênh lệch được ghi bằng **phiếu điều chỉnh qua sổ cái** (kèm lý do) — không sửa thẳng số tồn, để mọi chênh lệch đều có dấu vết kiểm kê.
 
-### D8. Báo cáo
+### D8. In tem mã vạch (trang Sản phẩm)
+Nút **In tem mã vạch** ở trang **Sản phẩm**: tick chọn các mã cần in (mặc định tick các mã còn hàng), số lượng mỗi mã mặc định bằng **tồn kho (Tổng)** — sửa tay được; chọn khổ tem (50×30, 40×30, 100×50 mm) và có thể tick **In giá lẻ lên tem**. Mỗi tem gồm mã vạch **Code128** của SKU, tên hàng, mã hàng (và giá lẻ nếu chọn). Hệ thống không điều khiển trực tiếp máy in: bấm **In** sẽ mở hộp thoại in của hệ điều hành — chọn đúng **máy in tem** đã cài driver và khổ tem trùng khổ đã chọn; mỗi tem là một trang. Tối đa 500 tem mỗi lần in (chia nhỏ nếu nhiều hơn). Badge cạnh cột **Tổng**: **Hết** = tồn bằng 0; **Dưới tối thiểu** = còn hàng nhưng dưới **Tồn tối thiểu** đã đặt cho sản phẩm; **Đủ** = tồn đạt hoặc vượt mức tối thiểu (không đặt mức tối thiểu thì còn hàng là Đủ).
+
+### D9. Báo cáo
 **Công nợ & Báo cáo → Báo cáo**: báo cáo tồn kho, bán hàng, đối soát với từng nhà cung cấp (hàng ký gửi: đã nhận / đã bán / còn giữ / phải trả) và từng đối tác (đã gửi / đã tiêu thụ / còn giữ / phải thu); xuất **CSV** để mở bằng Excel khi cần gửi đối tác/kế toán.
 
 ---

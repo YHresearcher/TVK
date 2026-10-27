@@ -5,3 +5,28 @@
 body {
   @apply bg-slate-100 text-slate-900 antialiased;
 }
+
+/* In tem mã vạch: khi in chỉ hiện tờ tem, ẩn toàn bộ giao diện.
+   Khổ trang (@page) được đặt động theo khổ tem đã chọn lúc in. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .label-print-area,
+  .label-print-area * {
+    visibility: visible;
+  }
+  .label-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  .label-page {
+    page-break-after: always;
+    break-after: page;
+  }
+  .label-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+}

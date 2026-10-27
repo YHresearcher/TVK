@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import LabelPrintButton from "@/components/LabelPrintButton";
 import { createProductAction } from "@/lib/actions";
 import { getCurrentProfile, listProductStock, listProducts } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
@@ -46,6 +47,17 @@ export default async function ProductsPage({
             </label>
             <button className={btnCls} type="submit">Tìm kiếm</button>
           </form>
+          <div className="mb-4 flex justify-end">
+            <LabelPrintButton
+              products={rows.map((p) => ({
+                id: p.id,
+                sku: p.sku,
+                name: p.name,
+                retail_price: Number(p.retail_price ?? 0),
+                totalQty: Number(stockMap.get(p.id)?.total_qty ?? 0),
+              }))}
+            />
+          </div>
           {rows.length === 0 ? (
             <EmptyState message="Chưa có sản phẩm." />
           ) : (
