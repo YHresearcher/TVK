@@ -1,5 +1,5 @@
-import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
-import SalePriceSection from "@/components/SalePriceSection";
+import { EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
+import CounterSaleTabs from "@/components/CounterSaleTabs";
 import { createCounterSaleAction } from "@/lib/actions";
 import { getCurrentProfile, listBatchStock, listPartners, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
@@ -34,7 +34,7 @@ export default async function SalesPage({
     value: r.batch_id,
     label: `${r.batch_code} — ${r.product_name} · ${OWNERSHIP_LABELS[r.ownership] ?? r.ownership} · tại ${r.location_name}`,
   }));
-  // Giá theo lô cho ô loại giá: lẻ lấy retail_price, đại lý lấy
+  // Giá theo lô cho 2 tab: lẻ lấy retail_price, đại lý lấy
   // wholesale_price của sản phẩm trong lô.
   const productById = new Map(
     products.data.map((p) => [p.id, p])
@@ -54,29 +54,18 @@ export default async function SalesPage({
     <>
       <PageHeader
         title="Bán hàng (tại quầy)"
-        description="Chọn đúng các lô được bán. Lô của mình đi vào chứng từ BH; lô ký gửi đi vào chứng từ KG và tự động tạo khoản phải trả cho nhà cung cấp của lô đó theo giá ký gửi của lô. Giảm giá chỉ áp dụng cho phần BH."
+        description="Hai tab riêng: Bán lẻ dùng giá lẻ, Bán đại lý dùng giá đại lý. Chọn đúng các lô được bán. Lô của mình đi vào chứng từ BH; lô ký gửi đi vào chứng từ KG và tự động tạo khoản phải trả cho nhà cung cấp của lô đó theo giá ký gửi của lô. Giảm giá chỉ áp dụng cho phần BH."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã bán xong — chứng từ đã xác nhận, tồn kho và công nợ đã cập nhật.</p>}
       <div className="space-y-6">
         {!readOnly && (
-        <Card title="Bán hàng mới">
-          <form action={createCounterSaleAction} className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-4">
-              <div><label className={labelCls}>Đối tác (không bắt buộc)</label>
-                <select name="partner_id" className={inputCls}><option value="">— Khách lẻ —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
-              <div><label className={labelCls}>Tên khách hàng</label><input name="customer_name" className={inputCls} /></div>
-              <div><label className={labelCls}>Giảm giá cho phần BH (₫)</label><input name="discount_amount" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
-              <div className="flex items-end pb-2">
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" name="is_credit" className="h-4 w-4" /> Bán chịu (tạo phải thu)
-                </label>
-              </div>
-            </div>
-            <SalePriceSection batchOptions={batchOptions} batchPrices={batchPrices} />
-            <button type="submit" className={btnCls}>Hoàn tất bán hàng</button>
-          </form>
-        </Card>
+          <CounterSaleTabs
+            batchOptions={batchOptions}
+            batchPrices={batchPrices}
+            partnerOptions={partnerOptions}
+            action={createCounterSaleAction}
+          />
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">
