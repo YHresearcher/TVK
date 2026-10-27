@@ -14,7 +14,7 @@ export default async function SuppliersPage({
   const readOnly = isReadOnlyRole(profile.data?.role);
   return (
     <>
-      <PageHeader title="Nhà cung cấp" description="Điều khoản ký gửi nằm ở đây: sau khi bán phải thanh toán trong bao nhiêu ngày, hàng ký gửi chưa bán được giữ bao lâu, và nhà cung cấp này có cho phép ký gửi tiếp (ô D) hay không." />
+      <PageHeader title="Nhà cung cấp" description="Nhà cung cấp là người cung cấp hàng cho cửa hàng, hoặc ký gửi hàng cho cửa hàng bán hộ — khác với đối tác là người nhận ký gửi từ cửa hàng. Điều khoản ký gửi nằm ở đây: sau khi bán phải thanh toán trong bao nhiêu ngày, hàng ký gửi chưa bán được giữ bao lâu, và nhà cung cấp này có cho phép ký gửi tiếp (ô D) hay không." />
       {!suppliers.configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="grid gap-6 lg:grid-cols-3">

@@ -15,7 +15,7 @@ export default async function PartnersPage({
   const readOnly = isReadOnlyRole(profile.data?.role);
   return (
     <>
-      <PageHeader title="Đối tác" description="Khách hàng, gara, công ty vận tải và cửa hàng khác. Một đối tác vừa mua đứt vừa nhận ký gửi — hệ thống theo dõi hai tính chất riêng biệt theo từng lô và từng chứng từ." />
+      <PageHeader title="Đối tác" description="Đối tác là người nhận ký gửi từ cửa hàng (đồng thời có thể mua đứt) — khác với nhà cung cấp là người giao hàng cho cửa hàng. Khách hàng, gara, công ty vận tải và cửa hàng khác. Một đối tác vừa mua đứt vừa nhận ký gửi — hệ thống theo dõi hai tính chất riêng biệt theo từng lô và từng chứng từ." />
       {!partners.configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="grid gap-6 lg:grid-cols-3">
