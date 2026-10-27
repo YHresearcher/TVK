@@ -130,7 +130,7 @@ export default async function DashboardPage() {
             <EmptyState message="Chưa có lô nào sắp đến hạn trả." />
           ) : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Số lượng</th><th className={thCls}>Hạn trả</th></tr></thead>
+              <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Nhập từ</th><th className={thCls}>Số lượng</th><th className={thCls}>Hạn trả</th></tr></thead>
               <tbody>
                 {d.expiring.map((r, i) => (
                   <tr key={i} className="border-t border-slate-100">
