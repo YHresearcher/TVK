@@ -46,6 +46,18 @@ export const listProducts = () =>
 export const listProductCodes = () =>
   list("product_codes", { column: "code", ascending: true });
 
+/** Dòng xe (vehicles.model) của từng sản phẩm, để tìm hàng theo mã xe ở quầy bán. */
+export async function listProductFitments(): Promise<QueryResult<AnyRow[]>> {
+  const supabase = await client();
+  if (!supabase) return empty([]);
+  const { data, error } = await supabase
+    .from("product_fitments")
+    .select("product_id, vehicles(model)")
+    .limit(5000);
+  if (error) return { configured: true, data: [] };
+  return { configured: true, data: (data ?? []) as AnyRow[] };
+}
+
 /** Normalized (trim + uppercase) map: any known product code or SKU → product_id. Used by the barcode scan box. */
 export function buildProductCodeMap(
   products: AnyRow[],

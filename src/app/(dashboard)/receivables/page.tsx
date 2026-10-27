@@ -27,7 +27,7 @@ export default async function ReceivablesPage({
 
   return (
     <>
-      <PageHeader title="Phải thu đối tác" description="Được tạo tự động khi xác nhận một giao dịch bán chịu hoặc một chứng từ tiêu thụ của đối tác (BH/KG). Số tiền BH là sau giảm giá; số tiền KG dùng giá chuyển giao đã thoả thuận." />
+      <PageHeader title="Phải thu đối tác" description="Được tạo tự động khi xác nhận một giao dịch ghi nợ hoặc một chứng từ tiêu thụ của đối tác (BH/KG). Số tiền BH là sau giảm giá; số tiền KG dùng giá chuyển giao đã thoả thuận." />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <p className="mb-4 text-sm text-slate-600">Tổng còn phải thu: <strong>{formatVND(totalOutstanding)}</strong></p>

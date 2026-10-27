@@ -1,9 +1,11 @@
-import { EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
-import CounterSaleTabs from "@/components/CounterSaleTabs";
+import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
+import PosSaleForm, { type PosBatch, type PosPartner, type PosProduct } from "@/components/PosSaleForm";
+import ImportDealerSale from "@/components/ImportDealerSale";
 import { createCounterSaleAction, importDealerSaleAction } from "@/lib/actions";
-import { buildProductCodeMap, getCurrentProfile, listBatchStock, listPartners, listProductCodes, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, listBatchStock, listPartners, listProductCodes, listProductFitments, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
+import type { AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,18 +14,42 @@ export default async function SalesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [orders, documents, partners, batchStock, products, productCodes, profile] = await Promise.all([
+  const [orders, documents, partners, batchStock, products, productCodes, fitments, profile] = await Promise.all([
     listSalesOrders(),
     listSalesDocuments(),
     listPartners(),
     listBatchStock(),
     listProducts(),
     listProductCodes(),
+    listProductFitments(),
     getCurrentProfile(),
   ]);
   const configured = orders.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
+  const posPartners: PosPartner[] = partners.data.map((p) => ({
+    id: p.id,
+    name: p.name,
+    kind: p.partner_kind,
+  }));
+  const fitmentsByProduct = new Map<string, string[]>();
+  for (const f of fitments.data) {
+    const v = f.vehicles as AnyRow | AnyRow[] | null;
+    const model = Array.isArray(v) ? v[0]?.model : v?.model;
+    if (!model) continue;
+    const list = fitmentsByProduct.get(f.product_id) ?? [];
+    if (!list.includes(String(model))) list.push(String(model));
+    fitmentsByProduct.set(f.product_id, list);
+  }
+  const posProducts: PosProduct[] = products.data.map((p) => ({
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    retailPrice: Number(p.retail_price) || 0,
+    garagePrice: Number(p.garage_price) || 0,
+    wholesalePrice: Number(p.wholesale_price) || 0,
+    fitments: fitmentsByProduct.get(p.id) ?? [],
+  }));
   const ownBatches = Array.from(
     new Map(
       batchStock.data
@@ -31,41 +57,12 @@ export default async function SalesPage({
         .map((r) => [r.batch_id, r])
     ).values()
   );
-  const batchOptions = ownBatches.map((r) => ({
-    value: r.batch_id,
-    label: `${r.batch_code} — ${r.product_name} · ${OWNERSHIP_LABELS[r.ownership] ?? r.ownership} · tại ${r.location_name}`,
-  }));
-  // Giá theo lô cho 2 tab: lẻ lấy retail_price, đại lý lấy
-  // wholesale_price của sản phẩm trong lô.
   const productById = new Map(
     products.data.map((p) => [p.id, p])
   );
-  const batchPrices: Record<string, { retail: number; wholesale: number }> = {};
-  for (const r of ownBatches) {
-    const p = productById.get(r.product_id);
-    if (p) {
-      batchPrices[r.batch_id] = {
-        retail: Number(p.retail_price) || 0,
-        wholesale: Number(p.wholesale_price) || 0,
-      };
-    }
-  }
-
-  // Quét mã ở tab Bán lẻ: mã hàng (SKU hoặc mã đã đăng ký) → lô FIFO của
-  // sản phẩm đó: lô cũ nhất (received_date, rồi mã lô) còn hàng tại kho
-  // của mình. Giá quét theo giá lẻ; số lượng quét lại cộng dồn tối đa bằng
-  // tồn kho của lô FIFO. Mã có thật nhưng hết hàng thì báo hết hàng.
+  // Tra cứu mã hàng: mọi mã/SKU đã đăng ký (chuẩn hoá trim + hoa, như
+  // buildProductCodeMap) → sản phẩm; dùng chung cho quầy POS và import.
   const codeMap = buildProductCodeMap(products.data, productCodes.data);
-  const ownQtyByBatch = new Map<string, number>();
-  for (const r of batchStock.data) {
-    if (r.location_kind !== "OWN_WAREHOUSE") continue;
-    ownQtyByBatch.set(
-      r.batch_id,
-      (ownQtyByBatch.get(r.batch_id) ?? 0) + (Number(r.qty) || 0)
-    );
-  }
-  // Tra cứu mã hàng cho import bán đại lý: mọi mã/SKU đã đăng ký
-  // (chuẩn hoá trim + hoa, như buildProductCodeMap) → sản phẩm + giá đại lý.
   const dealerCodeMap: Record<string, { productId: string; productName: string; wholesalePrice: number }> = {};
   for (const [code, productId] of Object.entries(codeMap)) {
     const p = productById.get(productId);
@@ -77,9 +74,10 @@ export default async function SalesPage({
       };
     }
   }
-  // Hàng đợi FIFO cho import bán đại lý: theo từng sản phẩm, lô cũ nhất
-  // trước; mỗi lô mang tồn tại vị trí kho mình giữ nhiều nhất (đúng vị
-  // trí phiếu sẽ trừ — cùng logic mainOwnLocationOfBatch phía server).
+  // Hàng đợi FIFO: theo từng sản phẩm, lô cũ nhất trước; mỗi lô mang tồn
+  // tại vị trí kho mình giữ nhiều nhất (đúng vị trí phiếu sẽ trừ — cùng
+  // logic mainOwnLocations phía server). Dùng chung cho import bán đại lý
+  // và quầy POS (POS giữ thêm ownership thô để tách BH/KG khi tính tổng).
   const mainOwnQtyByBatch = new Map<string, number>();
   for (const r of batchStock.data) {
     if (r.location_kind !== "OWN_WAREHOUSE") continue;
@@ -87,6 +85,7 @@ export default async function SalesPage({
     if (Number(r.qty) > prev) mainOwnQtyByBatch.set(r.batch_id, Number(r.qty));
   }
   const dealerFifoBatches: Record<string, { batch_id: string; batch_code: string; ownership: string; mainOwnQty: number }[]> = {};
+  const posFifoBatches: Record<string, PosBatch[]> = {};
   for (const r of [...ownBatches].sort(
     (a, b) =>
       String(a.received_date).localeCompare(String(b.received_date)) ||
@@ -100,72 +99,48 @@ export default async function SalesPage({
       ownership: OWNERSHIP_LABELS[r.ownership] ?? r.ownership,
       mainOwnQty: q,
     });
+    (posFifoBatches[r.product_id] ??= []).push({
+      batch_id: r.batch_id,
+      batch_code: r.batch_code,
+      ownership: r.ownership,
+      mainOwnQty: q,
+    });
   }
-  const fifoByProduct = new Map<string, (typeof ownBatches)[number]>();
-  for (const r of [...ownBatches].sort(
-    (a, b) =>
-      String(a.received_date).localeCompare(String(b.received_date)) ||
-      String(a.batch_code).localeCompare(String(b.batch_code))
-  )) {
-    if (
-      !fifoByProduct.has(r.product_id) &&
-      (ownQtyByBatch.get(r.batch_id) ?? 0) > 0
-    ) {
-      fifoByProduct.set(r.product_id, r);
-    }
-  }
-  const retailScanPick = {
-    selectField: "batch_id",
-    picks: Object.fromEntries(
-      Object.entries(codeMap)
-        .map(([code, productId]) => {
-          const fifo = fifoByProduct.get(productId);
-          return fifo ? [code, fifo.batch_id] : null;
-        })
-        .filter((e): e is [string, string] => e !== null)
-    ),
-    prices: Object.fromEntries(
-      Object.entries(codeMap)
-        .map(([code, productId]) => {
-          const fifo = fifoByProduct.get(productId);
-          return fifo ? [code, batchPrices[fifo.batch_id]?.retail ?? 0] : null;
-        })
-        .filter((e): e is [string, number] => e !== null)
-    ),
-    priceField: "unit_price",
-    maxQty: Object.fromEntries(
-      Object.entries(codeMap)
-        .map(([code, productId]) => {
-          const fifo = fifoByProduct.get(productId);
-          return fifo
-            ? [code, ownQtyByBatch.get(fifo.batch_id) ?? 0]
-            : null;
-        })
-        .filter((e): e is [string, number] => e !== null)
-    ),
-    known: Object.fromEntries(Object.keys(codeMap).map((k) => [k, true])),
-  };
 
   return (
     <>
       <PageHeader
         title="Bán hàng (tại quầy)"
-        description="Hai tab riêng: Bán lẻ dùng giá lẻ, Bán đại lý dùng giá đại lý. Chọn đúng các lô được bán. Lô của mình đi vào chứng từ BH; lô ký gửi đi vào chứng từ KG và tự động tạo khoản phải trả cho nhà cung cấp của lô đó theo giá ký gửi của lô. Giảm giá chỉ áp dụng cho phần BH."
+        description="Tìm hàng theo tên, mã xe, mã hàng hoặc barcode rồi Enter để thêm dòng — giá tự theo loại khách hàng: khách lẻ giá lẻ, Gara giá gara, đối tác khác giá đại lý. Lô của mình đi vào chứng từ BH; lô ký gửi đi vào chứng từ KG và tự động tạo khoản phải trả cho nhà cung cấp của lô đó theo giá ký gửi của lô. Giảm giá chỉ áp dụng cho phần BH."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã bán xong — chứng từ đã xác nhận, tồn kho và công nợ đã cập nhật.</p>}
       <div className="space-y-6">
         {!readOnly && (
-          <CounterSaleTabs
-            batchOptions={batchOptions}
-            batchPrices={batchPrices}
-            partnerOptions={partnerOptions}
+          <PosSaleForm
+            partners={posPartners}
+            products={posProducts}
+            codeMap={codeMap}
+            fifoBatches={posFifoBatches}
             action={createCounterSaleAction}
-            retailScanPick={retailScanPick}
-            dealerCodeMap={dealerCodeMap}
-            dealerFifoBatches={dealerFifoBatches}
-            dealerImportAction={importDealerSaleAction}
           />
+        )}
+        {!readOnly && (
+          <Card title="Nhập từ Excel (Bán đại lý)">
+            <p className="mb-4 text-sm text-slate-500">
+              Một file là một đơn bán đại lý cho một đối tác (hoặc khách lẻ),
+              vào đúng ngày bán đã chọn. Nhập theo mã hàng — hệ thống tự
+              phân bổ theo lô cũ nhất còn hàng (FIFO). Đơn giá để trống thì
+              lấy giá đại lý. Đơn tạo xong xác nhận ngay như nhập tay — lô
+              của mình vào BH, lô ký gửi vào KG.
+            </p>
+            <ImportDealerSale
+              partners={partnerOptions}
+              codeMap={dealerCodeMap}
+              fifoBatches={dealerFifoBatches}
+              action={importDealerSaleAction}
+            />
+          </Card>
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">

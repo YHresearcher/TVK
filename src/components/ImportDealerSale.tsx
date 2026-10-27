@@ -278,7 +278,7 @@ export default function ImportDealerSale({
       </div>
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={isCredit} onChange={(e) => setIsCredit(e.target.checked)} className="h-4 w-4" />
-        Bán chịu (tạo phải thu)
+        Ghi nợ (tạo phải thu)
       </label>
 
       {(formatProblems.length > 0 || parseError) && (
