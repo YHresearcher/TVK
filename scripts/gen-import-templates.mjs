@@ -15,19 +15,22 @@ const templates = [
     ],
   },
   {
+    // Example codes are REAL registered codes (from the live catalog):
+    // short illustrative codes do NOT resolve — the real SKUs carry the
+    // -SMS-xxxxx suffix, e.g. VG1246060108-SMS-10636, not VG1246060108.
     file: "public/mau-import-bao-cao-tieu-thu.xlsx",
     rows: [
       ["MaHang", "SoLuongTieuThu"],
-      ["VG1246060108", 5],
-      ["611600080113", 20],
+      ["AZ1664430120-SMS-30759", 5],
+      ["AZ1664440069-SMS-30705", 20],
     ],
   },
   {
     file: "public/mau-import-phan-bo.xlsx",
     rows: [
       ["MaHang", "MaLo", "NguonHang", "SoLuong", "DonGiaVND"],
-      ["VG1246060108", "OWN-2610-0001", "Ký gửi", 5, 1500000],
-      ["611600080113", "OWN-2610-0002", "Mua đứt", 10, 800000],
+      ["AZ1664430120-SMS-30759", "OWN-2610-0001", "Ký gửi", 5, 1500000],
+      ["AZ1664440069-SMS-30705", "OWN-2610-0002", "Mua đứt", 10, 800000],
     ],
   },
 ];
