@@ -993,7 +993,7 @@ export async function createConsumptionReportAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Tạo phiếu hàng đã bán"
+    "Tạo báo cáo tiêu thụ"
   );
   const items = zipItems(formData, ["product_id", "qty_consumed"])
     .filter((r) => r.product_id && Number(r.qty_consumed) > 0)
@@ -1003,7 +1003,7 @@ export async function createConsumptionReportAction(formData: FormData) {
       qty_consumed: Math.trunc(Number(r.qty_consumed)),
     }));
   if (!items.length) throw new Error("Báo cáo cần ít nhất một dòng hàng.");
-  done(await supabase.from("consumption_report_items").insert(items), "Thêm dòng phiếu");
+  done(await supabase.from("consumption_report_items").insert(items), "Thêm dòng báo cáo");
   revalidatePath("/partner-consumption");
   redirect("/partner-consumption?ok=1");
 }
@@ -1061,7 +1061,7 @@ export async function confirmAllocationAction(formData: FormData) {
 }
 
 /**
- * Import hàng đã bán [Đối tác] (BT) từ Excel. Một file = một phiếu cho một
+ * Import báo cáo tiêu thụ (BT) từ Excel. Một file = một báo cáo cho một
  * đối tác trong một kỳ. Báo cáo chỉ ghi nhận số lượng, không có giá.
  * Kiểm tra toàn bộ file trước khi ghi — dòng lỗi nào cũng từ chối cả import.
  */
@@ -1123,13 +1123,13 @@ export async function importConsumptionReportAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Tạo phiếu hàng đã bán"
+    "Tạo báo cáo tiêu thụ"
   );
   done(
     await supabase.from("consumption_report_items").insert(
       items.map((i) => ({ report_id: report.id, ...i }))
     ),
-    "Thêm dòng phiếu"
+    "Thêm dòng báo cáo"
   );
   if (confirmNow) {
     done(
@@ -1137,7 +1137,7 @@ export async function importConsumptionReportAction(formData: FormData) {
         .from("consumption_reports")
         .update({ status: "CONFIRMED" })
         .eq("id", report.id),
-      "Xác nhận phiếu"
+      "Xác nhận báo cáo"
     );
   }
   revalidatePath("/partner-consumption");
@@ -1171,7 +1171,7 @@ export async function importAllocationAction(formData: FormData) {
       .select("id")
       .eq("id", reportId)
       .maybeSingle();
-    if (!report) throw new Error("Không tìm thấy phiếu hàng đã bán đã chọn.");
+    if (!report) throw new Error("Không tìm thấy báo cáo tiêu thụ đã chọn.");
   }
   const partnerLoc = await partnerLocationId(supabase, partnerId);
   if (!partnerLoc) throw new Error("Đối tác chưa có kho ảo (chưa từng nhận ký gửi).");

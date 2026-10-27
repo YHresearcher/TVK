@@ -79,7 +79,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Tiêu thụ của đối tác & phân bổ",
     roles: ["SALES"],
     points: [
-      "Vào Tiêu thụ của đối tác: khi đối tác báo đã bán được hàng, tạo “Hàng đã bán [Đối tác] (BT)” — chọn đối tác, kỳ từ ngày–đến ngày, số lượng đối tác đã bán của từng sản phẩm (có thể quét mã vạch) — rồi bấm “Xác nhận phiếu” ở danh sách.",
+      "Vào Tiêu thụ của đối tác: khi đối tác báo đã bán được hàng, tạo “Báo cáo tiêu thụ mới (BT)” — chọn đối tác, kỳ từ ngày–đến ngày, số lượng đã tiêu thụ của từng sản phẩm (có thể quét mã vạch) — rồi bấm “Xác nhận báo cáo” ở danh sách.",
       "Tiếp theo tạo “Phiếu phân bổ mới (PB)”: gán từng số lượng đã tiêu thụ vào đúng Lô tại đối tác, chọn Nguồn hàng — Mua đứt (PURCHASED) hoặc Ký gửi (CONSIGNED) — và đơn giá. Việc phân bổ phải làm TRƯỚC khi xuất hoá đơn.",
       "Mở phiếu phân bổ (nút “Mở”) → “Xác nhận phân bổ”: hệ thống kiểm tra 3 chốt — không vượt quá lượng đã báo tiêu thụ, không vượt hạn mức đã giao theo từng tính chất, và lô phải còn đủ hàng tại đối tác.",
       "Sau khi phân bổ được xác nhận, bấm “Tạo chứng từ BH/KG” cho các dòng đang chờ; mỗi số lượng chỉ được phân bổ và xuất hoá đơn đúng một lần, không nhập lại trên hoá đơn.",

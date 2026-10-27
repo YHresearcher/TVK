@@ -148,7 +148,7 @@ export default function ImportConsumptionReport({
       <input type="hidden" name="payload" value={JSON.stringify(payload)} />
       <div className="rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/70 px-4 py-4">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-blue-950">File hàng đã bán (.xlsx / .csv)</label>
+          <label className="text-sm font-semibold text-blue-950">File báo cáo tiêu thụ (.xlsx / .csv)</label>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <input
@@ -167,8 +167,8 @@ export default function ImportConsumptionReport({
         </div>
         <p className="mt-2 text-xs text-blue-900/70">
           Tải file mẫu về, xoá các dòng ví dụ rồi điền lượng đối tác đã tiêu thụ —
-          một file là một phiếu hàng đã bán (BT) cho một đối tác trong một kỳ.
-          Phiếu chỉ ghi nhận số lượng, không có giá.
+          một file là một báo cáo (BT) cho một đối tác trong một kỳ. Báo cáo chỉ
+          ghi nhận số lượng, không có giá.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
@@ -204,7 +204,7 @@ export default function ImportConsumptionReport({
             ))}
           </ul>
           <div className="rounded-md bg-white/70 px-3 py-2 text-xs leading-relaxed text-slate-700">
-            <p className="font-semibold">Định dạng chuẩn của file hàng đã bán:</p>
+            <p className="font-semibold">Định dạng chuẩn của file báo cáo tiêu thụ:</p>
             <p className="mt-1 font-mono text-[11px]">MaHang* · SoLuongTieuThu*</p>
             <p className="mt-1">
               Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là bắt
@@ -226,7 +226,7 @@ export default function ImportConsumptionReport({
       {fileName && !parseError && (
         <p className="text-sm text-slate-600">
           Đã đọc file <span className="font-medium">{fileName}</span>: {preview.length} dòng,{" "}
-          {importable.length} dòng sẵn sàng, {preview.length - importable.length} dòng lỗi.
+          {importable.length} dòng sẵn sàng báo, {preview.length - importable.length} dòng lỗi.
         </p>
       )}
 
@@ -273,13 +273,13 @@ export default function ImportConsumptionReport({
       )}
 
       <button type="submit" disabled={!canSubmit} className={btnCls}>
-        Tạo phiếu hàng đã bán
+        Tạo báo cáo tiêu thụ
       </button>
       {!canSubmit && rawRows !== null && (
         <p className="text-xs text-slate-500">
           {errorCount > 0
             ? "Hãy sửa hết các dòng lỗi trong file Excel rồi tải lại."
-            : "Cần chọn đối tác, kỳ và có ít nhất một dòng hợp lệ để tạo phiếu."}
+            : "Cần chọn đối tác, kỳ báo cáo và có ít nhất một dòng hợp lệ để tạo báo cáo."}
         </p>
       )}
     </form>
