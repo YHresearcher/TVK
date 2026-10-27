@@ -73,13 +73,6 @@ export default async function ProductsPage({
                 {rows.map((p) => {
                   const s = stockMap.get(p.id);
                   const totalQty = Number(s?.total_qty ?? 0);
-                  const minStock = Number(p.min_stock ?? 0);
-                  const stockChip =
-                    totalQty <= 0
-                      ? { label: "Hết", cls: "bg-red-100 text-red-700" }
-                      : minStock > 0 && totalQty < minStock
-                        ? { label: "Dưới tối thiểu", cls: "bg-amber-100 text-amber-800" }
-                        : { label: "Đủ", cls: "bg-green-100 text-green-700" };
                   return (
                     <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50">
                       <td className={tdCls}>
@@ -100,7 +93,6 @@ export default async function ProductsPage({
                       <td className={tdCls}>{formatNumber(Number(s?.owned_at_partners ?? 0) + Number(s?.consigned_at_partners ?? 0))}</td>
                       <td className={`${tdCls} font-medium`}>
                         {formatNumber(totalQty)}
-                        <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${stockChip.cls}`}>{stockChip.label}</span>
                       </td>
                     </tr>
                   );
