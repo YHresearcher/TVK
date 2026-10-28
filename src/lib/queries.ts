@@ -206,6 +206,8 @@ export async function getDashboard() {
       atPartnersQty: 0, atPartnersValue: 0, payablesOutstanding: 0, receivablesOutstanding: 0,
       revenueAll: 0, grossProfitAll: 0, orderCountAll: 0,
       revenue30: 0, grossProfit30: 0, orderCount30: 0, orderAnalysis: [] as AnyRow[],
+      bookOwnedOwnValue: 0, bookAtPartnersOwnedValue: 0, bookInventoryValue: 0,
+      bookConsignedCustodyValue: 0, overduePayables: 0, overdueReceivables: 0,
       lowStock: [] as AnyRow[], expiring: [] as AnyRow[], discrepancies: [] as AnyRow[],
       revenue14: [] as { label: string; value: number }[],
       topProducts: [] as AnyRow[],
@@ -222,8 +224,8 @@ export async function getDashboard() {
     new Date(Date.now() - daysAgo * dayMs).toISOString().slice(0, 10);
   const [batchStock, payables, receivables, productStock, partnerCons, productMins, partnersList, salesDocs] = await Promise.all([
     supabase.from("v_batch_stock").select("*").limit(2000),
-    supabase.from("supplier_payables").select("amount, amount_paid, status").in("status", ["UNPAID", "PARTIAL"]),
-    supabase.from("partner_receivables").select("amount, amount_paid, status").in("status", ["UNPAID", "PARTIAL"]),
+    supabase.from("supplier_payables").select("amount, amount_paid, status, due_date").in("status", ["UNPAID", "PARTIAL"]),
+    supabase.from("partner_receivables").select("amount, amount_paid, status, due_date").in("status", ["UNPAID", "PARTIAL"]),
     supabase.from("v_product_stock").select("*").limit(2000),
     supabase.from("v_partner_consignment").select("*"),
     supabase.from("products").select("id, min_stock, retail_price, wholesale_price"),
@@ -338,6 +340,16 @@ export async function getDashboard() {
   const consignedOwn = realCompositionOf((r) => consigned(r) && r.location_kind === "OWN_WAREHOUSE");
   const atPartners = realCompositionOf((r) => r.location_kind === "PARTNER_VIRTUAL");
   const consignedReal = rows.filter(consigned).reduce((acc, r) => acc + realValueOf(r), 0);
+  // Sổ kế toán: tồn kho ghi theo GIÁ VỐN, không theo giá bán. Hàng giữ hộ
+  // của nhà cung cấp không phải tài sản — chỉ theo dõi riêng, không gộp
+  // vào tồn kho thuộc sở hữu.
+  const costOf = (filter: (r: AnyRow) => boolean) => ({
+    qty: sum(filter, (r) => Number(r.qty)),
+    value: sum(filter, (r) => Number(r.qty) * Number(r.unit_cost)),
+  });
+  const bookOwnedOwn = costOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
+  const bookAtPartnersOwned = costOf((r) => owned(r) && r.location_kind === "PARTNER_VIRTUAL");
+  const bookConsignedCustody = costOf(consigned);
   // Doanh thu / lợi nhuận gộp / số đơn — mọi chứng từ đã xác nhận, không
   // giới hạn ngày (ngày chứng từ có thể ghi lùi so với ngày nhập máy).
   // Giá vốn của mỗi dòng lấy từ lô đã bán của dòng đó (luồng đối tác thì
@@ -432,6 +444,13 @@ export async function getDashboard() {
     (data ?? [])
       .filter((r: AnyRow) => r.status === status)
       .reduce((a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0);
+  // Quá hạn: còn nợ và đã qua hạn thanh toán (hàng đã giao/bán nhưng
+  // chưa thu/trả đúng hẹn — khoản cần đôn đốc trước tiên).
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const overdueOutstanding = (data: AnyRow[] | null) =>
+    (data ?? [])
+      .filter((r: AnyRow) => r.due_date && String(r.due_date).slice(0, 10) < todayIso)
+      .reduce((a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0);
   return {
     configured: true,
     // Ô "Tồn kho" chỉ tính hàng đang nằm trong kho của mình — hàng đã
@@ -454,6 +473,12 @@ export async function getDashboard() {
     grossProfit30: revenue30 - cogs30,
     orderCount30,
     orderAnalysis,
+    bookOwnedOwnValue: bookOwnedOwn.value,
+    bookAtPartnersOwnedValue: bookAtPartnersOwned.value,
+    bookInventoryValue: bookOwnedOwn.value + bookAtPartnersOwned.value,
+    bookConsignedCustodyValue: bookConsignedCustody.value,
+    overduePayables: overdueOutstanding(payables.data as AnyRow[] | null),
+    overdueReceivables: overdueOutstanding(receivables.data as AnyRow[] | null),
     revenue14,
     topProducts,
     stockComposition: {

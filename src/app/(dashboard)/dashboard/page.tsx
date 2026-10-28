@@ -68,11 +68,28 @@ export default async function DashboardPage({
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ chúng ta" />
       </div>
 
+      {canSeeCost && (
+        <div className="mt-6">
+          <Card title="Theo sổ kế toán (giá vốn)">
+            <p className="mb-3 text-sm leading-relaxed text-slate-600">
+              Tồn kho trên sổ ghi theo giá vốn, không theo giá bán. Hàng giữ hộ của nhà cung cấp không phải
+              tài sản của cửa hàng nên không gộp vào tồn kho thuộc sở hữu.
+            </p>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <StatCard label="Tồn kho trong kho (giá vốn)" value={formatVND(d.bookOwnedOwnValue)} />
+              <StatCard label="Hàng của mình tại đối tác (giá vốn)" value={formatVND(d.bookAtPartnersOwnedValue)} />
+              <StatCard label="Tổng tồn kho thuộc sở hữu (giá vốn)" value={formatVND(d.bookInventoryValue)} />
+              <StatCard label="Hàng giữ hộ (không phải tài sản)" value={formatVND(d.bookConsignedCustodyValue)} sub="Chỉ theo dõi, không ghi vào tài sản" />
+            </div>
+          </Card>
+        </div>
+      )}
+
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {canSeeMoney && (
-          <Card title="Doanh thu 14 ngày gần nhất" className="lg:col-span-2">
+          <Card title="Doanh thu thuần 14 ngày gần nhất" className="lg:col-span-2">
             <p className="mb-2 text-xs text-slate-500">
-              Tổng 14 ngày: <strong className="text-slate-800">{formatVND(revenue14Total)}</strong>
+              Tổng doanh thu thuần 14 ngày: <strong className="text-slate-800">{formatVND(revenue14Total)}</strong>
               {" · "}Tất cả: <strong className="text-slate-800">{formatVND(d.revenueAll)}</strong>
               {" · "}{formatNumber(d.orderCountAll)} đơn đã xác nhận
             </p>
@@ -81,14 +98,17 @@ export default async function DashboardPage({
         )}
         <Card title="Cơ cấu tồn kho">
           <p className="mb-3 text-xs text-slate-500">
-            {canSeeMoney ? "Theo giá trị thật — giá bán / giá chuyển giao" : "Theo số lượng"}
+            {canSeeMoney ? "Theo giá trị thật — giá bán / giá chuyển giao (quản trị)" : "Theo số lượng"}
           </p>
           <DonutChart
             segments={compSegments}
             format={canSeeMoney ? formatCompactVND : (v) => formatNumber(v)}
             centerLabel={canSeeMoney ? formatCompactVND(compTotal) : formatNumber(compTotal)}
-            centerSub="Tổng tồn kho"
+            centerSub="Tổng hàng đang quản lý"
           />
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">
+            Hàng giữ hộ là hàng của nhà cung cấp, không phải tài sản của cửa hàng.
+          </p>
         </Card>
       </div>
 
@@ -131,12 +151,13 @@ export default async function DashboardPage({
         <div className="mt-6">
           <Card title="Phân tích đơn hàng">
             <p className="mb-3 text-sm leading-relaxed text-slate-600">
-              Doanh thu <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
+              Doanh thu thuần <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
               {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
               {" · "}Lợi nhuận gộp <strong className="text-slate-900">{formatVND(d.grossProfitAll)}</strong>
               {" "}(ROS {grossMargin}% · ROI {roiAll}%).
-              ROS là lãi chia cho doanh thu, ROI là lãi chia cho vốn hàng đã bán.
-              {" "}30 ngày gần nhất: doanh thu {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn.
+              ROS là lãi chia cho doanh thu thuần, ROI là lãi chia cho vốn hàng đã bán.
+              Giá vốn tính theo lô thực tế đã xuất (nhập trước – xuất trước); giảm giá đã trừ vào doanh thu thuần.
+              {" "}30 ngày gần nhất: doanh thu thuần {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn.
             </p>
             {d.orderAnalysis.length === 0 ? (
               <EmptyState message="Chưa có đơn hàng nào được xác nhận." />
@@ -177,6 +198,8 @@ export default async function DashboardPage({
           <Card title="Công nợ theo trạng thái">
             <HBarList
               data={[
+                { label: "Phải thu — quá hạn", value: d.overdueReceivables, color: "#e11d48" },
+                { label: "Phải trả — quá hạn", value: d.overduePayables, color: "#9f1239" },
                 { label: "Phải trả — chưa thanh toán", value: d.balances.payablesUnpaid, color: "#f43f5e" },
                 { label: "Phải trả — thanh toán một phần", value: d.balances.payablesPartial, color: "#f59e0b" },
                 { label: "Phải thu — chưa thanh toán", value: d.balances.receivablesUnpaid, color: "#0ea5e9" },
