@@ -11,13 +11,13 @@ import { MOBILE_NAV_TOGGLE_EVENT } from "@/components/Sidebar";
  */
 export default function MobileTopBar({ role }: { role: string }) {
   return (
-    <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-2.5 lg:hidden">
+    <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-900 bg-slate-900 px-4 py-2.5 lg:hidden">
       <div className="flex items-center gap-3">
         <button
           type="button"
           aria-label="Mở menu điều hướng"
           onClick={() => window.dispatchEvent(new Event(MOBILE_NAV_TOGGLE_EVENT))}
-          className="rounded-md p-1.5 text-stone-700 hover:bg-stone-100"
+          className="rounded-md p-1.5 text-white hover:bg-white/10"
         >
           <svg
             className="h-6 w-6"
@@ -32,10 +32,10 @@ export default function MobileTopBar({ role }: { role: string }) {
           </svg>
         </button>
         <div>
-          <p className="text-base font-bold leading-tight tracking-wide text-stone-900">
+          <p className="text-base font-bold leading-tight tracking-wide text-white">
             TVK
           </p>
-          <p className="text-[11px] leading-tight text-stone-500">
+          <p className="text-[11px] leading-tight text-slate-400">
             Tân Vạn Khang · Quản lý kho phụ tùng
           </p>
         </div>

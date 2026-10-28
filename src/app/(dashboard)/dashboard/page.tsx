@@ -8,23 +8,14 @@ export const dynamic = "force-dynamic";
 
 type StatTone = "blue" | "sky" | "amber" | "emerald" | "violet" | "rose";
 
-// Thẻ số liệu màu kiểu sidebar: viền màu + cạnh dưới đậm + gradient nhạt.
-const STAT_TONE_CARD: Record<StatTone, string> = {
-  blue: "border-blue-300 border-b-blue-500 bg-gradient-to-b from-blue-100 to-blue-50",
-  sky: "border-sky-300 border-b-sky-500 bg-gradient-to-b from-sky-100 to-sky-50",
-  amber: "border-amber-300 border-b-amber-500 bg-gradient-to-b from-amber-100 to-amber-50",
-  emerald: "border-emerald-300 border-b-emerald-500 bg-gradient-to-b from-emerald-100 to-emerald-50",
-  violet: "border-violet-300 border-b-violet-500 bg-gradient-to-b from-violet-100 to-violet-50",
-  rose: "border-rose-300 border-b-rose-500 bg-gradient-to-b from-rose-100 to-rose-50",
-};
-
-const STAT_TONE_LABEL: Record<StatTone, string> = {
-  blue: "text-blue-700",
-  sky: "text-sky-700",
-  amber: "text-amber-700",
-  emerald: "text-emerald-700",
-  violet: "text-violet-700",
-  rose: "text-rose-700",
+// Thẻ số liệu Minimal Enterprise: nền trắng, vạch màu dọc bên trái.
+const STAT_TONE_BAR: Record<StatTone, string> = {
+  blue: "border-l-blue-600",
+  sky: "border-l-sky-500",
+  amber: "border-l-amber-500",
+  emerald: "border-l-emerald-500",
+  violet: "border-l-violet-500",
+  rose: "border-l-rose-500",
 };
 
 function StatCard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: StatTone }) {
@@ -32,13 +23,13 @@ function StatCard({ label, value, sub, tone }: { label: string; value: string; s
     <div
       className={
         tone
-          ? `min-w-0 rounded-xl border-2 border-b-4 p-4 shadow-md ${STAT_TONE_CARD[tone]}`
+          ? `min-w-0 rounded-lg border border-slate-200 border-l-4 bg-white p-4 shadow-sm ${STAT_TONE_BAR[tone]}`
           : "min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
       }
     >
-      <p className={`text-xs font-medium uppercase tracking-wide ${tone ? STAT_TONE_LABEL[tone] : "text-slate-500"}`}>{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-bold leading-tight text-slate-900 sm:text-2xl">{value}</p>
-      {sub && <p className={`mt-0.5 text-xs ${tone ? "text-slate-600" : "text-slate-500"}`}>{sub}</p>}
+      {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
     </div>
   );
 }

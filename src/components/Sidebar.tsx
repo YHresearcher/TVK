@@ -16,33 +16,19 @@ interface NavGroup {
   title: string;
   /** Màu chấm nhấn riêng cho từng nhóm. */
   dot: string;
-  /**
-   * Khung tab 3D màu sáng của nhóm: nền gradient nhạt, viền màu, cạnh dưới
-   * dày hơn + bóng đổ tạo chiều sâu — mỗi nhóm một màu cho dễ nhận biết.
-   */
-  card: string;
-  /** Nền của mục đang chọn trong nhóm. */
-  active: string;
   items: NavItem[];
 }
 
 const TOP_ITEM: NavItem = { href: "/dashboard", label: "Tổng quan" };
-const TOP_FRAME = {
-  card: "rounded-xl border-2 border-blue-300 border-b-4 border-b-blue-500 bg-gradient-to-b from-blue-100 to-blue-50 p-1.5 shadow-md",
-  active: "bg-blue-600 text-white shadow",
-};
-const BOTTOM_FRAME = {
-  card: "rounded-xl border-2 border-slate-300 border-b-4 border-b-slate-500 bg-gradient-to-b from-slate-100 to-white p-1.5 shadow-md",
-  active: "bg-slate-700 text-white shadow",
-};
+
+/** Mục đang chọn: xanh dương điện tử trên nền navy. */
+const NAV_ACTIVE = "bg-blue-600 text-white shadow";
 
 const GROUPS: NavGroup[] = [
   {
     id: "hang-hoa-kho",
     title: "Hàng hoá & Kho",
     dot: "bg-sky-500",
-    card: "rounded-xl border-2 border-sky-300 border-b-4 border-b-sky-500 bg-gradient-to-b from-sky-100 to-sky-50 p-1.5 shadow-md",
-    active: "bg-sky-500 text-white shadow",
     items: [
       { href: "/products", label: "Sản phẩm" },
       { href: "/inventory", label: "Tồn kho theo lô" },
@@ -53,8 +39,6 @@ const GROUPS: NavGroup[] = [
     id: "ky-gui",
     title: "Ký gửi",
     dot: "bg-amber-500",
-    card: "rounded-xl border-2 border-amber-300 border-b-4 border-b-amber-500 bg-gradient-to-b from-amber-100 to-amber-50 p-1.5 shadow-md",
-    active: "bg-amber-500 text-white shadow",
     items: [
       { href: "/consignment-out", label: "Gửi ký gửi" },
       { href: "/partner-consumption", label: "Tiêu thụ của đối tác" },
@@ -64,8 +48,6 @@ const GROUPS: NavGroup[] = [
     id: "ban-hang-hoa-don",
     title: "Bán hàng & Hoá đơn",
     dot: "bg-emerald-500",
-    card: "rounded-xl border-2 border-emerald-300 border-b-4 border-b-emerald-500 bg-gradient-to-b from-emerald-100 to-emerald-50 p-1.5 shadow-md",
-    active: "bg-emerald-500 text-white shadow",
     items: [
       { href: "/sales", label: "Bán hàng" },
       { href: "/invoices", label: "Hoá đơn GTGT" },
@@ -76,8 +58,6 @@ const GROUPS: NavGroup[] = [
     id: "cong-no-bao-cao",
     title: "Công nợ & Báo cáo",
     dot: "bg-violet-500",
-    card: "rounded-xl border-2 border-violet-300 border-b-4 border-b-violet-500 bg-gradient-to-b from-violet-100 to-violet-50 p-1.5 shadow-md",
-    active: "bg-violet-500 text-white shadow",
     items: [
       { href: "/payables", label: "Phải trả nhà cung cấp" },
       { href: "/receivables", label: "Phải thu đối tác" },
@@ -88,8 +68,6 @@ const GROUPS: NavGroup[] = [
     id: "danh-muc",
     title: "Danh mục",
     dot: "bg-rose-500",
-    card: "rounded-xl border-2 border-rose-300 border-b-4 border-b-rose-500 bg-gradient-to-b from-rose-100 to-rose-50 p-1.5 shadow-md",
-    active: "bg-rose-500 text-white shadow",
     items: [
       { href: "/suppliers", label: "Nhà cung cấp" },
       { href: "/partners", label: "Đối tác" },
@@ -186,13 +164,13 @@ export default function Sidebar({
     });
   }
 
-  // Mục trong khung sáng: chữ đậm trên nền nhạt, mục đang chọn tô đặc
-  // màu của nhóm — nhìn là biết đang ở đâu.
-  const itemCls = (href: string, activeCls: string) =>
+  // Navy tối giản: chữ xám nhạt trên nền navy, mục đang chọn tô đặc
+  // xanh dương điện tử — nhìn là biết đang ở đâu.
+  const itemCls = (href: string) =>
     `block rounded-md px-3 py-2 text-sm ${
       isActive(pathname, href)
-        ? `font-medium ${activeCls}`
-        : "text-slate-700 hover:bg-white/80 hover:text-slate-900"
+        ? `font-medium ${NAV_ACTIVE}`
+        : "text-slate-300 hover:bg-white/10 hover:text-white"
     }`;
 
   return (
@@ -206,19 +184,19 @@ export default function Sidebar({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white text-slate-700 transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col border-r border-slate-900 bg-slate-900 text-slate-300 transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-      <div className="border-b border-slate-200 px-5 py-4">
-        <p className="text-lg font-bold tracking-wide text-slate-900">TVK</p>
-        <p className="text-xs text-slate-500">Quản lý kho phụ tùng</p>
+      <div className="border-b border-white/10 px-5 py-4">
+        <p className="text-lg font-bold tracking-wide text-white">TVK</p>
+        <p className="text-xs text-slate-400">Quản lý kho phụ tùng</p>
       </div>
       <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
-        <div className={TOP_FRAME.card}>
+        <div>
           <Link
             href={TOP_ITEM.href}
-            className={itemCls(TOP_ITEM.href, TOP_FRAME.active)}
+            className={itemCls(TOP_ITEM.href)}
             onClick={() => setMobileOpen(false)}
           >
             {TOP_ITEM.label}
@@ -229,15 +207,15 @@ export default function Sidebar({
           const expanded = openId === group.id;
           const containsActive = group.id === currentGroup;
           return (
-            <div key={group.id} className={group.card}>
+            <div key={group.id}>
               <button
                 type="button"
                 onClick={() => toggleGroup(group.id)}
                 aria-expanded={expanded}
                 className={`flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ${
                   containsActive
-                    ? "text-slate-900"
-                    : "text-slate-700 hover:text-slate-900"
+                    ? "text-white"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 <span className="flex items-center gap-2">
@@ -263,7 +241,7 @@ export default function Sidebar({
                     <li key={item.href}>
                       <Link
                         href={item.href}
-                        className={itemCls(item.href, group.active)}
+                        className={itemCls(item.href)}
                         onClick={() => setMobileOpen(false)}
                       >
                         {item.label}
@@ -276,29 +254,29 @@ export default function Sidebar({
           );
         })}
 
-        <div className={BOTTOM_FRAME.card}>
+        <div>
           <Link
             href={BOTTOM_ITEM.href}
-            className={itemCls(BOTTOM_ITEM.href, BOTTOM_FRAME.active)}
+            className={itemCls(BOTTOM_ITEM.href)}
             onClick={() => setMobileOpen(false)}
           >
             {BOTTOM_ITEM.label}
           </Link>
         </div>
       </nav>
-      <div className="border-t border-slate-200 px-5 py-4">
-        <p className="truncate text-sm font-medium text-slate-900">{userName}</p>
-        <p className="text-xs text-slate-500">{role}</p>
+      <div className="border-t border-white/10 px-5 py-4">
+        <p className="truncate text-sm font-medium text-white">{userName}</p>
+        <p className="text-xs text-slate-400">{role}</p>
         <form action={signOutAction} className="mt-3">
           <SubmitButton
-            className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100"
+            className="w-full rounded-md border border-white/20 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10"
           >
             Đăng xuất
           </SubmitButton>
         </form>
-        <div className="mt-4 border-t border-slate-200 pt-3 text-center">
-          <p className="text-[11px] text-slate-400">TVK management system by Thanh Phan</p>
-          <p className="mt-0.5 text-[11px] text-slate-400">version 1.0</p>
+        <div className="mt-4 border-t border-white/10 pt-3 text-center">
+          <p className="text-[11px] text-slate-500">TVK management system by Thanh Phan</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">version 1.0</p>
         </div>
       </div>
       </aside>
