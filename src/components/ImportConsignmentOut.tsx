@@ -6,7 +6,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { formatNumber, formatVND, todayISO } from "@/lib/format";
 import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import { matchByNameVehicle, normCode } from "@/lib/product-match";
-import { OWNERSHIP_LABELS, type AnyRow } from "@/lib/types";
+import { type AnyRow } from "@/lib/types";
 import type { PosProduct } from "@/components/PosSaleForm";
 import type { DealerFifoBatchRow } from "@/components/ImportDealerSale";
 
