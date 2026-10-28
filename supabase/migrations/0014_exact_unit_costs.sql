@@ -9,6 +9,13 @@
 -- phiếu mới luôn ghi 0; hàm xác nhận cộng nó như cũ nên không đổi.
 -- Giá bán (lẻ/gara/đại lý) vẫn làm tròn đồng chẵn như trước — chỉ phần
 -- giá vốn và tổng tiền là tính chính xác.
+--
+-- LƯU Ý ÁP DỤNG: view v_batch_stock phụ thuộc cột stock_batches.unit_cost
+-- nên Postgres chặn đổi kiểu cột khi view còn đó. Phải DROP view trước,
+-- đổi cột xong tạo lại đúng định nghĩa hiện tại (migration 0011) và cấp
+-- lại quyền select cho authenticated (drop view làm mất quyền cũ).
+-- Toàn bộ migration này chạy lại được (idempotent) nếu lần áp trước dở dang.
+drop view if exists public.v_batch_stock;
 alter table public.stock_batches
   alter column unit_cost type numeric(15,4);
 alter table public.purchase_receipt_items
