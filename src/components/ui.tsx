@@ -33,19 +33,56 @@ export function PageHeader({
   );
 }
 
+export type CardTone = "blue" | "sky" | "amber" | "emerald" | "violet" | "rose" | "slate";
+
+// Khung thẻ màu kiểu sidebar: viền màu + cạnh dưới đậm + gradient nhạt dần về trắng.
+const CARD_TONE_FRAME: Record<CardTone, string> = {
+  blue: "border-blue-300 border-b-blue-500 bg-gradient-to-b from-blue-100 via-blue-50 to-white",
+  sky: "border-sky-300 border-b-sky-500 bg-gradient-to-b from-sky-100 via-sky-50 to-white",
+  amber: "border-amber-300 border-b-amber-500 bg-gradient-to-b from-amber-100 via-amber-50 to-white",
+  emerald: "border-emerald-300 border-b-emerald-500 bg-gradient-to-b from-emerald-100 via-emerald-50 to-white",
+  violet: "border-violet-300 border-b-violet-500 bg-gradient-to-b from-violet-100 via-violet-50 to-white",
+  rose: "border-rose-300 border-b-rose-500 bg-gradient-to-b from-rose-100 via-rose-50 to-white",
+  slate: "border-slate-300 border-b-slate-500 bg-gradient-to-b from-slate-100 via-slate-50 to-white",
+};
+
+const CARD_TONE_HEADER: Record<CardTone, string> = {
+  blue: "border-blue-200 text-blue-900",
+  sky: "border-sky-200 text-sky-900",
+  amber: "border-amber-200 text-amber-900",
+  emerald: "border-emerald-200 text-emerald-900",
+  violet: "border-violet-200 text-violet-900",
+  rose: "border-rose-200 text-rose-900",
+  slate: "border-slate-200 text-slate-800",
+};
+
 export function Card({
   title,
   children,
   className = "",
+  tone,
 }: {
   title?: string;
   children: ReactNode;
   className?: string;
+  tone?: CardTone;
 }) {
   return (
-    <div className={`rounded-lg border border-slate-200 bg-white shadow-sm ${className}`}>
+    <div
+      className={
+        tone
+          ? `rounded-xl border-2 border-b-4 shadow-md ${CARD_TONE_FRAME[tone]} ${className}`
+          : `rounded-lg border border-slate-200 bg-white shadow-sm ${className}`
+      }
+    >
       {title && (
-        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-800">
+        <div
+          className={
+            tone
+              ? `border-b px-4 py-3 text-sm font-semibold ${CARD_TONE_HEADER[tone]}`
+              : "border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-800"
+          }
+        >
           {title}
         </div>
       )}
