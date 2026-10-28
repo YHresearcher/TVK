@@ -2,14 +2,14 @@ import { BackLink, Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCl
 import SubmitButton from "@/components/SubmitButton";
 import PriceEditForm from "@/components/PriceEditForm";
 import { createFitmentAction, createProductCodeAction, updateProductInfoAction, updateProductPricesAction } from "@/lib/actions";
-import { getCurrentProfile, getProductDetail } from "@/lib/queries";
+import { getCurrentProfile, getProductDetail, listProductGroups } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { CODE_KINDS, CODE_KIND_LABELS, OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProductDetailPage({ params }: { params: { id: string } }) {
-  const [detail, profile] = await Promise.all([getProductDetail(params.id), getCurrentProfile()]);
+  const [detail, profile, groups] = await Promise.all([getProductDetail(params.id), getCurrentProfile(), listProductGroups()]);
   if (!detail.configured) return (<><PageHeader title="Sản phẩm" /><NotConfigured /></>);
   if (!detail.product) return (<><BackLink href="/products" label="Quay lại danh sách sản phẩm" /><EmptyState message="Không tìm thấy sản phẩm." /></>);
   const p = detail.product;
@@ -29,6 +29,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
             <div className="flex justify-between"><dt className="text-slate-500">Mã hàng (SKU)</dt><dd className="font-mono font-medium">{p.sku}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Tên</dt><dd className="font-medium">{p.name}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Thương hiệu</dt><dd className="font-medium">{p.brand ?? "—"}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Nhóm hàng</dt><dd className="font-medium">{p.product_group ?? "—"}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Đơn vị</dt><dd className="font-medium">{p.unit}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Tồn tối thiểu</dt><dd className="font-medium">{formatNumber(p.min_stock)}</dd></div>
           </dl>
@@ -41,6 +42,15 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
             <div>
               <label className={labelCls}>Thương hiệu</label>
               <input name="brand" defaultValue={p.brand ?? ""} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Nhóm hàng</label>
+              <input name="product_group" list="tvk-product-groups" defaultValue={p.product_group ?? ""} placeholder="VD: Linh kiện ô tô tải" className={inputCls} />
+              <datalist id="tvk-product-groups">
+                {groups.map((g) => (
+                  <option key={g} value={g} />
+                ))}
+              </datalist>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>

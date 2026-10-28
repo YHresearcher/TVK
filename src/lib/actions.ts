@@ -161,6 +161,7 @@ export async function createProductAction(formData: FormData) {
         sku: str(formData, "sku"),
         name: str(formData, "name"),
         brand: optStr(formData, "brand"),
+        product_group: optStr(formData, "product_group"),
         unit: str(formData, "unit") || "cái",
         retail_price: num(formData, "retail_price"),
         garage_price: num(formData, "garage_price"),
@@ -235,7 +236,7 @@ export async function createFitmentAction(productId: string, formData: FormData)
   revalidatePath(`/products/${productId}`);
 }
 
-/** Sửa thông tin hàng hoá (tên, thương hiệu, đơn vị, tồn tối thiểu). Mã SKU
+/** Sửa thông tin hàng hoá (tên, thương hiệu, nhóm hàng, đơn vị, tồn tối thiểu). Mã SKU
  * không sửa được — nó là chìa khoá khớp hàng của import, quầy bán và tem
  * mã vạch. Quyền sửa khớp đúng RLS của bảng products: chỉ Chủ cửa hàng
  * và Thủ kho; CEO và các vai trò còn lại bị chặn ngay ở đây. */
@@ -254,6 +255,7 @@ export async function updateProductInfoAction(productId: string, formData: FormD
     await supabase.from("products").update({
       name,
       brand: optStr(formData, "brand"),
+      product_group: optStr(formData, "product_group"),
       unit,
       min_stock: Math.max(0, Math.trunc(num(formData, "min_stock"))),
     }).eq("id", productId),
@@ -569,6 +571,7 @@ export async function importStockAction(formData: FormData) {
   const retailPct = Number(payload.retailPct) || 0;
   const autoCreate = !!payload.autoCreate;
   const confirmNow = !!payload.confirmNow;
+  const productGroup = String(payload.productGroup ?? "").trim() || null;
   const rawRows: ImportPayloadRow[] = Array.isArray(payload.rows) ? payload.rows : [];
   if (!rawRows.length) throw new Error("File không có dòng nào để nhập.");
 
@@ -641,6 +644,7 @@ export async function importStockAction(formData: FormData) {
     sku: string;
     name: string;
     brand: string | null;
+    product_group: string | null;
     unit: string;
     retail_price: number;
     garage_price: number;
@@ -679,6 +683,7 @@ export async function importStockAction(formData: FormData) {
           sku: code,
           name: String(r.name ?? "").trim() || code,
           brand: String(r.brand ?? "").trim() || null,
+          product_group: productGroup,
           unit: String(r.unit ?? "").trim() || "Cái",
           // Giá ban đầu của sản phẩm mới: Giá lẻ = Đơn giá nhập ×
           // (1 + % giá bán lẻ trên form); Giá đại lý = Đơn giá nhập ×

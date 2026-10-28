@@ -3,7 +3,7 @@ import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCl
 import SubmitButton from "@/components/SubmitButton";
 import LabelPrintButton from "@/components/LabelPrintButton";
 import { createProductAction } from "@/lib/actions";
-import { getCurrentProfile, listProductStock, listProducts } from "@/lib/queries";
+import { getCurrentProfile, listProductGroups, listProductStock, listProducts } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
 
@@ -12,20 +12,22 @@ export const dynamic = "force-dynamic";
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: { q?: string; ok?: string; noRetail?: string };
+  searchParams: { q?: string; ok?: string; noRetail?: string; group?: string };
 }) {
-  const [products, stock, profile] = await Promise.all([listProducts(), listProductStock(), getCurrentProfile()]);
+  const [products, stock, profile, groups] = await Promise.all([listProducts(), listProductStock(), getCurrentProfile(), listProductGroups()]);
   const configured = products.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const stockMap = new Map(stock.data.map((s) => [s.product_id, s]));
   const q = (searchParams.q ?? "").toLowerCase();
   const onlyNoRetail = searchParams.noRetail === "1";
+  const group = searchParams.group ?? "";
   const rows = products.data.filter(
     (p) =>
       (!q ||
         p.name.toLowerCase().includes(q) ||
         p.sku.toLowerCase().includes(q)) &&
-      (!onlyNoRetail || !Number(p.retail_price ?? 0))
+      (!onlyNoRetail || !Number(p.retail_price ?? 0)) &&
+      (!group || (group === "__none" ? !p.product_group : p.product_group === group))
   );
 
   return (
@@ -42,6 +44,13 @@ export default async function ProductsPage({
         <div className="min-w-0 lg:col-span-2">
           <form method="get" className="mb-4 flex flex-wrap items-center gap-2">
             <input name="q" defaultValue={searchParams.q ?? ""} placeholder="Tìm theo tên hoặc SKU…" className={inputCls} />
+            <select name="group" defaultValue={group} className={inputCls} aria-label="Lọc theo nhóm hàng">
+              <option value="">Tất cả nhóm</option>
+              {groups.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+              <option value="__none">Chưa xếp nhóm</option>
+            </select>
             <label className="flex items-center gap-1.5 text-sm text-slate-700">
               <input type="checkbox" name="noRetail" value="1" defaultChecked={onlyNoRetail} />
               Chỉ hiện hàng chưa có giá lẻ
@@ -65,7 +74,7 @@ export default async function ProductsPage({
             <TableWrap>
               <thead>
                 <tr>
-                  <th className={`${thCls} text-right`}>STT</th><th className={thCls}>SKU</th><th className={thCls}>Tên</th><th className={thCls}>Thương hiệu</th>
+                  <th className={`${thCls} text-right`}>STT</th><th className={thCls}>SKU</th><th className={thCls}>Tên</th><th className={thCls}>Thương hiệu</th><th className={thCls}>Nhóm</th>
                   <th className={`${thCls} text-right`}>Giá lẻ</th><th className={`${thCls} text-right`}>Giá đại lý</th><th className={thCls}>Của mình</th><th className={thCls}>Ký gửi</th>
                   <th className={thCls}>Tại đối tác</th><th className={thCls}>Tổng</th>
                 </tr>
@@ -82,6 +91,7 @@ export default async function ProductsPage({
                       </td>
                       <td className={tdCls}>{p.name}</td>
                       <td className={tdCls}>{p.brand ?? "—"}</td>
+                      <td className={tdCls}>{p.product_group ?? "—"}</td>
                       <td className={`${tdCls} text-right`}>
                         {!Number(p.retail_price ?? 0) ? (
                           <span className="font-semibold text-amber-700">Chưa có giá</span>
@@ -109,6 +119,15 @@ export default async function ProductsPage({
             <div><label className={labelCls}>SKU *</label><input name="sku" required className={inputCls} /></div>
             <div><label className={labelCls}>Tên *</label><input name="name" required className={inputCls} /></div>
             <div><label className={labelCls}>Thương hiệu</label><input name="brand" className={inputCls} /></div>
+            <div>
+              <label className={labelCls}>Nhóm hàng</label>
+              <input name="product_group" list="tvk-product-groups" placeholder="VD: Linh kiện ô tô tải" className={inputCls} />
+              <datalist id="tvk-product-groups">
+                {groups.map((g) => (
+                  <option key={g} value={g} />
+                ))}
+              </datalist>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div><label className={labelCls}>Đơn vị</label><input name="unit" defaultValue="cái" className={inputCls} /></div>
               <div><label className={labelCls}>Tồn tối thiểu</label><input name="min_stock" type="number" defaultValue="0" className={inputCls} /></div>

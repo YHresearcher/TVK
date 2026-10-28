@@ -67,12 +67,14 @@ export default function ImportExcel({
   warehouses,
   products,
   codes,
+  groups,
   action,
 }: {
   suppliers: AnyRow[];
   warehouses: AnyRow[];
   products: CatalogProduct[];
   codes: CatalogCode[];
+  groups: string[];
   action: (formData: FormData) => Promise<void>;
 }) {
   const [kind, setKind] = useState<"PN" | "NK">("PN");
@@ -94,6 +96,7 @@ export default function ImportExcel({
   const [retailPct, setRetailPct] = useState(50);
   const [autoCreate, setAutoCreate] = useState(true);
   const [confirmNow, setConfirmNow] = useState(false);
+  const [productGroup, setProductGroup] = useState("");
   const [fileName, setFileName] = useState("");
   const [rawRows, setRawRows] = useState<RawRow[] | null>(null);
   const [parseError, setParseError] = useState("");
@@ -271,6 +274,7 @@ export default function ImportExcel({
     retailPct,
     autoCreate,
     confirmNow,
+    productGroup,
     rows: importable.map((r) => ({
       code: r.code,
       altCodes: r.altCodes,
@@ -423,6 +427,21 @@ export default function ImportExcel({
             onChange={(e) => setRetailPct(Number(e.target.value) || 0)}
             className={inputCls}
           />
+        </div>
+        <div>
+          <label className={labelCls}>Nhóm hàng cho sản phẩm mới (áp cho cả file)</label>
+          <input
+            value={productGroup}
+            onChange={(e) => setProductGroup(e.target.value)}
+            list="tvk-import-groups"
+            placeholder="Để trống = chưa xếp nhóm"
+            className={inputCls}
+          />
+          <datalist id="tvk-import-groups">
+            {groups.map((g) => (
+              <option key={g} value={g} />
+            ))}
+          </datalist>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">

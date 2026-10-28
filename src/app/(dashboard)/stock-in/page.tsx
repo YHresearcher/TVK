@@ -12,7 +12,7 @@ import {
   deleteReceiptAction,
   importStockAction,
 } from "@/lib/actions";
-import { buildProductCodeMap, getCurrentProfile, listConsignmentReceipts, listLocations, listProductCodes, listProducts, listPurchaseReceipts, listSuppliers } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, listConsignmentReceipts, listLocations, listProductCodes, listProductGroups, listProducts, listPurchaseReceipts, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
 import { isReadOnlyRole, type AnyRow } from "@/lib/types";
 
@@ -29,13 +29,14 @@ export default async function StockInPage({
       : searchParams.tab === "import"
         ? "import"
         : "purchase";
-  const [suppliers, locations, products, purchases, consignments, productCodes, profile] = await Promise.all([
+  const [suppliers, locations, products, purchases, consignments, productCodes, groups, profile] = await Promise.all([
     listSuppliers(),
     listLocations(),
     listProducts(),
     listPurchaseReceipts(),
     listConsignmentReceipts(),
     listProductCodes(),
+    listProductGroups(),
     getCurrentProfile(),
   ]);
   const readOnly = isReadOnlyRole(profile.data?.role);
@@ -92,6 +93,7 @@ export default async function StockInPage({
                     code: c.code,
                     product_id: c.product_id,
                   }))}
+                  groups={groups}
                   action={importStockAction}
                 />
               </Card>

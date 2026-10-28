@@ -43,6 +43,20 @@ async function list<T = AnyRow>(
 
 export const listProducts = () =>
   list("products", { column: "name", ascending: true });
+
+/** Các nhóm hàng đã dùng (để lọc + gợi ý khi gán nhóm). */
+export async function listProductGroups(): Promise<string[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("products").select("product_group").limit(5000);
+  if (error || !data) return [];
+  const groups = new Set<string>();
+  for (const r of data as AnyRow[]) {
+    const g = String(r.product_group ?? "").trim();
+    if (g) groups.add(g);
+  }
+  return Array.from(groups).sort((a, b) => a.localeCompare(b, "vi"));
+}
 export const listProductCodes = () =>
   list("product_codes", { column: "code", ascending: true });
 
