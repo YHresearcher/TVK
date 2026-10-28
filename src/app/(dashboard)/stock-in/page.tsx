@@ -2,11 +2,13 @@ import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import ItemsRows from "@/components/ItemsRows";
 import ImportExcel from "@/components/ImportExcel";
+import DeleteReceiptButton from "@/components/DeleteReceiptButton";
 import {
   confirmConsignmentReceiptAction,
   confirmPurchaseReceiptAction,
   createConsignmentReceiptAction,
   createPurchaseReceiptAction,
+  deleteReceiptAction,
   importStockAction,
 } from "@/lib/actions";
 import { buildProductCodeMap, getCurrentProfile, listConsignmentReceipts, listLocations, listProductCodes, listProducts, listPurchaseReceipts, listSuppliers } from "@/lib/queries";
@@ -18,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function StockInPage({
   searchParams,
 }: {
-  searchParams: { tab?: string; ok?: string };
+  searchParams: { tab?: string; ok?: string; error?: string };
 }) {
   const tab =
     searchParams.tab === "consignment"
@@ -36,6 +38,7 @@ export default async function StockInPage({
     getCurrentProfile(),
   ]);
   const readOnly = isReadOnlyRole(profile.data?.role);
+  const isOwner = profile.data?.role === "OWNER";
   const codeMap = buildProductCodeMap(products.data, productCodes.data);
   const configured = suppliers.configured;
   const warehouses = locations.data.filter((l) => l.location_kind === "OWN_WAREHOUSE");
@@ -52,6 +55,7 @@ export default async function StockInPage({
       <PageHeader title="Nhập kho" />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {searchParams.error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{searchParams.error}</p>}
       <div className="mb-6 flex gap-2">
         <Link href="/stock-in?tab=purchase" className={tabCls(tab === "purchase", "bg-blue-600 text-white")}>Phiếu nhập mua (PN)</Link>
         <Link href="/stock-in?tab=consignment" className={tabCls(tab === "consignment", "bg-amber-500 text-white")}>Phiếu nhận ký gửi (NK)</Link>
@@ -121,7 +125,11 @@ export default async function StockInPage({
             rows={purchases.data}
             supplierName={supplierName}
             confirmAction={confirmPurchaseReceiptAction}
+            deleteAction={deleteReceiptAction}
+            kind="PN"
+            tab="purchase"
             readOnly={readOnly}
+            canDelete={isOwner}
           />
         </div>
       ) : (
@@ -156,7 +164,11 @@ export default async function StockInPage({
             rows={consignments.data}
             supplierName={supplierName}
             confirmAction={confirmConsignmentReceiptAction}
+            deleteAction={deleteReceiptAction}
+            kind="NK"
+            tab="consignment"
             readOnly={readOnly}
+            canDelete={isOwner}
           />
         </div>
       )}
@@ -168,12 +180,20 @@ function ReceiptTable({
   rows,
   supplierName,
   confirmAction,
+  deleteAction,
+  kind,
+  tab,
   readOnly,
+  canDelete,
 }: {
   rows: AnyRow[];
   supplierName: Map<string, string>;
   confirmAction: (formData: FormData) => Promise<void>;
+  deleteAction: (formData: FormData) => Promise<void>;
+  kind: "PN" | "NK";
+  tab: string;
   readOnly?: boolean;
+  canDelete?: boolean;
 }) {
   if (rows.length === 0) return <EmptyState message="Chưa có phiếu nhập." />;
   return (
@@ -187,12 +207,23 @@ function ReceiptTable({
             <td className={tdCls}>{formatDate(r.receipt_date)}</td>
             <td className={tdCls}><StatusBadge status={r.status} /></td>
             <td className={tdCls}>
-              {r.status === "DRAFT" && !readOnly && (
-                <form action={confirmAction}>
-                  <input type="hidden" name="id" value={r.id} />
-                  <button type="submit" className={btnGhostCls}>Xác nhận → tạo lô</button>
-                </form>
-              )}
+              <div className="flex items-center gap-2">
+                {r.status === "DRAFT" && !readOnly && (
+                  <form action={confirmAction}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <button type="submit" className={btnGhostCls}>Xác nhận → tạo lô</button>
+                  </form>
+                )}
+                {canDelete && (
+                  <DeleteReceiptButton
+                    receiptId={r.id}
+                    kind={kind}
+                    tab={tab}
+                    docCode={r.doc_code}
+                    action={deleteAction}
+                  />
+                )}
+              </div>
             </td>
           </tr>
         ))}

@@ -117,7 +117,7 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 
 ## PHẦN C — NHẬP HÀNG CHI TIẾT (giải thích từng mục)
 
-Trang **Nhập kho** có 3 nút: **Phiếu nhập mua (PN)** · **Phiếu nhận ký gửi (NK)** · **Nhập từ Excel**. Phiếu tạo ra ở trạng thái **Nháp**; chỉ khi bấm **Xác nhận** thì hàng mới thực sự vào kho (tạo lô + ghi sổ cái). Phiếu nháp sai có thể huỷ. Cả hai form nhập tay (PN, NK) đều có tick **Xác nhận ngay → tạo lô**: tick vào thì phiếu được xác nhận luôn trong cùng một thao tác, không qua bước nháp; không tick thì giữ luồng nháp để kiểm tra lại rồi xác nhận sau.
+Trang **Nhập kho** có 3 nút: **Phiếu nhập mua (PN)** · **Phiếu nhận ký gửi (NK)** · **Nhập từ Excel**. Phiếu tạo ra ở trạng thái **Nháp**; chỉ khi bấm **Xác nhận** thì hàng mới thực sự vào kho (tạo lô + ghi sổ cái). Chỉ **Chủ cửa hàng** thấy nút **Xoá** ở mỗi phiếu (cả nháp lẫn đã xác nhận): xoá hẳn phiếu cùng các lô và biến động nhập của nó trong một thao tác, không khôi phục được; phiếu nào đã có lô đem bán/gửi đi thì hệ thống chặn và báo rõ lý do. Mã phiếu đã xoá không dùng lại. Sản phẩm trong danh mục không bị xoá theo phiếu. Cả hai form nhập tay (PN, NK) đều có tick **Xác nhận ngay → tạo lô**: tick vào thì phiếu được xác nhận luôn trong cùng một thao tác, không qua bước nháp; không tick thì giữ luồng nháp để kiểm tra lại rồi xác nhận sau.
 
 ### C1. Phiếu nhập mua (PN) — mua đứt
 

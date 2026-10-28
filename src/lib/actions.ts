@@ -412,6 +412,30 @@ export async function confirmPurchaseReceiptAction(formData: FormData) {
   revalidatePath("/inventory");
 }
 
+// Xoá phiếu nhập (PN/NK) — chỉ Chủ cửa hàng. Hàm delete_receipt kiểm
+// tra quyền và chặn khi lô đã phát sinh nghiệp vụ; lỗi quay lại trang
+// kèm thông báo thay vì trang lỗi.
+export async function deleteReceiptAction(formData: FormData) {
+  const supabase = await db();
+  const uid = await userId();
+  if (!uid) throw new Error("Chưa đăng nhập.");
+  const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+  if (!prof || prof.role !== "OWNER")
+    throw new Error("Chỉ chủ cửa hàng mới được xoá phiếu nhập.");
+  const id = str(formData, "id");
+  const kind = str(formData, "kind");
+  const tab = str(formData, "tab") === "consignment" ? "consignment" : "purchase";
+  if (!id || (kind !== "PN" && kind !== "NK")) throw new Error("Thiếu thông tin phiếu cần xoá.");
+  const { error } = await supabase.rpc("delete_receipt", {
+    p_receipt_id: id,
+    p_kind: kind,
+  });
+  if (error) redirect(`/stock-in?tab=${tab}&error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/stock-in");
+  revalidatePath("/inventory");
+  redirect(`/stock-in?tab=${tab}&ok=1`);
+}
+
 export async function createConsignmentReceiptAction(formData: FormData) {
   const supabase = await db();
   const receipt = must(
