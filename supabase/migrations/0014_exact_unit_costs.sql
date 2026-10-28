@@ -27,6 +27,24 @@ alter table public.consignment_receipt_items
 alter table public.consignment_receipts
   add column if not exists total_amount numeric(15,4) not null default 0;
 
+-- Tạo lại view v_batch_stock đúng định nghĩa hiện tại (migration 0011:
+-- tên NCC của lô OWNED tra từ phiếu mua) + cấp lại quyền đã mất khi drop.
+create or replace view public.v_batch_stock as
+select b.id as batch_id, b.batch_code, b.product_id, p.sku, p.name as product_name,
+       b.ownership, b.supplier_id, coalesce(s.name, ps.name) as supplier_name, b.unit_cost,
+       bl.location_id, l.name as location_name, l.location_kind, l.partner_id,
+       bl.qty, b.received_date, b.return_by_date, b.status
+from stock_batches b
+join products p on p.id = b.product_id
+left join suppliers s on s.id = b.supplier_id
+left join purchase_receipts pr
+  on pr.id = b.source_doc_id and b.source_doc_type = 'PURCHASE_RECEIPT'
+left join suppliers ps on ps.id = pr.supplier_id
+join batch_locations bl on bl.batch_id = b.id
+join locations l on l.id = bl.location_id;
+
+grant select on public.v_batch_stock to authenticated;
+
 -- confirm_consignment_receipt: như 0002, cộng thêm ghi total_amount =
 -- tổng chính xác các dòng (phiếu NK trước đây không có cột tổng tiền).
 create or replace function confirm_consignment_receipt(p_receipt_id uuid) returns void

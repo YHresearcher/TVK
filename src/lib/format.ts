@@ -1,17 +1,10 @@
 /** Số tiền VNĐ: chỉ hiện số đã nhóm nghìn, không thêm hậu tố đơn vị. */
 export function formatVND(value: number | string | null | undefined): string {
   const n = Number(value ?? 0);
-  return n.toLocaleString("vi-VN");
-}
-
-// Tiền tính chính xác, giữ tối đa 4 số lẻ (giá vốn nhập hàng từ USD,
-// migration 0014). Số nguyên hiển thị như formatVND, không thêm ",00".
-export function formatVNDExact(value: number | string | null | undefined): string {
-  const n = Number(value ?? 0);
-  return n.toLocaleString("vi-VN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
-  });
+  // Hiển thị tròn về đồng chẵn, không hiện số lẻ sau dấu phẩy (quyết
+  // của chủ cửa hàng 28/10) — chỉ làm tròn lúc hiển thị, giá trị lưu
+  // trong database vẫn giữ chính xác (migration 0014).
+  return n.toLocaleString("vi-VN", { maximumFractionDigits: 0 });
 }
 
 /** Số tiền USD: ký hiệu $ ở phía trước (vd $100, $3.88). */

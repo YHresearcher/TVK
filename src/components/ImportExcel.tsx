@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import { normCode } from "@/lib/product-match";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
-import { formatNumber, formatUSD, formatVND, formatVNDExact, todayISO } from "@/lib/format";
+import { formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
 
 /** Cột tiền: căn phải để dễ dò số. */
 const thNumCls = `${thCls} text-right`;
@@ -525,9 +525,9 @@ export default function ImportExcel({
                 <td className={tdCls}>{r.unit || "—"}</td>
                 <td className={tdCls}>{formatNumber(r.qty)}</td>
                 <td className={tdNumCls}>{r.usd > 0 ? formatUSD(r.usd) : "—"}</td>
-                <td className={tdNumCls}>{r.unitCost > 0 ? formatVNDExact(r.unitCost) : "—"}</td>
+                <td className={tdNumCls}>{r.unitCost > 0 ? formatVND(r.unitCost) : "—"}</td>
                 <td className={tdNumCls}>
-                  {r.unitCost > 0 ? formatVNDExact(r.qty * r.unitCost) : "—"}
+                  {r.unitCost > 0 ? formatVND(r.qty * r.unitCost) : "—"}
                 </td>
                 <td className={tdNumCls}>
                   {r.salePriceEff > 0 ? formatVND(r.salePriceEff) : "—"}
@@ -569,7 +569,7 @@ export default function ImportExcel({
               <td className={tdCls}>{formatNumber(totalQty)}</td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
-              <td className={tdNumCls}>{formatVNDExact(exactTotal)}</td>
+              <td className={tdNumCls}>{formatVND(exactTotal)}</td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
