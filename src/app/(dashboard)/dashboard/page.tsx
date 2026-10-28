@@ -201,9 +201,9 @@ export default async function DashboardPage({
                 { label: "Phải thu — quá hạn", value: d.overdueReceivables, color: "#e11d48" },
                 { label: "Phải trả — quá hạn", value: d.overduePayables, color: "#9f1239" },
                 { label: "Phải trả — chưa thanh toán", value: d.balances.payablesUnpaid, color: "#f43f5e" },
-                { label: "Phải trả — thanh toán một phần", value: d.balances.payablesPartial, color: "#f59e0b" },
+                { label: "Phải trả — một phần", value: d.balances.payablesPartial, color: "#f59e0b" },
                 { label: "Phải thu — chưa thanh toán", value: d.balances.receivablesUnpaid, color: "#0ea5e9" },
-                { label: "Phải thu — thanh toán một phần", value: d.balances.receivablesPartial, color: "#8b5cf6" },
+                { label: "Phải thu — một phần", value: d.balances.receivablesPartial, color: "#8b5cf6" },
               ]}
             />
           </Card>
