@@ -3,7 +3,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { createStockAdjustmentAction } from "@/lib/actions";
 import { getCurrentProfile, listBatchStock, listLocations } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
-import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
+import { OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +53,7 @@ export default async function InventoryPage({
 
       {rows.length === 0 ? <EmptyState message="Không có dòng tồn kho nào khớp." /> : (
         <TableWrap>
-          <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Quyền sở hữu</th><th className={thCls}>Nhập từ</th><th className={thCls}>Vị trí</th><th className={thCls}>Số lượng</th><th className={thCls}>Giá vốn</th><th className={thCls}>Ngày nhập</th><th className={thCls}>Trạng thái</th></tr></thead>
+          <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Quyền sở hữu</th><th className={thCls}>Nhập từ</th><th className={thCls}>Vị trí</th><th className={thCls}>Số lượng</th><th className={thCls}>Giá vốn</th><th className={thCls}>Ngày nhập</th><th className={thCls}>Hạn dùng</th><th className={thCls}>Trạng thái</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-100">
@@ -65,6 +65,7 @@ export default async function InventoryPage({
                 <td className={`${tdCls} font-medium`}>{formatNumber(r.qty)}</td>
                 <td className={tdCls}>{formatVND(r.unit_cost)}</td>
                 <td className={tdCls}>{formatDate(r.received_date)}</td>
+                <td className={tdCls}>{(r as AnyRow).expiry_date ? formatDate((r as AnyRow).expiry_date) : "—"}</td>
                 <td className={tdCls}><StatusBadge status={r.status} /></td>
               </tr>
             ))}

@@ -129,6 +129,10 @@ export default async function ProductsPage({
               </datalist>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
+              <div><label className={labelCls}>Độ nhớt SAE (nhớt)</label><input name="sae_viscosity" placeholder="VD: 15W-40" className={inputCls} /></div>
+              <div><label className={labelCls}>Chuẩn API/ACEA (nhớt)</label><input name="api_standard" placeholder="VD: CI-4" className={inputCls} /></div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
               <div><label className={labelCls}>Đơn vị</label><input name="unit" defaultValue="cái" className={inputCls} /></div>
               <div><label className={labelCls}>Tồn tối thiểu</label><input name="min_stock" type="number" defaultValue="0" className={inputCls} /></div>
             </div>

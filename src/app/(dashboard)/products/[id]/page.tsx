@@ -4,7 +4,7 @@ import PriceEditForm from "@/components/PriceEditForm";
 import { createFitmentAction, createProductCodeAction, updateProductInfoAction, updateProductPricesAction } from "@/lib/actions";
 import { getCurrentProfile, getProductDetail, listProductGroups } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
-import { CODE_KINDS, CODE_KIND_LABELS, OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
+import { CODE_KINDS, CODE_KIND_LABELS, OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +30,8 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
             <div className="flex justify-between"><dt className="text-slate-500">Tên</dt><dd className="font-medium">{p.name}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Thương hiệu</dt><dd className="font-medium">{p.brand ?? "—"}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Nhóm hàng</dt><dd className="font-medium">{p.product_group ?? "—"}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Độ nhớt SAE</dt><dd className="font-medium">{(p as AnyRow).sae_viscosity ?? "—"}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Chuẩn API/ACEA</dt><dd className="font-medium">{(p as AnyRow).api_standard ?? "—"}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Đơn vị</dt><dd className="font-medium">{p.unit}</dd></div>
             <div className="flex justify-between"><dt className="text-slate-500">Tồn tối thiểu</dt><dd className="font-medium">{formatNumber(p.min_stock)}</dd></div>
           </dl>
@@ -51,6 +53,16 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
                   <option key={g} value={g} />
                 ))}
               </datalist>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls}>Độ nhớt SAE (nhớt)</label>
+                <input name="sae_viscosity" defaultValue={(p as AnyRow).sae_viscosity ?? ""} placeholder="VD: 15W-40" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Chuẩn API/ACEA (nhớt)</label>
+                <input name="api_standard" defaultValue={(p as AnyRow).api_standard ?? ""} placeholder="VD: CI-4" className={inputCls} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
