@@ -1,6 +1,6 @@
-import { BackLink, Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, tdCls, thCls } from "@/components/ui";
+import { BackLink, Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import PriceEditForm from "@/components/PriceEditForm";
-import { createFitmentAction, createProductCodeAction, updateProductPricesAction } from "@/lib/actions";
+import { createFitmentAction, createProductCodeAction, updateProductInfoAction, updateProductPricesAction } from "@/lib/actions";
 import { getCurrentProfile, getProductDetail } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { CODE_KINDS, CODE_KIND_LABELS, OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
@@ -16,12 +16,47 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
   const addCode = createProductCodeAction.bind(null, p.id);
   const addFitment = createFitmentAction.bind(null, p.id);
   const updatePrices = updateProductPricesAction.bind(null, p.id);
+  const updateInfo = updateProductInfoAction.bind(null, p.id);
 
   return (
     <>
       <BackLink href="/products" label="Quay lại danh sách sản phẩm" />
       <PageHeader title={`${p.sku} — ${p.name}`} description={`Thương hiệu: ${p.brand ?? "—"} · Đơn vị: ${p.unit} · Tồn tối thiểu: ${p.min_stock}`} />
       <div className="grid gap-6 lg:grid-cols-3">
+        <Card title="Thông tin hàng hoá">
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between"><dt className="text-slate-500">Mã hàng (SKU)</dt><dd className="font-mono font-medium">{p.sku}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Tên</dt><dd className="font-medium">{p.name}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Thương hiệu</dt><dd className="font-medium">{p.brand ?? "—"}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Đơn vị</dt><dd className="font-medium">{p.unit}</dd></div>
+            <div className="flex justify-between"><dt className="text-slate-500">Tồn tối thiểu</dt><dd className="font-medium">{formatNumber(p.min_stock)}</dd></div>
+          </dl>
+          {!readOnly && (
+          <form action={updateInfo} className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+            <div>
+              <label className={labelCls}>Tên hàng *</label>
+              <input name="name" required defaultValue={p.name} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Thương hiệu</label>
+              <input name="brand" defaultValue={p.brand ?? ""} className={inputCls} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls}>Đơn vị *</label>
+                <input name="unit" required defaultValue={p.unit} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Tồn tối thiểu</label>
+                <input name="min_stock" type="number" min="0" defaultValue={p.min_stock} className={inputCls} />
+              </div>
+            </div>
+            <p className="text-xs text-slate-500">Mã hàng (SKU) không sửa được — nó là chìa khoá khớp hàng của import, quầy bán và tem mã vạch.</p>
+            <button type="submit" className={`${btnCls} w-full`}>Lưu thông tin</button>
+          </form>
+          )}
+        </Card>
+
         <Card title="Bảng giá">
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between"><dt className="text-slate-500">Giá lẻ</dt><dd className="font-medium">{formatVND(p.retail_price)}</dd></div>

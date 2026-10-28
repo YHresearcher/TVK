@@ -235,6 +235,34 @@ export async function createFitmentAction(productId: string, formData: FormData)
   revalidatePath(`/products/${productId}`);
 }
 
+/** Sửa thông tin hàng hoá (tên, thương hiệu, đơn vị, tồn tối thiểu). Mã SKU
+ * không sửa được — nó là chìa khoá khớp hàng của import, quầy bán và tem
+ * mã vạch. Quyền sửa khớp đúng RLS của bảng products: chỉ Chủ cửa hàng
+ * và Thủ kho; CEO và các vai trò còn lại bị chặn ngay ở đây. */
+export async function updateProductInfoAction(productId: string, formData: FormData) {
+  const supabase = await db();
+  const uid = await userId();
+  if (!uid) throw new Error("Chưa đăng nhập.");
+  const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+  if (prof?.role !== "OWNER" && prof?.role !== "WAREHOUSE")
+    throw new Error("Chỉ Chủ cửa hàng và Thủ kho mới sửa được thông tin hàng hoá.");
+  const name = str(formData, "name");
+  const unit = str(formData, "unit");
+  if (!name) throw new Error("Cần nhập tên hàng.");
+  if (!unit) throw new Error("Cần nhập đơn vị tính.");
+  done(
+    await supabase.from("products").update({
+      name,
+      brand: optStr(formData, "brand"),
+      unit,
+      min_stock: Math.max(0, Math.trunc(num(formData, "min_stock"))),
+    }).eq("id", productId),
+    "Cập nhật thông tin hàng hoá"
+  );
+  revalidatePath(`/products/${productId}`);
+  revalidatePath("/products");
+}
+
 export async function updateProductPricesAction(productId: string, formData: FormData) {
   const supabase = await db();
   const uid = await userId();
