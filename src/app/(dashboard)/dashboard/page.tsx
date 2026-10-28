@@ -153,6 +153,23 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {canSeeMoney && (
+        <div className="mt-6">
+          <Card title="Hàng đã bán và đã gửi ký gởi">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <StatCard label="Đã bán" value={`${formatNumber(d.flows.soldQty)} cái`} sub={`Doanh thu thuần ${formatVND(d.flows.soldRevenue)}`} />
+              <StatCard label="Đã gửi ký gởi" value={`${formatNumber(d.flows.sentQty)} cái`} sub={`Giá chuyển giao ${formatVND(d.flows.sentValue)}`} />
+              <StatCard label="Đối tác đã tiêu thụ" value={`${formatNumber(d.flows.consumedQty)} cái`} sub="Theo báo cáo tiêu thụ đã xác nhận" />
+              <StatCard label="Còn ở đối tác" value={`${formatNumber(d.flows.stillQty)} cái`} sub={`Giá chuyển giao ${formatVND(d.flows.stillValue)}`} />
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-slate-500">
+              Chỉ tính chứng từ bán hàng (BH) và phiếu gửi ký gởi (GK) đã xác nhận. Hàng còn ở đối tác
+              tính theo giá chuyển giao mới nhất của từng lô.
+            </p>
+          </Card>
+        </div>
+      )}
+
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {canSeeMoney && (
           <Card title="Công nợ theo trạng thái">

@@ -3,7 +3,7 @@ import PosSaleForm, { type PosBatch, type PosPartner, type PosProduct } from "@/
 import ImportDealerSale from "@/components/ImportDealerSale";
 import ExportExcelButton from "@/components/ExportExcelButton";
 import { createCounterSaleAction, importDealerSaleAction } from "@/lib/actions";
-import { buildProductCodeMap, getCurrentProfile, listBatchStock, listPartners, listProductCodes, listProductFitments, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, getSalesDocumentCosts, listBatchStock, listPartners, listProductCodes, listProductFitments, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { OWNERSHIP_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
 import type { AnyRow } from "@/lib/types";
@@ -27,6 +27,11 @@ export default async function SalesPage({
   ]);
   const configured = orders.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
+  // Giá vốn / lãi gộp chỉ Chủ cửa hàng và Kế toán được coi.
+  const canSeeCost = ["OWNER", "ACCOUNTING"].includes(profile.data?.role ?? "");
+  const docCosts = canSeeCost
+    ? await getSalesDocumentCosts(documents.data.slice(0, 20).map((d) => String(d.id)))
+    : new Map<string, { qty: number; total: number; cost: number }>();
   const orderRows = orders.data.map((o) => ({
     "Mã": o.doc_code,
     "Ngày": formatDate(o.order_date),
@@ -189,19 +194,32 @@ export default async function SalesPage({
             </div>
             {documents.data.length === 0 ? <EmptyState message="Chưa có chứng từ." /> : (
               <TableWrap>
-                <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Ngày</th><th className={thCls}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
+                <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Ngày</th><th className={thCls}>Tổng</th>{canSeeCost && (<><th className={`${thCls} text-right`}>Giá vốn</th><th className={`${thCls} text-right`}>Lãi gộp</th></>)}<th className={thCls}>Trạng thái</th></tr></thead>
                 <tbody>
-                  {documents.data.slice(0, 20).map((d) => (
-                    <tr key={d.id} className="border-t border-slate-100">
-                      <td className={`${tdCls} font-mono text-xs`}>{d.doc_code}</td>
-                      <td className={tdCls}>{d.doc_kind}</td>
-                      <td className={tdCls}>{formatDate(d.doc_date)}</td>
-                      <td className={tdCls}>{formatVND(d.total_amount)}</td>
-                      <td className={tdCls}><StatusBadge status={d.status} /></td>
-                    </tr>
-                  ))}
+                  {documents.data.slice(0, 20).map((d) => {
+                    const c = docCosts.get(String(d.id));
+                    const profit = c ? Number(d.total_amount) - c.cost : null;
+                    return (
+                      <tr key={d.id} className="border-t border-slate-100">
+                        <td className={`${tdCls} font-mono text-xs`}>{d.doc_code}</td>
+                        <td className={tdCls}>{d.doc_kind}</td>
+                        <td className={tdCls}>{formatDate(d.doc_date)}</td>
+                        <td className={tdCls}>{formatVND(d.total_amount)}</td>
+                        {canSeeCost && (
+                          <>
+                            <td className={`${tdCls} text-right`}>{c ? formatVND(c.cost) : "—"}</td>
+                            <td className={`${tdCls} text-right`}>{profit === null ? "—" : formatVND(profit)}</td>
+                          </>
+                        )}
+                        <td className={tdCls}><StatusBadge status={d.status} /></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </TableWrap>
+            )}
+            {canSeeCost && documents.data.length > 0 && (
+              <p className="mt-2 text-xs text-slate-500">Giá vốn tính theo lô thực tế đã xuất; lãi gộp = tổng chứng từ − giá vốn. Chứng từ nháp chưa xuất kho nên chưa có giá vốn.</p>
             )}
           </div>
         </div>

@@ -305,6 +305,67 @@ export async function getVatInvoiceMode(): Promise<string> {
   return data?.value ? String(data.value) : "COMBINED";
 }
 
+// Giá vốn từng chứng từ bán hàng đã xác nhận, tính từ lô thực tế của mỗi
+// dòng (luồng đối tác thì lô nằm ở dòng phân bổ gốc) — cùng cách tính với
+// phân tích đơn hàng trên dashboard. Chứng từ nháp không có kết quả vì
+// hàng chưa xuất kho. Chỉ gọi khi người xem được phép coi giá vốn.
+export async function getSalesDocumentCosts(
+  docIds: string[]
+): Promise<Map<string, { qty: number; total: number; cost: number }>> {
+  const empty = new Map<string, { qty: number; total: number; cost: number }>();
+  const supabase = await client();
+  if (!supabase || docIds.length === 0) return empty;
+  const { data: docs } = await supabase
+    .from("sales_documents")
+    .select("id, status")
+    .in("id", docIds);
+  const confirmed = new Set(
+    ((docs ?? []) as AnyRow[]).filter((d) => d.status === "CONFIRMED").map((d) => String(d.id))
+  );
+  if (confirmed.size === 0) return empty;
+  const { data: lines } = await supabase
+    .from("sales_document_lines")
+    .select("document_id, qty, line_total, batch_id, allocation_line_id")
+    .in("document_id", [...confirmed])
+    .limit(20000);
+  const allLines = (lines ?? []) as AnyRow[];
+  const allocIds = Array.from(new Set(allLines.map((l) => l.allocation_line_id).filter(Boolean)));
+  let allocBatch = new Map<string, string>();
+  if (allocIds.length) {
+    const { data: allocs } = await supabase
+      .from("allocation_lines")
+      .select("id, batch_id")
+      .in("id", allocIds);
+    allocBatch = new Map(((allocs ?? []) as AnyRow[]).map((a) => [String(a.id), String(a.batch_id)]));
+  }
+  const batchIds = Array.from(
+    new Set(
+      allLines
+        .map((l) => (l.batch_id ? String(l.batch_id) : allocBatch.get(String(l.allocation_line_id))))
+        .filter((v): v is string => Boolean(v))
+    )
+  );
+  let batchCost = new Map<string, number>();
+  if (batchIds.length) {
+    const { data: batches } = await supabase
+      .from("stock_batches")
+      .select("id, unit_cost")
+      .in("id", batchIds);
+    batchCost = new Map(((batches ?? []) as AnyRow[]).map((b) => [String(b.id), Number(b.unit_cost ?? 0)]));
+  }
+  const map = new Map<string, { qty: number; total: number; cost: number }>();
+  for (const l of allLines) {
+    const batchId = l.batch_id ? String(l.batch_id) : allocBatch.get(String(l.allocation_line_id));
+    const cost = batchId ? batchCost.get(batchId) ?? 0 : 0;
+    const entry = map.get(l.document_id) ?? { qty: 0, total: 0, cost: 0 };
+    entry.qty += Number(l.qty ?? 0);
+    entry.total += Number(l.line_total ?? 0);
+    entry.cost += Number(l.qty ?? 0) * cost;
+    map.set(l.document_id, entry);
+  }
+  return map;
+}
+
 export async function getDashboard() {
   const supabase = await client();
   if (!supabase) {
@@ -312,6 +373,7 @@ export async function getDashboard() {
       configured: false,
       ownedQty: 0, ownedValue: 0, consignedQty: 0, consignedValue: 0,
       atPartnersQty: 0, atPartnersValue: 0, payablesOutstanding: 0, receivablesOutstanding: 0,
+      flows: { soldQty: 0, soldRevenue: 0, sentQty: 0, sentValue: 0, consumedQty: 0, stillQty: 0, stillValue: 0 },
       revenueAll: 0, grossProfitAll: 0, orderCountAll: 0,
       revenue30: 0, grossProfit30: 0, orderCount30: 0, orderAnalysis: [] as AnyRow[],
       bookOwnedOwnValue: 0, bookAtPartnersOwnedValue: 0, bookInventoryValue: 0,
@@ -483,7 +545,7 @@ export async function getDashboard() {
   // lô nằm ở dòng phân bổ gốc). Giảm giá trừ ở cấp chứng từ, như biểu đồ.
   const allDocsRes = await supabase
     .from("sales_documents")
-    .select("id, doc_code, doc_date, discount_amount, partner_id, customer_name")
+    .select("id, doc_code, doc_date, doc_kind, discount_amount, partner_id, customer_name")
     .eq("status", "CONFIRMED")
     .limit(5000);
   const allDocRows = (allDocsRes.data ?? []) as AnyRow[];
@@ -522,13 +584,14 @@ export async function getDashboard() {
   }
   const docDateAll = new Map(allDocRows.map((d) => [d.id, String(d.doc_date).slice(0, 10)]));
   const docDiscountAll = new Map(allDocRows.map((d) => [d.id, Number(d.discount_amount ?? 0)]));
-  const perDoc = new Map<string, { total: number; cost: number }>();
+  const perDoc = new Map<string, { total: number; cost: number; qty: number }>();
   for (const l of allLines) {
     const batchId = l.batch_id ? String(l.batch_id) : allocBatch.get(String(l.allocation_line_id));
     const cost = batchId ? batchCost.get(batchId) ?? 0 : 0;
-    const entry = perDoc.get(l.document_id) ?? { total: 0, cost: 0 };
+    const entry = perDoc.get(l.document_id) ?? { total: 0, cost: 0, qty: 0 };
     entry.total += Number(l.line_total ?? 0);
     entry.cost += Number(l.qty ?? 0) * cost;
+    entry.qty += Number(l.qty ?? 0);
     perDoc.set(l.document_id, entry);
   }
   const cutoff30 = isoDay(29);
@@ -567,6 +630,42 @@ export async function getDashboard() {
       orderCount30++;
     }
   }
+  // Luồng hàng đã bán / đã gửi ký gởi (chỉ chứng từ/phiếu đã xác nhận).
+  // Đã bán chỉ tính chứng từ BH; đã gửi ký gởi tính theo phiếu GK đã xác
+  // nhận (số lượng + giá chuyển giao); đã tiêu thụ/còn ở đối tác lấy từ
+  // đối soát ký gửi theo đối tác.
+  let soldQty = 0;
+  let soldRevenue = 0;
+  for (const d of allDocRows) {
+    if (String((d as AnyRow).doc_kind) !== "BH") continue;
+    const t = perDoc.get(d.id);
+    soldQty += t?.qty ?? 0;
+    soldRevenue += Math.max((t?.total ?? 0) - (docDiscountAll.get(d.id) ?? 0), 0);
+  }
+  let sentQty = 0;
+  let sentValue = 0;
+  {
+    const { data: slips } = await supabase
+      .from("consignment_out_slips")
+      .select("id")
+      .eq("status", "CONFIRMED")
+      .limit(5000);
+    const slipIds = ((slips ?? []) as AnyRow[]).map((s) => String(s.id));
+    if (slipIds.length) {
+      const { data: items } = await supabase
+        .from("consignment_out_items")
+        .select("qty, transfer_price")
+        .in("slip_id", slipIds)
+        .limit(20000);
+      for (const it of (items ?? []) as AnyRow[]) {
+        sentQty += Number(it.qty ?? 0);
+        sentValue += Number(it.qty ?? 0) * Number(it.transfer_price ?? 0);
+      }
+    }
+  }
+  const consRows = (partnerCons.data ?? []) as AnyRow[];
+  const consumedQty = consRows.reduce((a, r) => a + Number(r.qty_consumed ?? 0), 0);
+  const stillQty = consRows.reduce((a, r) => a + Number(r.qty_still_at_partner ?? 0), 0);
   const remainingByStatus = (data: AnyRow[] | null, status: string) =>
     (data ?? [])
       .filter((r: AnyRow) => r.status === status)
@@ -589,6 +688,7 @@ export async function getDashboard() {
     consignedValue: consignedReal,
     atPartnersQty: sum((r) => r.location_kind === "PARTNER_VIRTUAL", (r) => Number(r.qty)),
     atPartnersValue: atPartners.value,
+    flows: { soldQty, soldRevenue, sentQty, sentValue, consumedQty, stillQty, stillValue: atPartners.value },
     payablesOutstanding: (payables.data ?? []).reduce(
       (a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0),
     receivablesOutstanding: (receivables.data ?? []).reduce(
