@@ -65,17 +65,18 @@ export default async function ProductsPage({
             <TableWrap>
               <thead>
                 <tr>
-                  <th className={thCls}>SKU</th><th className={thCls}>Tên</th><th className={thCls}>Thương hiệu</th>
+                  <th className={`${thCls} text-right`}>STT</th><th className={thCls}>SKU</th><th className={thCls}>Tên</th><th className={thCls}>Thương hiệu</th>
                   <th className={`${thCls} text-right`}>Giá lẻ</th><th className={`${thCls} text-right`}>Giá đại lý</th><th className={thCls}>Của mình</th><th className={thCls}>Ký gửi</th>
                   <th className={thCls}>Tại đối tác</th><th className={thCls}>Tổng</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((p) => {
+                {rows.map((p, i) => {
                   const s = stockMap.get(p.id);
                   const totalQty = Number(s?.total_qty ?? 0);
                   return (
                     <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50">
+                      <td className={`${tdCls} text-right text-slate-400`}>{i + 1}</td>
                       <td className={tdCls}>
                         <Link href={`/products/${p.id}`} className="font-medium text-blue-600 hover:underline">{p.sku}</Link>
                       </td>
