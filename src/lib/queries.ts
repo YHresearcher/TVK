@@ -204,6 +204,8 @@ export async function getDashboard() {
       configured: false,
       ownedQty: 0, ownedValue: 0, consignedQty: 0, consignedValue: 0,
       atPartnersQty: 0, payablesOutstanding: 0, receivablesOutstanding: 0,
+      revenueAll: 0, grossProfitAll: 0, orderCountAll: 0,
+      revenue30: 0, grossProfit30: 0, orderCount30: 0,
       lowStock: [] as AnyRow[], expiring: [] as AnyRow[], discrepancies: [] as AnyRow[],
       revenue14: [] as { label: string; value: number }[],
       topProducts: [] as AnyRow[],
@@ -286,14 +288,91 @@ export async function getDashboard() {
     qty: sum(filter, (r) => Number(r.qty)),
     value: sum(filter, (r) => Number(r.qty) * Number(r.unit_cost)),
   });
+  const ownedOwn = compositionOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
+  const consignedOwn = compositionOf((r) => consigned(r) && r.location_kind === "OWN_WAREHOUSE");
+  const atPartners = compositionOf((r) => r.location_kind === "PARTNER_VIRTUAL");
+  // Doanh thu / lợi nhuận gộp / số đơn — mọi chứng từ đã xác nhận, không
+  // giới hạn ngày (ngày chứng từ có thể ghi lùi so với ngày nhập máy).
+  // Giá vốn của mỗi dòng lấy từ lô đã bán của dòng đó (luồng đối tác thì
+  // lô nằm ở dòng phân bổ gốc). Giảm giá trừ ở cấp chứng từ, như biểu đồ.
+  const allDocsRes = await supabase
+    .from("sales_documents")
+    .select("id, doc_date, discount_amount")
+    .eq("status", "CONFIRMED")
+    .limit(5000);
+  const allDocRows = (allDocsRes.data ?? []) as AnyRow[];
+  let allLines: AnyRow[] = [];
+  if (allDocRows.length) {
+    const { data: lines } = await supabase
+      .from("sales_document_lines")
+      .select("document_id, qty, line_total, batch_id, allocation_line_id")
+      .in("document_id", allDocRows.map((d) => d.id))
+      .limit(20000);
+    allLines = (lines ?? []) as AnyRow[];
+  }
+  const allocIds = Array.from(new Set(allLines.map((l) => l.allocation_line_id).filter(Boolean)));
+  let allocBatch = new Map<string, string>();
+  if (allocIds.length) {
+    const { data: allocs } = await supabase
+      .from("allocation_lines")
+      .select("id, batch_id")
+      .in("id", allocIds);
+    allocBatch = new Map(((allocs ?? []) as AnyRow[]).map((a) => [String(a.id), String(a.batch_id)]));
+  }
+  const batchIds = Array.from(
+    new Set(
+      allLines
+        .map((l) => (l.batch_id ? String(l.batch_id) : allocBatch.get(String(l.allocation_line_id))))
+        .filter((v): v is string => Boolean(v))
+    )
+  );
+  let batchCost = new Map<string, number>();
+  if (batchIds.length) {
+    const { data: batches } = await supabase
+      .from("stock_batches")
+      .select("id, unit_cost")
+      .in("id", batchIds);
+    batchCost = new Map(((batches ?? []) as AnyRow[]).map((b) => [String(b.id), Number(b.unit_cost ?? 0)]));
+  }
+  const docDateAll = new Map(allDocRows.map((d) => [d.id, String(d.doc_date).slice(0, 10)]));
+  const docDiscountAll = new Map(allDocRows.map((d) => [d.id, Number(d.discount_amount ?? 0)]));
+  const perDoc = new Map<string, { total: number; cost: number }>();
+  for (const l of allLines) {
+    const batchId = l.batch_id ? String(l.batch_id) : allocBatch.get(String(l.allocation_line_id));
+    const cost = batchId ? batchCost.get(batchId) ?? 0 : 0;
+    const entry = perDoc.get(l.document_id) ?? { total: 0, cost: 0 };
+    entry.total += Number(l.line_total ?? 0);
+    entry.cost += Number(l.qty ?? 0) * cost;
+    perDoc.set(l.document_id, entry);
+  }
+  const cutoff30 = isoDay(29);
+  let revenueAll = 0;
+  let cogsAll = 0;
+  let revenue30 = 0;
+  let cogs30 = 0;
+  let orderCount30 = 0;
+  for (const d of allDocRows) {
+    const t = perDoc.get(d.id);
+    const net = Math.max((t?.total ?? 0) - (docDiscountAll.get(d.id) ?? 0), 0);
+    revenueAll += net;
+    cogsAll += t?.cost ?? 0;
+    if ((docDateAll.get(d.id) ?? "") >= cutoff30) {
+      revenue30 += net;
+      cogs30 += t?.cost ?? 0;
+      orderCount30++;
+    }
+  }
   const remainingByStatus = (data: AnyRow[] | null, status: string) =>
     (data ?? [])
       .filter((r: AnyRow) => r.status === status)
       .reduce((a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0);
   return {
     configured: true,
-    ownedQty: sum(owned, (r) => Number(r.qty)),
-    ownedValue: sum(owned, (r) => Number(r.qty) * Number(r.unit_cost)),
+    // Ô "Tồn kho" chỉ tính hàng đang nằm trong kho của mình — hàng đã
+    // gửi tới đối tác nằm ở ô riêng, không gộp chung (trước đây gộp
+    // chung nên nhìn lệch với biểu đồ cơ cấu).
+    ownedQty: ownedOwn.qty,
+    ownedValue: ownedOwn.value,
     consignedQty: sum(consigned, (r) => Number(r.qty)),
     consignedValue: sum(consigned, (r) => Number(r.qty) * Number(r.unit_cost)),
     atPartnersQty: sum((r) => r.location_kind === "PARTNER_VIRTUAL", (r) => Number(r.qty)),
@@ -301,12 +380,18 @@ export async function getDashboard() {
       (a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0),
     receivablesOutstanding: (receivables.data ?? []).reduce(
       (a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0),
+    revenueAll,
+    grossProfitAll: revenueAll - cogsAll,
+    orderCountAll: allDocRows.length,
+    revenue30,
+    grossProfit30: revenue30 - cogs30,
+    orderCount30,
     revenue14,
     topProducts,
     stockComposition: {
-      ownedOwn: compositionOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE"),
-      consignedOwn: compositionOf((r) => consigned(r) && r.location_kind === "OWN_WAREHOUSE"),
-      atPartners: compositionOf((r) => r.location_kind === "PARTNER_VIRTUAL"),
+      ownedOwn,
+      consignedOwn,
+      atPartners,
     },
     balances: {
       payablesUnpaid: remainingByStatus(payables.data as AnyRow[] | null, "UNPAID"),

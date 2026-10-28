@@ -72,12 +72,33 @@ export default async function ReportsPage() {
 
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-800">Tổng hợp tồn kho theo sản phẩm (của mình / ký gửi / tại đối tác)</h2>
+            <h2 className="text-sm font-semibold text-slate-800">Tổng hợp tồn kho theo sản phẩm</h2>
             <a href="/api/export?view=v_product_stock" className="text-sm text-blue-600 hover:underline">Xuất CSV</a>
           </div>
+          <p className="mb-3 text-sm leading-relaxed text-slate-600">
+            Mỗi hàng là một sản phẩm, chia theo 2 chiều: hàng là <strong className="text-slate-800">của mình</strong> hay
+            hàng mình <strong className="text-slate-800">giữ hộ nhà cung cấp</strong> (nhà cung cấp gửi mình giữ/bán hộ,
+            chưa phải hàng của mình) — và hàng đang ở <strong className="text-slate-800">kho TVK</strong> hay
+            đang ở chỗ <strong className="text-slate-800">đối tác</strong>. Cột “Giữ hộ NCC” ở kho TVK là hàng của
+            nhà cung cấp đang nằm trong kho nhà mình.
+          </p>
           {stock.data.length === 0 ? <EmptyState message="Chưa có dữ liệu." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>SKU</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Của mình @ Kho TVK</th><th className={thCls}>Ký gửi @ Kho TVK</th><th className={thCls}>Của mình @ đối tác</th><th className={thCls}>Ký gửi @ đối tác</th><th className={thCls}>Tổng</th></tr></thead>
+              <thead>
+                <tr>
+                  <th className={thCls} rowSpan={2}>SKU</th>
+                  <th className={thCls} rowSpan={2}>Sản phẩm</th>
+                  <th className={`${thCls} text-center`} colSpan={2}>Tại kho TVK</th>
+                  <th className={`${thCls} text-center`} colSpan={2}>Tại đối tác</th>
+                  <th className={thCls} rowSpan={2}>Tổng</th>
+                </tr>
+                <tr>
+                  <th className={thCls}>Của mình</th>
+                  <th className={thCls}>Giữ hộ NCC</th>
+                  <th className={thCls}>Của mình</th>
+                  <th className={thCls}>Giữ hộ NCC</th>
+                </tr>
+              </thead>
               <tbody>
                 {stock.data.map((r) => (
                   <tr key={r.product_id} className="border-t border-slate-100">

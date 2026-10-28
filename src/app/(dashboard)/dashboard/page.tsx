@@ -24,6 +24,8 @@ export default async function DashboardPage({
   const [d, profile, partners] = await Promise.all([getDashboard(), getCurrentProfile(), listPartners()]);
   const selectedId = searchParams.partner ?? "";
   const detail = selectedId ? await getPartnerDetail(selectedId) : null;
+  const canSeeMoney = ["OWNER", "ACCOUNTING", "CEO"].includes(profile.data?.role ?? "");
+  const grossMargin = d.revenueAll > 0 ? Math.round((d.grossProfitAll / d.revenueAll) * 100) : 0;
   if (!d.configured) {
     return (
       <>
@@ -45,6 +47,14 @@ export default async function DashboardPage({
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" />
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ chúng ta" />
       </div>
+
+      {canSeeMoney && (
+        <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
+          <StatCard label="Doanh thu bán hàng" value={formatVND(d.revenueAll)} sub={`Đã trừ giảm giá · 30 ngày gần nhất: ${formatVND(d.revenue30)}`} />
+          <StatCard label="Lợi nhuận gộp" value={formatVND(d.grossProfitAll)} sub={`Doanh thu − giá vốn · biên gộp ${grossMargin}% · 30 ngày: ${formatVND(d.grossProfit30)}`} />
+          <StatCard label="Đơn hàng đã xác nhận" value={formatNumber(d.orderCountAll)} sub={`30 ngày gần nhất: ${formatNumber(d.orderCount30)} đơn`} />
+        </div>
+      )}
 
       <div className="mt-6">
         <Card title="Thống kê đối tác">
@@ -84,8 +94,6 @@ export default async function DashboardPage({
       </div>
 
       {(() => {
-        const role = profile.data?.role;
-        const canSeeMoney = role === "OWNER" || role === "ACCOUNTING" || role === "CEO";
         const comp = d.stockComposition;
         const compSegments = [
           { label: "Tồn kho tại kho", seg: comp.ownedOwn, color: "#10b981" },
