@@ -123,8 +123,9 @@ export default async function SettingsPage() {
         {me?.role === "OWNER" && (
           <Card title="Quản lý tài khoản" className="lg:col-span-2">
             <p className="mb-4 text-xs text-slate-500">
-              Chỉ Chủ cửa hàng thấy mục này. Tạo tài khoản cho nhân viên, đổi vai
-              trò, khoá/mở khoá, gửi email đặt lại mật khẩu hoặc xoá tài khoản.
+              Chỉ Chủ cửa hàng thấy mục này. Tạo tài khoản cho nhân viên, sửa
+              họ tên và tên đăng nhập, đổi vai trò, khoá/mở khoá, gửi email
+              đặt lại mật khẩu hoặc xoá tài khoản.
               Các chốt an toàn: không tự đổi vai trò, tự khoá hay tự xoá chính
               mình; hệ thống luôn giữ ít nhất một Chủ cửa hàng.
             </p>

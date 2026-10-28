@@ -6,6 +6,7 @@ import {
   inviteUserAction,
   resetUserPasswordAction,
   setUserActiveAction,
+  updateUserInfoAction,
   updateUserRoleAction,
 } from "@/lib/actions";
 import { btnCls, inputCls, labelCls } from "@/components/ui";
@@ -19,8 +20,10 @@ const dangerBtn =
   "rounded-md border border-red-300 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40";
 
 function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
+  const [editing, setEditing] = useState(false);
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
+    <div className="py-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <div className="min-w-52 flex-1">
         <p className="text-sm font-medium text-slate-900">
           {u.full_name}
@@ -31,6 +34,7 @@ function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
           )}
         </p>
         <p className="text-xs text-slate-500">
+          {u.username ? `@${u.username} · ` : ""}
           {u.email ?? "—"} · {u.is_active ? "Đang hoạt động" : "Đã khoá"}
         </p>
       </div>
@@ -94,6 +98,25 @@ function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
           Xoá
         </button>
       </form>
+        <button type="button" onClick={() => setEditing(!editing)} className={smallBtn}>
+          {editing ? "Đóng" : "Sửa"}
+        </button>
+      </div>
+      {editing && (
+        <form action={updateUserInfoAction} className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+          <input type="hidden" name="profile_id" value={u.id} />
+          <div>
+            <label className={labelCls}>Họ tên</label>
+            <input name="full_name" defaultValue={u.full_name ?? ""} required className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Tên đăng nhập</label>
+            <input name="username" defaultValue={u.username ?? ""} placeholder="Để trống = không có tên đăng nhập" className={inputCls} />
+          </div>
+          <button type="submit" className={btnCls}>Lưu thay đổi</button>
+          <button type="button" onClick={() => setEditing(false)} className={smallBtn}>Huỷ</button>
+        </form>
+      )}
     </div>
   );
 }
