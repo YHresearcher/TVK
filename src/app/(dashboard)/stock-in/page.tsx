@@ -214,7 +214,7 @@ function ReceiptTable({
                     <button type="submit" className={btnGhostCls}>Xác nhận → tạo lô</button>
                   </form>
                 )}
-                {canDelete && (
+                {canDelete && r.status === "DRAFT" && (
                   <DeleteReceiptButton
                     receiptId={r.id}
                     kind={kind}
