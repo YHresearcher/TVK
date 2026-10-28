@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import ItemsRows from "@/components/ItemsRows";
 import ImportExcel from "@/components/ImportExcel";
 import DeleteReceiptButton from "@/components/DeleteReceiptButton";
@@ -46,6 +46,10 @@ export default async function StockInPage({
   const warehouseOptions = warehouses.map((l) => ({ value: l.id, label: l.name }));
   const productOptions = products.data.map((p) => ({ value: p.id, label: `${p.sku} — ${p.name}` }));
   const supplierName = new Map(suppliers.data.map((s) => [s.id, s.name]));
+  const draftPurchases = purchases.data.filter((r) => r.status === "DRAFT");
+  const confirmedPurchases = purchases.data.filter((r) => r.status !== "DRAFT");
+  const draftConsignments = consignments.data.filter((r) => r.status === "DRAFT");
+  const confirmedConsignments = consignments.data.filter((r) => r.status !== "DRAFT");
 
   const tabCls = (active: boolean, activeCls: string) =>
     `rounded-md px-4 py-2 text-sm font-medium ${active ? activeCls : "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"}`;
@@ -95,6 +99,16 @@ export default async function StockInPage({
         </div>
       ) : tab === "purchase" ? (
         <div className="space-y-6">
+          <DraftsCard
+            rows={draftPurchases}
+            supplierName={supplierName}
+            confirmAction={confirmPurchaseReceiptAction}
+            deleteAction={deleteReceiptAction}
+            kind="PN"
+            tab="purchase"
+            readOnly={readOnly}
+            canDelete={isOwner}
+          />
           {!readOnly && (
           <Card title="Phiếu nhập mua mới">
             <form action={createPurchaseReceiptAction} className="space-y-4">
@@ -122,18 +136,23 @@ export default async function StockInPage({
           </Card>
           )}
           <ReceiptTable
-            rows={purchases.data}
+            rows={confirmedPurchases}
             supplierName={supplierName}
-            confirmAction={confirmPurchaseReceiptAction}
-            deleteAction={deleteReceiptAction}
-            kind="PN"
-            tab="purchase"
-            readOnly={readOnly}
-            canDelete={isOwner}
+            hasDrafts={draftPurchases.length > 0}
           />
         </div>
       ) : (
         <div className="space-y-6">
+          <DraftsCard
+            rows={draftConsignments}
+            supplierName={supplierName}
+            confirmAction={confirmConsignmentReceiptAction}
+            deleteAction={deleteReceiptAction}
+            kind="NK"
+            tab="consignment"
+            readOnly={readOnly}
+            canDelete={isOwner}
+          />
           {!readOnly && (
           <Card title="Phiếu nhận ký gửi mới">
             <form action={createConsignmentReceiptAction} className="space-y-4">
@@ -161,14 +180,9 @@ export default async function StockInPage({
           </Card>
           )}
           <ReceiptTable
-            rows={consignments.data}
+            rows={confirmedConsignments}
             supplierName={supplierName}
-            confirmAction={confirmConsignmentReceiptAction}
-            deleteAction={deleteReceiptAction}
-            kind="NK"
-            tab="consignment"
-            readOnly={readOnly}
-            canDelete={isOwner}
+            hasDrafts={draftConsignments.length > 0}
           />
         </div>
       )}
@@ -176,7 +190,8 @@ export default async function StockInPage({
   );
 }
 
-function ReceiptTable({
+/** Phiếu nháp chờ xác nhận — đặt lên đầu tab để dễ thấy: hàng chưa vào kho cho tới khi xác nhận. */
+function DraftsCard({
   rows,
   supplierName,
   confirmAction,
@@ -195,10 +210,55 @@ function ReceiptTable({
   readOnly?: boolean;
   canDelete?: boolean;
 }) {
-  if (rows.length === 0) return <EmptyState message="Chưa có phiếu nhập." />;
+  if (rows.length === 0) return null;
+  return (
+    <Card title={`Phiếu nháp chờ xác nhận (${rows.length})`}>
+      <p className="mb-4 text-sm leading-relaxed text-slate-600">
+        Hàng chưa vào kho. Bấm Xác nhận để tạo lô và ghi sổ cái.
+      </p>
+      <div className="space-y-3">
+        {rows.map((r) => (
+          <div key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <span className="font-mono text-xs font-medium">{r.doc_code}</span>
+            <span className="text-sm text-slate-700">{supplierName.get(r.supplier_id) ?? "—"}</span>
+            <span className="text-sm text-slate-500">{formatDate(r.receipt_date)}</span>
+            <span className="ml-auto flex items-center gap-2">
+              {!readOnly && (
+                <form action={confirmAction}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <button type="submit" className={btnCls}>Xác nhận → tạo lô</button>
+                </form>
+              )}
+              {canDelete && (
+                <DeleteReceiptButton
+                  receiptId={r.id}
+                  kind={kind}
+                  tab={tab}
+                  docCode={r.doc_code}
+                  action={deleteAction}
+                />
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function ReceiptTable({
+  rows,
+  supplierName,
+  hasDrafts,
+}: {
+  rows: AnyRow[];
+  supplierName: Map<string, string>;
+  hasDrafts?: boolean;
+}) {
+  if (rows.length === 0) return hasDrafts ? null : <EmptyState message="Chưa có phiếu nhập." />;
   return (
     <TableWrap>
-      <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
+      <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th></tr></thead>
       <tbody>
         {rows.map((r) => (
           <tr key={r.id} className="border-t border-slate-100">
@@ -206,25 +266,6 @@ function ReceiptTable({
             <td className={tdCls}>{supplierName.get(r.supplier_id) ?? "—"}</td>
             <td className={tdCls}>{formatDate(r.receipt_date)}</td>
             <td className={tdCls}><StatusBadge status={r.status} /></td>
-            <td className={tdCls}>
-              <div className="flex items-center gap-2">
-                {r.status === "DRAFT" && !readOnly && (
-                  <form action={confirmAction}>
-                    <input type="hidden" name="id" value={r.id} />
-                    <button type="submit" className={btnGhostCls}>Xác nhận → tạo lô</button>
-                  </form>
-                )}
-                {canDelete && r.status === "DRAFT" && (
-                  <DeleteReceiptButton
-                    receiptId={r.id}
-                    kind={kind}
-                    tab={tab}
-                    docCode={r.doc_code}
-                    action={deleteAction}
-                  />
-                )}
-              </div>
-            </td>
           </tr>
         ))}
       </tbody>
