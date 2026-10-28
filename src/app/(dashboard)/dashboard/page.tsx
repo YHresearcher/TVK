@@ -98,6 +98,22 @@ export default async function DashboardPage() {
             centerLabel={canSeeMoney ? formatCompactVND(compTotal) : formatNumber(compTotal)}
             centerSub="Tổng hàng đang quản lý"
           />
+          {canSeeCost && (
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <p className="text-sm leading-relaxed text-slate-600">
+                Hàng trong kho TVK theo 3 mức giá: Giá vốn{" "}
+                <strong className="text-slate-900">{formatVND(d.warehouseTierValues.cost)}</strong>
+                {" · "}Giá sỉ{" "}
+                <strong className="text-slate-900">{formatVND(d.warehouseTierValues.wholesale)}</strong>
+                {" · "}Giá lẻ{" "}
+                <strong className="text-slate-900">{formatVND(d.warehouseTierValues.retail)}</strong>
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                Chỉ tính hàng của TVK trong kho, chưa gồm hàng ở đối tác (tính theo giá chuyển giao).
+                Giá lẻ lấy theo giá sỉ khi sản phẩm chưa có giá lẻ.
+              </p>
+            </div>
+          )}
           <p className="mt-2 text-xs leading-relaxed text-slate-500">
             Hàng giữ hộ là hàng của nhà cung cấp, không phải tài sản của cửa hàng.
           </p>

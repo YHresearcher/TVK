@@ -315,7 +315,8 @@ export async function getDashboard() {
       revenueAll: 0, grossProfitAll: 0, orderCountAll: 0,
       revenue30: 0, grossProfit30: 0, orderCount30: 0, orderAnalysis: [] as AnyRow[],
       bookOwnedOwnValue: 0, bookAtPartnersOwnedValue: 0, bookInventoryValue: 0,
-      bookConsignedCustodyValue: 0, overduePayables: 0, overdueReceivables: 0,
+      bookConsignedCustodyValue: 0, warehouseTierValues: { cost: 0, wholesale: 0, retail: 0 },
+      overduePayables: 0, overdueReceivables: 0,
       lowStock: [] as AnyRow[], expiring: [] as AnyRow[], discrepancies: [] as AnyRow[],
       revenue14: [] as { label: string; value: number }[],
       topProducts: [] as AnyRow[],
@@ -397,6 +398,10 @@ export async function getDashboard() {
       Number(p.retail_price ?? 0) > 0 ? Number(p.retail_price) : Number(p.wholesale_price ?? 0),
     ])
   );
+  // Giá đại lý của sản phẩm, dùng cho dòng so sánh 3 mức giá của hàng trong kho.
+  const wholesalePrice = new Map(
+    ((productMins.data ?? []) as AnyRow[]).map((p) => [p.id, Number(p.wholesale_price ?? 0)])
+  );
   // Giá chuyển giao mới nhất của từng lô đã gửi ký gửi (phiếu đã xác nhận):
   // hàng ở kho đối tác tính theo giá này, vì đó là giá đối tác sẽ trả khi
   // tiêu thụ — không phải giá vốn, không phải giá lẻ hiện tại.
@@ -458,6 +463,20 @@ export async function getDashboard() {
   const bookOwnedOwn = costOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
   const bookAtPartnersOwned = costOf((r) => owned(r) && r.location_kind === "PARTNER_VIRTUAL");
   const bookConsignedCustody = costOf(consigned);
+  // Hàng trong kho TVK theo 3 mức giá (chỉ lô thuộc sở hữu, chỉ kho TVK):
+  // vốn = giá vốn lô; sỉ = giá đại lý (chưa có thì giá vốn); lẻ = giá bán
+  // (giá lẻ trước, không có thì giá đại lý, không có nữa thì giá vốn).
+  const warehouseTierValues = {
+    cost: bookOwnedOwn.value,
+    wholesale: sum(
+      (r) => owned(r) && r.location_kind === "OWN_WAREHOUSE",
+      (r) => {
+        const wp = wholesalePrice.get(r.product_id) ?? 0;
+        return Number(r.qty) * (wp > 0 ? wp : Number(r.unit_cost));
+      }
+    ),
+    retail: ownedOwn.value,
+  };
   // Doanh thu / lợi nhuận gộp / số đơn — mọi chứng từ đã xác nhận, không
   // giới hạn ngày (ngày chứng từ có thể ghi lùi so với ngày nhập máy).
   // Giá vốn của mỗi dòng lấy từ lô đã bán của dòng đó (luồng đối tác thì
@@ -585,6 +604,7 @@ export async function getDashboard() {
     bookAtPartnersOwnedValue: bookAtPartnersOwned.value,
     bookInventoryValue: bookOwnedOwn.value + bookAtPartnersOwned.value,
     bookConsignedCustodyValue: bookConsignedCustody.value,
+    warehouseTierValues,
     overduePayables: overdueOutstanding(payables.data as AnyRow[] | null),
     overdueReceivables: overdueOutstanding(receivables.data as AnyRow[] | null),
     revenue14,
