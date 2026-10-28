@@ -76,11 +76,12 @@ export default async function ReportsPage() {
             <a href="/api/export?view=v_product_stock" className="text-sm text-blue-600 hover:underline">Xuất CSV</a>
           </div>
           <p className="mb-3 text-sm leading-relaxed text-slate-600">
-            Mỗi hàng là một sản phẩm, chia theo 2 chiều: hàng là <strong className="text-slate-800">của mình</strong> hay
-            hàng mình <strong className="text-slate-800">giữ hộ nhà cung cấp</strong> (nhà cung cấp gửi mình giữ/bán hộ,
-            chưa phải hàng của mình) — và hàng đang ở <strong className="text-slate-800">kho TVK</strong> hay
-            đang ở chỗ <strong className="text-slate-800">đối tác</strong>. Cột “Giữ hộ NCC” ở kho TVK là hàng của
-            nhà cung cấp đang nằm trong kho nhà mình.
+            Mỗi hàng là một sản phẩm, chia theo 2 chiều: hàng đang ở <strong className="text-slate-800">kho TVK</strong> hay
+            ở <strong className="text-slate-800">kho đối tác</strong> — và hàng là <strong className="text-slate-800">tự nhập</strong> (mình
+            mua về, của mình), <strong className="text-slate-800">được ký gởi</strong> (nhà cung cấp gửi mình giữ/bán hộ),
+            {" "}<strong className="text-slate-800">gửi ký gởi</strong> (mình gửi cho đối tác bán hộ, vẫn là của mình),
+            {" "}<strong className="text-slate-800">ký gởi tiếp</strong> (hàng của nhà cung cấp mà mình gửi tiếp cho đối tác —
+            mặc định khoá, chỉ mở khi nhà cung cấp đó đồng ý).
           </p>
           {stock.data.length === 0 ? <EmptyState message="Chưa có dữ liệu." /> : (
             <TableWrap>
@@ -89,14 +90,14 @@ export default async function ReportsPage() {
                   <th className={thCls} rowSpan={2}>SKU</th>
                   <th className={thCls} rowSpan={2}>Sản phẩm</th>
                   <th className={`${thCls} text-center`} colSpan={2}>Tại kho TVK</th>
-                  <th className={`${thCls} text-center`} colSpan={2}>Tại đối tác</th>
+                  <th className={`${thCls} text-center`} colSpan={2}>Kho đối tác</th>
                   <th className={thCls} rowSpan={2}>Tổng</th>
                 </tr>
                 <tr>
-                  <th className={thCls}>Của mình</th>
-                  <th className={thCls}>Giữ hộ NCC</th>
-                  <th className={thCls}>Của mình</th>
-                  <th className={thCls}>Giữ hộ NCC</th>
+                  <th className={thCls}>Tự nhập</th>
+                  <th className={thCls}>Được ký gởi</th>
+                  <th className={thCls}>Gửi ký gởi</th>
+                  <th className={thCls}>Ký gởi tiếp</th>
                 </tr>
               </thead>
               <tbody>
