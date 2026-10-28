@@ -76,8 +76,14 @@ export default function ImportExcel({
   action: (formData: FormData) => Promise<void>;
 }) {
   const [kind, setKind] = useState<"PN" | "NK">("PN");
-  const [supplierId, setSupplierId] = useState("");
-  const [warehouseId, setWarehouseId] = useState("");
+  // Chỉ có một nhà cung cấp / một kho thì chọn sẵn luôn — khỏi bắt chọn
+  // tay mỗi lần import, không thì nút cứ mờ vì thiếu lựa chọn.
+  const [supplierId, setSupplierId] = useState(
+    suppliers.length === 1 ? suppliers[0].id : "",
+  );
+  const [warehouseId, setWarehouseId] = useState(
+    warehouses.length === 1 ? warehouses[0].id : "",
+  );
   const [receiptDate, setReceiptDate] = useState(todayISO());
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState("");
   const [tyGia, setTyGia] = useState(27000);
@@ -580,7 +586,7 @@ export default function ImportExcel({
       )}
 
       <SubmitButton disabled={!canSubmit} className={btnCls}>
-        Xác nhận nhập
+        {confirmNow ? "Xác nhận nhập kho" : "Tạo phiếu nháp"}
       </SubmitButton>
       {!canSubmit && rawRows !== null && (
         <p className="text-xs text-slate-500">
