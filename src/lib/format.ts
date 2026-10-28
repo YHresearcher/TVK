@@ -4,6 +4,16 @@ export function formatVND(value: number | string | null | undefined): string {
   return n.toLocaleString("vi-VN");
 }
 
+// Tiền tính chính xác, giữ tối đa 4 số lẻ (giá vốn nhập hàng từ USD,
+// migration 0014). Số nguyên hiển thị như formatVND, không thêm ",00".
+export function formatVNDExact(value: number | string | null | undefined): string {
+  const n = Number(value ?? 0);
+  return n.toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  });
+}
+
 /** Số tiền USD: ký hiệu $ ở phía trước (vd $100, $3.88). */
 export function formatUSD(value: number | string | null | undefined): string {
   const n = Number(value ?? 0);

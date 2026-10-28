@@ -1,7 +1,7 @@
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
 import { BarChart, DonutChart, HBarList, formatCompactVND } from "@/components/Charts";
 import { getCurrentProfile, getDashboard } from "@/lib/queries";
-import { formatDate, formatNumber, formatVND } from "@/lib/format";
+import { formatDate, formatNumber, formatVND, formatVNDExact } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +32,8 @@ export default async function DashboardPage() {
         description="Tồn kho và hàng ký gửi luôn được theo dõi tách biệt."
       />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Tồn kho (số lượng)" value={formatNumber(d.ownedQty)} sub={formatVND(d.ownedValue) + " vốn đang nằm trong kho"} />
-        <StatCard label="Hàng ký gửi (số lượng)" value={formatNumber(d.consignedQty)} sub={formatVND(d.consignedValue) + " đang giữ hộ nhà cung cấp"} />
+        <StatCard label="Tồn kho (số lượng)" value={formatNumber(d.ownedQty)} sub={formatVNDExact(d.ownedValue) + " vốn đang nằm trong kho"} />
+        <StatCard label="Hàng ký gửi (số lượng)" value={formatNumber(d.consignedQty)} sub={formatVNDExact(d.consignedValue) + " đang giữ hộ nhà cung cấp"} />
         <StatCard label="Hàng tại đối tác (số lượng)" value={formatNumber(d.atPartnersQty)} sub="Đã gửi ký gửi / đã giao, chưa tiêu thụ" />
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" />
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ chúng ta" />

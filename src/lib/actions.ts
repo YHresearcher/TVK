@@ -588,25 +588,21 @@ export async function importStockAction(formData: FormData) {
 
   const items: { product_id: string; qty: number; unit_cost: number }[] = [];
   // Công thức phía máy chủ (không tin bản xem trước ở client), áp chung
-  // cho toàn bộ file: Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%);
-  // Giá bán = Đơn giá nhập × (1 + % lợi nhuận).
+  // cho toàn bộ file: Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%),
+  // giữ chính xác tới 4 số lẻ, KHÔNG làm tròn (migration 0014). Giá bán
+  // vẫn làm tròn đồng chẵn như trước — chỉ giá vốn là tính chính xác.
   const rowPrices = (r: ImportPayloadRow): { unitCost: number; salePrice: number; retailPrice: number } => {
     const usd = Number(r.usd) || 0;
-    const unitCost = usd > 0 ? Math.round(usd * tyGia * (1 + vatPct / 100)) : 0;
+    const unitCost = usd > 0 ? usd * tyGia * (1 + vatPct / 100) : 0;
     return {
       unitCost,
       salePrice: Math.round(unitCost * (1 + profitPct / 100)),
       retailPrice: Math.round(unitCost * (1 + retailPct / 100)),
     };
   };
-  // Chênh lệch làm tròn (khớp kế toán, migration 0010): tổng làm tròn một
-  // lần ở cuối từ giá trị chính xác của từng dòng, trừ đi tổng các dòng
-  // (đơn giá đã làm tròn). Được lưu cùng phiếu và cộng vào total_amount
-  // khi xác nhận, nên mọi số nguyên hiển thị đều cộng khớp tuyệt đối.
-  // Cách tính tổng chính xác phải khớp từng phép tính với bản xem trước ở
-  // client (cùng thứ tự dòng, cùng biểu thức) để hai bên ra cùng một số.
-  let linesSum = 0;
-  let exactSum = 0;
+  // Không còn chênh lệch làm tròn (migration 0014): đơn giá giữ chính
+  // xác nên tổng các dòng bằng đúng tổng chính xác. Cột
+  // rounding_adjustment giữ lại làm chốt lịch sử, phiếu mới luôn ghi 0.
   // Kiểm soát phía máy chủ: kiểm tra TOÀN BỘ file trước khi ghi bất cứ thứ
   // gì. Bất kỳ dòng nào không hợp lệ cũng từ chối cả import (không nhập
   // một phần, không tạo sản phẩm dở dang), kể cả khi giao diện bị bỏ qua.
@@ -664,9 +660,6 @@ export async function importStockAction(formData: FormData) {
       .map((a) => storeCode(String(a ?? "")))
       .filter(Boolean);
     if (!code || qty <= 0 || unitCost <= 0) continue; // đã chặn ở vòng kiểm tra trước
-
-    linesSum += qty * unitCost;
-    exactSum += qty * (Number(r.usd) || 0) * tyGia * (1 + vatPct / 100);
 
     let productRef = bySku.get(normKey(code)) ?? byCode.get(normKey(code));
     if (!productRef) {
@@ -811,7 +804,7 @@ export async function importStockAction(formData: FormData) {
       "Không có dòng hợp lệ nào để nhập (kiểm tra mã hàng, số lượng và giá vốn)."
     );
 
-  const roundingAdjustment = Math.round(exactSum) - linesSum;
+  const roundingAdjustment = 0; // migration 0014: tính chính xác, không còn chênh lệch làm tròn
 
   const me = await userId();
   const receiptDate = String(payload.receiptDate ?? "").trim() || undefined;

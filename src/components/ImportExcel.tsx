@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import { normCode } from "@/lib/product-match";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
-import { formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
+import { formatNumber, formatUSD, formatVND, formatVNDExact, todayISO } from "@/lib/format";
 
 /** Cột tiền: căn phải để dễ dò số. */
 const thNumCls = `${thCls} text-right`;
@@ -177,10 +177,11 @@ export default function ImportExcel({
     return rawRows.map((r, i) => {
       // Công thức áp chung cho toàn bộ file (tỷ giá, VAT, % lợi nhuận và
       // % giá bán lẻ nhập trên form): Đơn giá nhập VNĐ = GiaUSD × Tỷ giá
-      // × (1 + VAT%); Giá đại lý = Đơn giá nhập × (1 + % lợi nhuận);
-      // Giá lẻ = Đơn giá nhập × (1 + % giá bán lẻ).
+      // × (1 + VAT%), giữ chính xác tới 4 số lẻ, không làm tròn
+      // (migration 0014); Giá đại lý = Đơn giá nhập × (1 + % lợi nhuận)
+      // và Giá lẻ = Đơn giá nhập × (1 + % giá bán lẻ) vẫn làm tròn đồng chẵn.
       const unitCost =
-        r.usd > 0 ? Math.round(r.usd * tyGia * (1 + vatPct / 100)) : 0;
+        r.usd > 0 ? r.usd * tyGia * (1 + vatPct / 100) : 0;
       const salePriceEff =
         unitCost > 0 ? Math.round(unitCost * (1 + profitPct / 100)) : 0;
       const retailPriceEff =
@@ -220,16 +221,12 @@ export default function ImportExcel({
   const importable = preview.filter((r) => r.status !== "error");
   const errorCount = preview.length - importable.length;
   const totalQty = importable.reduce((a, r) => a + r.qty, 0);
-  // Tổng khớp kế toán: làm tròn một lần ở cuối từ giá trị chính xác của
-  // từng dòng. Chênh lệch với tổng các dòng (đơn giá đã làm tròn) vẫn được
-  // tính và lưu cùng phiếu ở máy chủ (migration 0010), nhưng không hiện
-  // riêng ở cuối bảng — bảng chỉ hiện Total cuối cùng. Cách tính phải khớp
-  // từng phép tính với máy chủ (cùng thứ tự dòng, cùng biểu thức).
-  const exactTotal = Math.round(
-    importable.reduce(
-      (a, r) => a + Math.trunc(r.qty) * r.usd * tyGia * (1 + vatPct / 100),
-      0
-    )
+  // Tổng chính xác: cộng đúng giá trị từng dòng, không làm tròn
+  // (migration 0014). Phải khớp từng phép tính với máy chủ (cùng thứ tự
+  // dòng, cùng biểu thức) để hai bên ra cùng một số.
+  const exactTotal = importable.reduce(
+    (a, r) => a + Math.trunc(r.qty) * r.usd * tyGia * (1 + vatPct / 100),
+    0
   );
   // Kiểm soát chặt: còn bất kỳ dòng lỗi nào là không cho nhập (không nhập một phần).
   const canSubmit =
@@ -528,9 +525,9 @@ export default function ImportExcel({
                 <td className={tdCls}>{r.unit || "—"}</td>
                 <td className={tdCls}>{formatNumber(r.qty)}</td>
                 <td className={tdNumCls}>{r.usd > 0 ? formatUSD(r.usd) : "—"}</td>
-                <td className={tdNumCls}>{r.unitCost > 0 ? formatVND(r.unitCost) : "—"}</td>
+                <td className={tdNumCls}>{r.unitCost > 0 ? formatVNDExact(r.unitCost) : "—"}</td>
                 <td className={tdNumCls}>
-                  {r.unitCost > 0 ? formatVND(r.qty * r.unitCost) : "—"}
+                  {r.unitCost > 0 ? formatVNDExact(r.qty * r.unitCost) : "—"}
                 </td>
                 <td className={tdNumCls}>
                   {r.salePriceEff > 0 ? formatVND(r.salePriceEff) : "—"}
@@ -572,7 +569,7 @@ export default function ImportExcel({
               <td className={tdCls}>{formatNumber(totalQty)}</td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
-              <td className={tdNumCls}>{formatVND(exactTotal)}</td>
+              <td className={tdNumCls}>{formatVNDExact(exactTotal)}</td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>

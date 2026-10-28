@@ -1,7 +1,7 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { createStockAdjustmentAction } from "@/lib/actions";
 import { getCurrentProfile, listBatchStock, listLocations } from "@/lib/queries";
-import { formatDate, formatNumber, formatVND } from "@/lib/format";
+import { formatDate, formatNumber, formatVND, formatVNDExact } from "@/lib/format";
 import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +46,7 @@ export default async function InventoryPage({
       </form>
 
       <p className="mb-3 text-sm text-slate-600">
-        Đang hiển thị <strong>{formatNumber(totalQty)}</strong> đơn vị · giá trị tồn <strong>{formatVND(totalValue)}</strong>
+        Đang hiển thị <strong>{formatNumber(totalQty)}</strong> đơn vị · giá trị tồn <strong>{formatVNDExact(totalValue)}</strong>
         <span className="text-slate-400"> (giá trị ký gửi là hàng giữ hộ nhà cung cấp, không phải vốn của mình)</span>
       </p>
 
@@ -62,7 +62,7 @@ export default async function InventoryPage({
                 <td className={tdCls}>{r.supplier_name ?? "—"}</td>
                 <td className={tdCls}>{r.location_name}</td>
                 <td className={`${tdCls} font-medium`}>{formatNumber(r.qty)}</td>
-                <td className={tdCls}>{formatVND(r.unit_cost)}</td>
+                <td className={tdCls}>{formatVNDExact(r.unit_cost)}</td>
                 <td className={tdCls}>{formatDate(r.received_date)}</td>
                 <td className={tdCls}><StatusBadge status={r.status} /></td>
               </tr>
