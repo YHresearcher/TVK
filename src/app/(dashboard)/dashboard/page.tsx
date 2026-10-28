@@ -114,15 +114,16 @@ export default async function DashboardPage() {
       {canSeeCost && (
         <div className="mt-6">
           <Card title="Phân tích đơn hàng">
-            <p className="mb-3 text-sm leading-relaxed text-slate-600">
+            <p className="mb-2 text-base leading-relaxed text-slate-600">
               Doanh thu thuần <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
               {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
               {" · "}Lợi nhuận gộp <strong className="text-slate-900">{formatVND(d.grossProfitAll)}</strong>
               {" "}(ROS {grossMargin}% · ROI {roiAll}%).
-              ROS là lãi chia cho doanh thu thuần, ROI là lãi chia cho vốn hàng đã bán.
               Giá vốn tính theo lô thực tế đã xuất (nhập trước – xuất trước); giảm giá đã trừ vào doanh thu thuần.
               {" "}30 ngày gần nhất: doanh thu thuần {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn.
             </p>
+            <p className="text-xs leading-relaxed text-slate-500">ROS là lãi chia cho doanh thu thuần.</p>
+            <p className="mb-3 text-xs leading-relaxed text-slate-500">ROI là lãi chia cho vốn hàng đã bán.</p>
             {d.orderAnalysis.length === 0 ? (
               <EmptyState message="Chưa có đơn hàng nào được xác nhận." />
             ) : (
