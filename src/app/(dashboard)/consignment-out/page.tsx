@@ -1,4 +1,4 @@
-import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ImportConsignmentOut from "@/components/ImportConsignmentOut";
@@ -28,6 +28,8 @@ export default async function ConsignmentOutPage({
   const configured = slips.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
+  const draftSlips = slips.data.filter((s) => s.status === "DRAFT");
+  const confirmedSlips = slips.data.filter((s) => s.status !== "DRAFT");
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
   const ownBatches = Array.from(
     new Map(
@@ -105,6 +107,7 @@ export default async function ConsignmentOutPage({
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="space-y-6">
+        <GkDraftsCard rows={draftSlips} partnerName={partnerName} readOnly={readOnly} />
         {!readOnly && (
         <>
         <Card title="Phiếu gửi ký gửi / giao hàng mới">
@@ -131,25 +134,19 @@ export default async function ConsignmentOutPage({
         </>
         )}
 
-        {slips.data.length === 0 ? <EmptyState message="Chưa có phiếu gửi." /> : (
+        {confirmedSlips.length === 0 ? (
+          draftSlips.length === 0 && <EmptyState message="Chưa có phiếu gửi." />
+        ) : (
           <TableWrap>
-            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Hạn đối soát</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
+            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Hạn đối soát</th><th className={thCls}>Trạng thái</th></tr></thead>
             <tbody>
-              {slips.data.map((s) => (
+              {confirmedSlips.map((s) => (
                 <tr key={s.id} className="border-t border-slate-100">
                   <td className={`${tdCls} font-mono text-xs`}>{s.doc_code}</td>
                   <td className={tdCls}>{partnerName.get(s.partner_id) ?? "—"}</td>
                   <td className={tdCls}>{formatDate(s.slip_date)}</td>
                   <td className={tdCls}>{formatDate(s.settlement_due_date)}</td>
                   <td className={tdCls}><StatusBadge status={s.status} /></td>
-                  <td className={tdCls}>
-                    {s.status === "DRAFT" && !readOnly && (
-                      <form action={confirmConsignmentOutAction}>
-                        <input type="hidden" name="id" value={s.id} />
-                        <SubmitButton className={btnGhostCls}>Xác nhận → chuyển hàng tới đối tác</SubmitButton>
-                      </form>
-                    )}
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -157,5 +154,45 @@ export default async function ConsignmentOutPage({
         )}
       </div>
     </>
+  );
+}
+
+/** Phiếu gửi nháp chờ xác nhận — đặt lên đầu trang và tô nổi để dễ thấy: hàng chưa chuyển đi cho tới khi xác nhận. */
+function GkDraftsCard({
+  rows,
+  partnerName,
+  readOnly,
+}: {
+  rows: AnyRow[];
+  partnerName: Map<string, string>;
+  readOnly?: boolean;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 shadow-md">
+      <p className="text-base font-bold text-amber-900">
+        Phiếu gửi nháp chờ xác nhận ({rows.length})
+      </p>
+      <p className="mt-1 text-sm leading-relaxed text-amber-800">
+        Hàng chưa chuyển đi. Bấm Xác nhận để chuyển hàng tới kho đối tác và ghi sổ cái.
+      </p>
+      <div className="mt-3 space-y-2">
+        {rows.map((r) => (
+          <div key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-amber-300 bg-white px-3 py-2 shadow-sm">
+            <span className="font-mono text-sm font-bold text-slate-900">{r.doc_code}</span>
+            <span className="text-sm font-medium text-slate-700">{partnerName.get(r.partner_id) ?? "—"}</span>
+            <span className="text-sm text-slate-500">{formatDate(r.slip_date)}</span>
+            <span className="ml-auto">
+              {!readOnly && (
+                <form action={confirmConsignmentOutAction}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <SubmitButton className={btnCls}>Xác nhận → chuyển hàng tới đối tác</SubmitButton>
+                </form>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
