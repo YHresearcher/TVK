@@ -102,6 +102,116 @@ export function BarChart({
   );
 }
 
+export interface GroupedDatum {
+  label: string;
+  a: number;
+  b: number;
+}
+
+/** Biểu đồ cột đôi: nhóm A (xanh) và nhóm B (vàng) chung một thang đo. */
+export function GroupedBarChart({
+  data,
+  labelA,
+  labelB,
+  format = formatCompactVND,
+  colorA = "#2563eb",
+  colorB = "#f59e0b",
+}: {
+  data: GroupedDatum[];
+  labelA: string;
+  labelB: string;
+  format?: (v: number) => string;
+  colorA?: string;
+  colorB?: string;
+}) {
+  const W = 640;
+  const H = 250;
+  const padTop = 26;
+  const padBottom = 26;
+  const padX = 6;
+  const chartH = H - padTop - padBottom;
+  const max = Math.max(0, ...data.flatMap((d) => [d.a, d.b]));
+  const slot = data.length ? (W - padX * 2) / data.length : W;
+  const barW = Math.min(slot * 0.28, 30);
+  const gridFracs = [0.25, 0.5, 0.75, 1];
+
+  return (
+    <div>
+      <div className="mb-2 flex gap-4 text-xs text-slate-500">
+        <span className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: colorA }} />
+          {labelA}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: colorB }} />
+          {labelB}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img">
+        {gridFracs.map((f) => {
+          const y = padTop + chartH * (1 - f);
+          return (
+            <line
+              key={f}
+              x1={padX}
+              x2={W - padX}
+              y1={y}
+              y2={y}
+              stroke="#e2e8f0"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+          );
+        })}
+        <line
+          x1={padX}
+          x2={W - padX}
+          y1={padTop + chartH}
+          y2={padTop + chartH}
+          stroke="#cbd5e1"
+          strokeWidth={1}
+        />
+        {data.map((d, i) => {
+          const hA = max > 0 ? (d.a / max) * chartH : 0;
+          const hB = max > 0 ? (d.b / max) * chartH : 0;
+          const cx = padX + slot * i + slot / 2;
+          const xA = cx - barW - 2;
+          const xB = cx + 2;
+          return (
+            <g key={i}>
+              <rect x={xA} y={padTop + chartH - hA} width={barW} height={hA} rx={3} fill={colorA} />
+              <rect x={xB} y={padTop + chartH - hB} width={barW} height={hB} rx={3} fill={colorB} />
+              <text
+                x={cx}
+                y={Math.max(padTop + chartH - Math.max(hA, hB) - 5, 10)}
+                textAnchor="middle"
+                fontSize={10}
+                fill="#475569"
+              >
+                {format(d.a)}
+              </text>
+              <text
+                x={cx}
+                y={padTop + chartH + 16}
+                textAnchor="middle"
+                fontSize={9.5}
+                fill="#94a3b8"
+              >
+                {d.label}
+              </text>
+            </g>
+          );
+        })}
+        {data.length === 0 && (
+          <text x={W / 2} y={H / 2} textAnchor="middle" fontSize={12} fill="#94a3b8">
+            Chưa có dữ liệu
+          </text>
+        )}
+      </svg>
+    </div>
+  );
+}
+
 export interface DonutSegment {
   label: string;
   value: number;

@@ -203,9 +203,9 @@ export async function getDashboard() {
     return {
       configured: false,
       ownedQty: 0, ownedValue: 0, consignedQty: 0, consignedValue: 0,
-      atPartnersQty: 0, payablesOutstanding: 0, receivablesOutstanding: 0,
+      atPartnersQty: 0, atPartnersValue: 0, payablesOutstanding: 0, receivablesOutstanding: 0,
       revenueAll: 0, grossProfitAll: 0, orderCountAll: 0,
-      revenue30: 0, grossProfit30: 0, orderCount30: 0,
+      revenue30: 0, grossProfit30: 0, orderCount30: 0, orderAnalysis: [] as AnyRow[],
       lowStock: [] as AnyRow[], expiring: [] as AnyRow[], discrepancies: [] as AnyRow[],
       revenue14: [] as { label: string; value: number }[],
       topProducts: [] as AnyRow[],
@@ -220,13 +220,14 @@ export async function getDashboard() {
   const dayMs = 864e5;
   const isoDay = (daysAgo: number) =>
     new Date(Date.now() - daysAgo * dayMs).toISOString().slice(0, 10);
-  const [batchStock, payables, receivables, productStock, partnerCons, productMins, salesDocs] = await Promise.all([
+  const [batchStock, payables, receivables, productStock, partnerCons, productMins, partnersList, salesDocs] = await Promise.all([
     supabase.from("v_batch_stock").select("*").limit(2000),
     supabase.from("supplier_payables").select("amount, amount_paid, status").in("status", ["UNPAID", "PARTIAL"]),
     supabase.from("partner_receivables").select("amount, amount_paid, status").in("status", ["UNPAID", "PARTIAL"]),
     supabase.from("v_product_stock").select("*").limit(2000),
     supabase.from("v_partner_consignment").select("*"),
-    supabase.from("products").select("id, min_stock"),
+    supabase.from("products").select("id, min_stock, retail_price, wholesale_price"),
+    supabase.from("partners").select("id, name"),
     supabase
       .from("sales_documents")
       .select("id, doc_date, discount_amount")
@@ -278,26 +279,72 @@ export async function getDashboard() {
       .map((id) => ({ ...byId.get(id), qty_sold: productQty.get(id) ?? 0 }));
   }
   const minMap = new Map(((productMins.data ?? []) as AnyRow[]).map((p) => [p.id, Number(p.min_stock ?? 0)]));
+  // Giá bán của sản phẩm: giá lẻ trước, không có thì giá đại lý, không có
+  // nữa thì giá vốn. Dùng để tính "giá trị thật" của hàng tồn cho CEO.
+  const sellPrice = new Map(
+    ((productMins.data ?? []) as AnyRow[]).map((p) => [
+      p.id,
+      Number(p.retail_price ?? 0) > 0 ? Number(p.retail_price) : Number(p.wholesale_price ?? 0),
+    ])
+  );
+  // Giá chuyển giao mới nhất của từng lô đã gửi ký gửi (phiếu đã xác nhận):
+  // hàng ở kho đối tác tính theo giá này, vì đó là giá đối tác sẽ trả khi
+  // tiêu thụ — không phải giá vốn, không phải giá lẻ hiện tại.
+  const { data: confirmedSlips } = await supabase
+    .from("consignment_out_slips")
+    .select("id, created_at")
+    .eq("status", "CONFIRMED")
+    .limit(500);
+  const slipCreated = new Map(
+    ((confirmedSlips ?? []) as AnyRow[]).map((s) => [String(s.id), String(s.created_at)])
+  );
+  const latestTransfer = new Map<string, number>();
+  if ((confirmedSlips ?? []).length) {
+    const { data: gkItems } = await supabase
+      .from("consignment_out_items")
+      .select("slip_id, batch_id, transfer_price")
+      .in("slip_id", (confirmedSlips ?? []).map((s) => s.id))
+      .limit(5000);
+    const sorted = ((gkItems ?? []) as AnyRow[]).sort((a, b) =>
+      String(slipCreated.get(String(b.slip_id)) ?? "").localeCompare(
+        String(slipCreated.get(String(a.slip_id)) ?? "")
+      )
+    );
+    for (const it of sorted) {
+      const key = String(it.batch_id);
+      if (!latestTransfer.has(key)) latestTransfer.set(key, Number(it.transfer_price ?? 0));
+    }
+  }
   const rows = (batchStock.data ?? []) as AnyRow[];
   const sum = (filter: (r: AnyRow) => boolean, field: (r: AnyRow) => number) =>
     rows.filter(filter).reduce((acc, r) => acc + field(r), 0);
   const owned = (r: AnyRow) => r.ownership === "OWNED";
   const consigned = (r: AnyRow) => r.ownership === "CONSIGNED";
   const soon = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
-  const compositionOf = (filter: (r: AnyRow) => boolean) => ({
+  const realValueOf = (r: AnyRow) => {
+    const qty = Number(r.qty);
+    if (r.location_kind === "PARTNER_VIRTUAL") {
+      const tp = latestTransfer.get(String(r.batch_id));
+      if (tp !== undefined) return qty * tp;
+    }
+    const sp = sellPrice.get(r.product_id) ?? 0;
+    return qty * (sp > 0 ? sp : Number(r.unit_cost));
+  };
+  const realCompositionOf = (filter: (r: AnyRow) => boolean) => ({
     qty: sum(filter, (r) => Number(r.qty)),
-    value: sum(filter, (r) => Number(r.qty) * Number(r.unit_cost)),
+    value: rows.filter(filter).reduce((acc, r) => acc + realValueOf(r), 0),
   });
-  const ownedOwn = compositionOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
-  const consignedOwn = compositionOf((r) => consigned(r) && r.location_kind === "OWN_WAREHOUSE");
-  const atPartners = compositionOf((r) => r.location_kind === "PARTNER_VIRTUAL");
+  const ownedOwn = realCompositionOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
+  const consignedOwn = realCompositionOf((r) => consigned(r) && r.location_kind === "OWN_WAREHOUSE");
+  const atPartners = realCompositionOf((r) => r.location_kind === "PARTNER_VIRTUAL");
+  const consignedReal = rows.filter(consigned).reduce((acc, r) => acc + realValueOf(r), 0);
   // Doanh thu / lợi nhuận gộp / số đơn — mọi chứng từ đã xác nhận, không
   // giới hạn ngày (ngày chứng từ có thể ghi lùi so với ngày nhập máy).
   // Giá vốn của mỗi dòng lấy từ lô đã bán của dòng đó (luồng đối tác thì
   // lô nằm ở dòng phân bổ gốc). Giảm giá trừ ở cấp chứng từ, như biểu đồ.
   const allDocsRes = await supabase
     .from("sales_documents")
-    .select("id, doc_date, discount_amount")
+    .select("id, doc_code, doc_date, discount_amount, partner_id, customer_name")
     .eq("status", "CONFIRMED")
     .limit(5000);
   const allDocRows = (allDocsRes.data ?? []) as AnyRow[];
@@ -351,6 +398,25 @@ export async function getDashboard() {
   let revenue30 = 0;
   let cogs30 = 0;
   let orderCount30 = 0;
+  const partnerName = new Map(
+    ((partnersList.data ?? []) as AnyRow[]).map((p) => [String(p.id), String(p.name)])
+  );
+  const orderAnalysis = allDocRows
+    .map((d) => {
+      const t = perDoc.get(d.id);
+      const net = Math.max((t?.total ?? 0) - (docDiscountAll.get(d.id) ?? 0), 0);
+      const cost = t?.cost ?? 0;
+      return {
+        code: String(d.doc_code),
+        date: String(d.doc_date).slice(0, 10),
+        customer: String(d.customer_name ?? partnerName.get(String(d.partner_id)) ?? "—"),
+        revenue: net,
+        cogs: cost,
+        profit: net - cost,
+      };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 10);
   for (const d of allDocRows) {
     const t = perDoc.get(d.id);
     const net = Math.max((t?.total ?? 0) - (docDiscountAll.get(d.id) ?? 0), 0);
@@ -374,8 +440,9 @@ export async function getDashboard() {
     ownedQty: ownedOwn.qty,
     ownedValue: ownedOwn.value,
     consignedQty: sum(consigned, (r) => Number(r.qty)),
-    consignedValue: sum(consigned, (r) => Number(r.qty) * Number(r.unit_cost)),
+    consignedValue: consignedReal,
     atPartnersQty: sum((r) => r.location_kind === "PARTNER_VIRTUAL", (r) => Number(r.qty)),
+    atPartnersValue: atPartners.value,
     payablesOutstanding: (payables.data ?? []).reduce(
       (a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0),
     receivablesOutstanding: (receivables.data ?? []).reduce(
@@ -386,6 +453,7 @@ export async function getDashboard() {
     revenue30,
     grossProfit30: revenue30 - cogs30,
     orderCount30,
+    orderAnalysis,
     revenue14,
     topProducts,
     stockComposition: {

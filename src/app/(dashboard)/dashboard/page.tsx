@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
-import { BarChart, DonutChart, HBarList, formatCompactVND } from "@/components/Charts";
+import { Suspense } from "react";
+import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import { BarChart, DonutChart, GroupedBarChart, HBarList, formatCompactVND } from "@/components/Charts";
+import PartnerSelect from "@/components/PartnerSelect";
 import { getCurrentProfile, getDashboard, getPartnerDetail, listPartners } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 
@@ -25,7 +27,12 @@ export default async function DashboardPage({
   const selectedId = searchParams.partner ?? "";
   const detail = selectedId ? await getPartnerDetail(selectedId) : null;
   const canSeeMoney = ["OWNER", "ACCOUNTING", "CEO"].includes(profile.data?.role ?? "");
+  // Giá vốn / lợi nhuận chỉ Chủ cửa hàng và Kế toán được coi — CEO chỉ coi
+  // giá trị thật, nhân viên bán hàng/kho không thấy giá vốn và lợi nhuận.
+  const canSeeCost = ["OWNER", "ACCOUNTING"].includes(profile.data?.role ?? "");
   const grossMargin = d.revenueAll > 0 ? Math.round((d.grossProfitAll / d.revenueAll) * 100) : 0;
+  const revenue14Total = d.revenue14.reduce((a, r) => a + r.value, 0);
+  const cogsAll = d.revenueAll - d.grossProfitAll;
   if (!d.configured) {
     return (
       <>
@@ -34,42 +41,67 @@ export default async function DashboardPage({
       </>
     );
   }
+  const comp = d.stockComposition;
+  const compSegments = [
+    { label: "Tồn kho tại kho", seg: comp.ownedOwn, color: "#10b981" },
+    { label: "Hàng ký gửi tại kho", seg: comp.consignedOwn, color: "#f59e0b" },
+    { label: "Hàng tại kho đối tác", seg: comp.atPartners, color: "#0ea5e9" },
+  ].map((s) => ({
+    label: s.label,
+    value: canSeeMoney ? s.seg.value : s.seg.qty,
+    color: s.color,
+  }));
+  const compTotal = compSegments.reduce((a, s) => a + s.value, 0);
   return (
     <>
       <PageHeader
         title="Tổng quan"
         description="Tồn kho và hàng ký gửi luôn được theo dõi tách biệt."
       />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Tồn kho (số lượng)" value={formatNumber(d.ownedQty)} sub={formatVND(d.ownedValue) + " vốn đang nằm trong kho"} />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
+        <StatCard label="Tồn kho (số lượng)" value={formatNumber(d.ownedQty)} sub={formatVND(d.ownedValue) + " giá trị theo giá bán"} />
         <StatCard label="Hàng ký gửi (số lượng)" value={formatNumber(d.consignedQty)} sub={formatVND(d.consignedValue) + " đang giữ hộ nhà cung cấp"} />
-        <StatCard label="Hàng tại kho đối tác" value={formatNumber(d.atPartnersQty)} sub="Đã gửi ký gửi / đã giao, chưa tiêu thụ" />
+        <StatCard label="Hàng tại kho đối tác" value={formatNumber(d.atPartnersQty)} sub={formatVND(d.atPartnersValue) + " theo giá chuyển giao"} />
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" />
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ chúng ta" />
       </div>
 
-      {canSeeMoney && (
-        <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
-          <StatCard label="Doanh thu bán hàng" value={formatVND(d.revenueAll)} sub={`Đã trừ giảm giá · 30 ngày gần nhất: ${formatVND(d.revenue30)}`} />
-          <StatCard label="Lợi nhuận gộp" value={formatVND(d.grossProfitAll)} sub={`Doanh thu − giá vốn · biên gộp ${grossMargin}% · 30 ngày: ${formatVND(d.grossProfit30)}`} />
-          <StatCard label="Đơn hàng đã xác nhận" value={formatNumber(d.orderCountAll)} sub={`30 ngày gần nhất: ${formatNumber(d.orderCount30)} đơn`} />
-        </div>
-      )}
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+        {canSeeMoney && (
+          <Card title="Doanh thu 14 ngày gần nhất" className="lg:col-span-2">
+            <p className="mb-2 text-xs text-slate-500">
+              Tổng 14 ngày: <strong className="text-slate-800">{formatVND(revenue14Total)}</strong>
+              {" · "}Tất cả: <strong className="text-slate-800">{formatVND(d.revenueAll)}</strong>
+              {" · "}{formatNumber(d.orderCountAll)} đơn đã xác nhận
+            </p>
+            <BarChart data={d.revenue14} />
+          </Card>
+        )}
+        <Card title="Cơ cấu tồn kho">
+          <p className="mb-3 text-xs text-slate-500">
+            {canSeeMoney ? "Theo giá trị thật — giá bán / giá chuyển giao" : "Theo số lượng"}
+          </p>
+          <DonutChart
+            segments={compSegments}
+            format={canSeeMoney ? formatCompactVND : (v) => formatNumber(v)}
+            centerLabel={canSeeMoney ? formatCompactVND(compTotal) : formatNumber(compTotal)}
+            centerSub="Tổng tồn kho"
+          />
+        </Card>
+      </div>
 
       <div className="mt-6">
         <Card title="Thống kê đối tác">
-          <form action="/dashboard" method="get" className="mb-4 flex flex-wrap items-end gap-3">
-            <div>
-              <label className={labelCls}>Chọn đối tác</label>
-              <select name="partner" defaultValue={selectedId} className={inputCls}>
-                <option value="">— Chọn đối tác —</option>
-                {partners.data.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" className={btnCls}>Xem</button>
-          </form>
+          <div className="mb-4">
+            <label className={labelCls}>Chọn đối tác</label>
+            <Suspense>
+              <PartnerSelect
+                options={partners.data.map((p) => ({ value: p.id, label: p.name }))}
+                defaultValue={selectedId}
+                className={inputCls}
+              />
+            </Suspense>
+          </div>
           {!detail ? (
             <p className="text-sm text-slate-500">Chọn một đối tác ở trên để xem số dư, tiền đã trả, hoá đơn và hàng còn ở đối tác đó.</p>
           ) : !detail.data.partner ? (
@@ -93,69 +125,77 @@ export default async function DashboardPage({
         </Card>
       </div>
 
-      {(() => {
-        const comp = d.stockComposition;
-        const compSegments = [
-          { label: "Tồn kho tại kho", seg: comp.ownedOwn, color: "#10b981" },
-          { label: "Hàng ký gửi tại kho", seg: comp.consignedOwn, color: "#f59e0b" },
-          { label: "Hàng tại kho đối tác", seg: comp.atPartners, color: "#0ea5e9" },
-        ].map((s) => ({
-          label: s.label,
-          value: canSeeMoney ? s.seg.value : s.seg.qty,
-          color: s.color,
-        }));
-        const compTotal = compSegments.reduce((a, s) => a + s.value, 0);
-        return (
-          <>
-            <div className="mt-6 grid gap-6 lg:grid-cols-3">
-              {canSeeMoney && (
-                <Card title="Doanh thu 14 ngày gần nhất" className="lg:col-span-2">
-                  <BarChart data={d.revenue14} />
-                </Card>
-              )}
-              <Card title="Cơ cấu tồn kho">
-                <p className="mb-3 text-xs text-slate-500">
-                  {canSeeMoney ? "Theo giá trị vốn" : "Theo số lượng"}
-                </p>
-                <DonutChart
-                  segments={compSegments}
-                  format={canSeeMoney ? formatCompactVND : (v) => formatNumber(v)}
-                  centerLabel={canSeeMoney ? formatCompactVND(compTotal) : formatNumber(compTotal)}
-                  centerSub="Tổng tồn kho"
+      {canSeeCost && (
+        <div className="mt-6">
+          <Card title="Phân tích đơn hàng">
+            <p className="mb-3 text-sm leading-relaxed text-slate-600">
+              Doanh thu <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
+              {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
+              {" · "}Lợi nhuận gộp <strong className="text-slate-900">{formatVND(d.grossProfitAll)}</strong>
+              {" "}(biên gộp {grossMargin}%)
+              {" · "}30 ngày gần nhất: doanh thu {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn.
+            </p>
+            {d.orderAnalysis.length === 0 ? (
+              <EmptyState message="Chưa có đơn hàng nào được xác nhận." />
+            ) : (
+              <>
+                <GroupedBarChart
+                  data={d.orderAnalysis.slice(0, 8).map((o) => ({ label: o.code, a: o.revenue, b: o.cogs }))}
+                  labelA="Doanh thu"
+                  labelB="Giá vốn"
                 />
-              </Card>
-            </div>
-            <div className="mt-6 grid gap-6 lg:grid-cols-2">
-              {canSeeMoney && (
-                <Card title="Công nợ theo trạng thái">
-                  <HBarList
-                    data={[
-                      { label: "Phải trả — chưa thanh toán", value: d.balances.payablesUnpaid, color: "#f43f5e" },
-                      { label: "Phải trả — thanh toán một phần", value: d.balances.payablesPartial, color: "#f59e0b" },
-                      { label: "Phải thu — chưa thanh toán", value: d.balances.receivablesUnpaid, color: "#0ea5e9" },
-                      { label: "Phải thu — thanh toán một phần", value: d.balances.receivablesPartial, color: "#8b5cf6" },
-                    ]}
-                  />
-                </Card>
-              )}
-              <Card title="Top 5 sản phẩm bán chạy (30 ngày)">
-                {d.topProducts.length === 0 ? (
-                  <EmptyState message="Chưa có sản phẩm nào được bán trong 30 ngày qua." />
-                ) : (
-                  <HBarList
-                    data={d.topProducts.map((p) => ({
-                      label: `${p.sku} — ${p.name}`,
-                      value: Number(p.qty_sold),
-                      color: "#2563eb",
-                    }))}
-                    format={(v) => formatNumber(v)}
-                  />
-                )}
-              </Card>
-            </div>
-          </>
-        );
-      })()}
+                <div className="mt-4">
+                  <TableWrap>
+                    <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Ngày</th><th className={thCls}>Khách hàng</th><th className={`${thCls} text-right`}>Doanh thu</th><th className={`${thCls} text-right`}>Giá vốn</th><th className={`${thCls} text-right`}>Lợi nhuận</th><th className={`${thCls} text-right`}>Biên</th></tr></thead>
+                    <tbody>
+                      {d.orderAnalysis.map((o) => (
+                        <tr key={o.code} className="border-t border-slate-100">
+                          <td className={`${tdCls} font-mono text-xs`}>{o.code}</td>
+                          <td className={tdCls}>{formatDate(o.date)}</td>
+                          <td className={tdCls}>{o.customer}</td>
+                          <td className={`${tdCls} text-right`}>{formatVND(o.revenue)}</td>
+                          <td className={`${tdCls} text-right`}>{formatVND(o.cogs)}</td>
+                          <td className={`${tdCls} text-right font-medium`}>{formatVND(o.profit)}</td>
+                          <td className={`${tdCls} text-right`}>{o.revenue > 0 ? `${Math.round((o.profit / o.revenue) * 100)}%` : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </TableWrap>
+                </div>
+              </>
+            )}
+          </Card>
+        </div>
+      )}
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        {canSeeMoney && (
+          <Card title="Công nợ theo trạng thái">
+            <HBarList
+              data={[
+                { label: "Phải trả — chưa thanh toán", value: d.balances.payablesUnpaid, color: "#f43f5e" },
+                { label: "Phải trả — thanh toán một phần", value: d.balances.payablesPartial, color: "#f59e0b" },
+                { label: "Phải thu — chưa thanh toán", value: d.balances.receivablesUnpaid, color: "#0ea5e9" },
+                { label: "Phải thu — thanh toán một phần", value: d.balances.receivablesPartial, color: "#8b5cf6" },
+              ]}
+            />
+          </Card>
+        )}
+        <Card title="Top 5 sản phẩm bán chạy (30 ngày)">
+          {d.topProducts.length === 0 ? (
+            <EmptyState message="Chưa có sản phẩm nào được bán trong 30 ngày qua." />
+          ) : (
+            <HBarList
+              data={d.topProducts.map((p) => ({
+                label: `${p.sku} — ${p.name}`,
+                value: Number(p.qty_sold),
+                color: "#2563eb",
+              }))}
+              format={(v) => formatNumber(v)}
+            />
+          )}
+        </Card>
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card title="Hàng sắp hết (bằng hoặc dưới mức tối thiểu)">
