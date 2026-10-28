@@ -1,6 +1,7 @@
-import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
+import Link from "next/link";
+import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { BarChart, DonutChart, HBarList, formatCompactVND } from "@/components/Charts";
-import { getCurrentProfile, getDashboard } from "@/lib/queries";
+import { getCurrentProfile, getDashboard, getPartnerDetail, listPartners } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +16,14 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
-export default async function DashboardPage() {
-  const [d, profile] = await Promise.all([getDashboard(), getCurrentProfile()]);
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { partner?: string };
+}) {
+  const [d, profile, partners] = await Promise.all([getDashboard(), getCurrentProfile(), listPartners()]);
+  const selectedId = searchParams.partner ?? "";
+  const detail = selectedId ? await getPartnerDetail(selectedId) : null;
   if (!d.configured) {
     return (
       <>
@@ -37,6 +44,43 @@ export default async function DashboardPage() {
         <StatCard label="Hàng tại kho đối tác" value={formatNumber(d.atPartnersQty)} sub="Đã gửi ký gửi / đã giao, chưa tiêu thụ" />
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" />
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ chúng ta" />
+      </div>
+
+      <div className="mt-6">
+        <Card title="Thống kê đối tác">
+          <form action="/dashboard" method="get" className="mb-4 flex flex-wrap items-end gap-3">
+            <div>
+              <label className={labelCls}>Chọn đối tác</label>
+              <select name="partner" defaultValue={selectedId} className={inputCls}>
+                <option value="">— Chọn đối tác —</option>
+                {partners.data.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" className={btnCls}>Xem</button>
+          </form>
+          {!detail ? (
+            <p className="text-sm text-slate-500">Chọn một đối tác ở trên để xem số dư, tiền đã trả, hoá đơn và hàng còn ở đối tác đó.</p>
+          ) : !detail.data.partner ? (
+            <EmptyState message="Không tìm thấy đối tác." />
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+                <StatCard label="Số dư còn phải thu" value={formatVND(detail.data.stats.outstanding)} sub="Đối tác còn nợ chúng ta" />
+                <StatCard label="Đã thanh toán" value={formatVND(detail.data.stats.totalPaid)} sub="Tổng tiền đã thu" />
+                <StatCard label="Hoá đơn đã xuất" value={formatNumber(detail.data.stats.invoiceCount)} sub="Hoá đơn đang hiệu lực" />
+                <StatCard label="Giá trị hoá đơn" value={formatVND(detail.data.stats.invoiceTotal)} sub="Tổng tiền hoá đơn đang hiệu lực" />
+                <StatCard label="Hàng còn ở đối tác" value={formatNumber(detail.data.stats.stillAtPartner)} sub="Số cái đang ở chỗ đối tác" />
+              </div>
+              <p className="mt-3 text-sm">
+                <Link href={`/partners/${detail.data.partner.id}`} className="font-medium text-blue-700 hover:underline">
+                  Mở trang chi tiết {detail.data.partner.name} →
+                </Link>
+              </p>
+            </>
+          )}
+        </Card>
       </div>
 
       {(() => {

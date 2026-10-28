@@ -96,7 +96,7 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 
 | Nhóm | Mục | Dùng để |
 |---|---|---|
-| — | **Tổng quan** | Doanh thu 14 ngày, cơ cấu tồn kho, công nợ, hàng bán chạy, cảnh báo (tồn thấp, lệch kiểm soát đối tác…) |
+| — | **Tổng quan** | Doanh thu 14 ngày, cơ cấu tồn kho, công nợ, hàng bán chạy, cảnh báo (tồn thấp, lệch kiểm soát đối tác…); thẻ **Thống kê đối tác**: chọn một đối tác để xem số dư phải thu, đã thanh toán, hoá đơn đã xuất + giá trị, hàng còn ở đối tác (mọi vai trò đều xem được, kể cả CEO) |
 | **Hàng hoá & Kho** | Sản phẩm | Danh mục sản phẩm, mã OEM/mã tương đương, xe tương thích, giá lẻ + giá đại lý; trang chi tiết sửa được tên/thương hiệu/đơn vị/tồn tối thiểu và bảng giá (Chủ cửa hàng + Thủ kho; mã SKU không sửa được) |
 | | Tồn kho theo lô | Xem tồn theo từng lô OWN/CONS, vị trí giữ hàng, kiểm kê & điều chỉnh |
 | | Nhập kho | Tạo phiếu PN / NK thủ công, hoặc **Nhập từ Excel** (nút thứ ba trong trang) |
