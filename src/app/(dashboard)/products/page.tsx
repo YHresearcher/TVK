@@ -39,7 +39,7 @@ export default async function ProductsPage({
         <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>
       )}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="min-w-0 lg:col-span-2">
           <form method="get" className="mb-4 flex flex-wrap items-center gap-2">
             <input name="q" defaultValue={searchParams.q ?? ""} placeholder="Tìm theo tên hoặc SKU…" className={inputCls} />
             <label className="flex items-center gap-1.5 text-sm text-slate-700">
@@ -104,7 +104,7 @@ export default async function ProductsPage({
           )}
         </div>
         {!readOnly && (
-        <Card title="Sản phẩm mới" className="h-fit">
+        <Card title="Sản phẩm mới" className="h-fit min-w-0">
           <form action={createProductAction} className="space-y-3">
             <div><label className={labelCls}>SKU *</label><input name="sku" required className={inputCls} /></div>
             <div><label className={labelCls}>Tên *</label><input name="name" required className={inputCls} /></div>
