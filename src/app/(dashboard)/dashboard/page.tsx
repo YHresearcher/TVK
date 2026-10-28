@@ -29,10 +29,10 @@ export default async function DashboardPage() {
     <>
       <PageHeader
         title="Tổng quan"
-        description="Hàng của mình và hàng ký gửi luôn được theo dõi tách biệt."
+        description="Tồn kho và hàng ký gửi luôn được theo dõi tách biệt."
       />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Hàng của mình (số lượng)" value={formatNumber(d.ownedQty)} sub={formatVND(d.ownedValue) + " vốn đang nằm trong kho"} />
+        <StatCard label="Tồn kho (số lượng)" value={formatNumber(d.ownedQty)} sub={formatVND(d.ownedValue) + " vốn đang nằm trong kho"} />
         <StatCard label="Hàng ký gửi (số lượng)" value={formatNumber(d.consignedQty)} sub={formatVND(d.consignedValue) + " đang giữ hộ nhà cung cấp"} />
         <StatCard label="Hàng tại đối tác (số lượng)" value={formatNumber(d.atPartnersQty)} sub="Đã gửi ký gửi / đã giao, chưa tiêu thụ" />
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" />
@@ -44,7 +44,7 @@ export default async function DashboardPage() {
         const canSeeMoney = role === "OWNER" || role === "ACCOUNTING" || role === "CEO";
         const comp = d.stockComposition;
         const compSegments = [
-          { label: "Hàng của mình tại kho", seg: comp.ownedOwn, color: "#10b981" },
+          { label: "Tồn kho tại kho", seg: comp.ownedOwn, color: "#10b981" },
           { label: "Hàng ký gửi tại kho", seg: comp.consignedOwn, color: "#f59e0b" },
           { label: "Hàng tại đối tác", seg: comp.atPartners, color: "#0ea5e9" },
         ].map((s) => ({

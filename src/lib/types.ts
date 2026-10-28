@@ -57,7 +57,7 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 export const OWNERSHIP_LABELS: Record<string, string> = {
-  OWNED: "Hàng của mình",
+  OWNED: "Tồn kho",
   CONSIGNED: "Hàng ký gửi",
 };
 

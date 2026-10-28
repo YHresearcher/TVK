@@ -115,7 +115,7 @@ export default function LoginPage() {
               Tân Vạn Khang
             </p>
             <p className="mt-4 text-sm leading-relaxed text-stone-500">
-              Quản lý kho phụ tùng ô tô — hàng của mình, hàng ký gửi, rõ ràng
+              Quản lý kho phụ tùng ô tô — tồn kho, hàng ký gửi, rõ ràng
               từng lô.
             </p>
           </div>

@@ -19,7 +19,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     points: [
       "Đăng nhập bằng tên đăng nhập hoặc email và mật khẩu. Quên mật khẩu: nhờ Chủ cửa hàng (OWNER) bấm “Đặt lại mật khẩu” cho bạn trong Cài đặt → Quản lý tài khoản — email đặt lại mật khẩu sẽ gửi về hộp thư của bạn.",
       "Menu bên trái được gộp theo nhóm công việc: Hàng hoá & Kho (Sản phẩm, Tồn kho theo lô, Nhập kho) · Ký gửi (Gửi ký gửi, Tiêu thụ của đối tác) · Bán hàng & Hoá đơn (Bán hàng, Hoá đơn GTGT, Trả hàng & bảo hành) · Công nợ & Báo cáo (Phải trả, Phải thu, Báo cáo) · Danh mục (Nhà cung cấp, Đối tác). Bấm vào tên nhóm để mở — mở nhóm khác thì nhóm đang mở tự thu lại (mỗi lúc chỉ một nhóm mở); nhóm chứa trang bạn đang xem sẽ tự mở, và hệ thống nhớ lựa chọn của riêng bạn. Nhập hàng từ Excel nằm ngay trong trang Nhập kho (nút “Nhập từ Excel”).",
-      "Nguyên tắc cốt lõi: mọi hàng hoá thuộc một trong hai loại — Hàng của mình (mua đứt, lô OWN) và Hàng ký gửi (giữ hộ nhà cung cấp, lô CONS). Cùng một sản phẩm có thể có cả hai loại lô, nên hãy luôn chọn đúng lô khi bán, gửi đi hoặc trả hàng.",
+      "Nguyên tắc cốt lõi: mọi hàng hoá thuộc một trong hai loại — Tồn kho (mua đứt, lô OWN) và Hàng ký gửi (giữ hộ nhà cung cấp, lô CONS). Cùng một sản phẩm có thể có cả hai loại lô, nên hãy luôn chọn đúng lô khi bán, gửi đi hoặc trả hàng.",
       "Quét mã vạch: các form có ô “Quét mã vạch / nhập mã hàng” (Nhập kho, Tiêu thụ của đối tác) nhận mã từ máy quét mã vạch hoặc gõ tay rồi Enter — hệ thống khớp theo SKU hoặc bất kỳ mã tra cứu nào đã đăng ký cho sản phẩm; quét lại cùng một mã sẽ cộng thêm 1 số lượng.",
       "Tồn kho không bao giờ sửa trực tiếp: mọi thay đổi đều đi qua chứng từ (PN, NK, GK, BT, PB, BH, KG, TH) và được ghi vào sổ cái biến động không thể sửa/xoá, nên số liệu luôn truy vết được.",
       "Nút Trợ giúp ở góc trên bên phải luôn hiển thị hướng dẫn đúng với vai trò của bạn.",
@@ -70,7 +70,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     points: [
       "Vào Bán hàng: chọn Khách lẻ hoặc đối tác (giá tự theo loại đối tác: Gara thì giá gara, còn lại thì giá đại lý; khách lẻ thì giá lẻ), điền Tên khách hàng (đã chọn đối tác thì tên tự hiện, không sửa được), quét mã vạch hoặc gõ tên, mã xe, mã hàng rồi Enter để thêm dòng theo lô cũ nhất còn hàng (FIFO) — quét lại cùng mã để cộng số lượng; tick “Ghi nợ (tạo phải thu)” nếu bán nợ, rồi bấm “Bán hàng”.",
       "Chứng từ tự tách theo lô bạn chọn: lô của mình vào chứng từ BH, lô ký gửi vào chứng từ KG và tự động tạo khoản phải trả cho nhà cung cấp của lô đó theo giá ký gửi. Vì vậy chọn đúng lô là bước quan trọng nhất.",
-      "Ô “Giảm giá cho phần BH” chỉ trừ vào phần hàng của mình (BH); giảm giá không bao giờ làm thay đổi khoản phải trả cho nhà cung cấp của hàng ký gửi.",
+      "Ô “Giảm giá cho phần BH” chỉ trừ vào phần tồn kho (BH); giảm giá không bao giờ làm thay đổi khoản phải trả cho nhà cung cấp của hàng ký gửi.",
       "Bán xong, tồn kho và công nợ cập nhật ngay — kiểm tra lại ở hai bảng “Đơn hàng gần đây” và “Chứng từ quản lý (BH / KG)” ngay dưới form.",
     ],
   },
@@ -181,7 +181,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Xem Tổng quan điều hành",
     roles: ["CEO"],
     points: [
-      "Mở Tổng quan để nắm bức tranh toàn cảnh: doanh thu 14 ngày gần nhất, cơ cấu tồn kho theo GIÁ TRỊ VỐN (hàng của mình / hàng ký gửi / hàng tại đối tác), công nợ phải trả và phải thu theo trạng thái, top 5 sản phẩm bán chạy trong 30 ngày.",
+      "Mở Tổng quan để nắm bức tranh toàn cảnh: doanh thu 14 ngày gần nhất, cơ cấu tồn kho theo GIÁ TRỊ VỐN (tồn kho / hàng ký gửi / hàng tại đối tác), công nợ phải trả và phải thu theo trạng thái, top 5 sản phẩm bán chạy trong 30 ngày.",
       "Chú ý các mục cảnh báo ở Tổng quan: “Hàng sắp hết” (tồn bằng hoặc dưới mức tối thiểu), “Lô ký gửi phải trả trong 30 ngày tới”, và bảng chênh lệch ký gửi tại đối tác xuất hiện khi số đã gửi không khớp đã tiêu thụ + đã trả + còn giữ.",
     ],
   },

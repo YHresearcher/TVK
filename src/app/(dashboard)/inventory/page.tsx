@@ -34,7 +34,7 @@ export default async function InventoryPage({
       <form method="get" className="mb-4 flex flex-wrap gap-2">
         <select name="ownership" defaultValue={searchParams.ownership ?? ""} className={`${inputCls} w-auto`}>
           <option value="">Tất cả quyền sở hữu</option>
-          <option value="OWNED">Hàng của mình (OWN)</option>
+          <option value="OWNED">Tồn kho (OWN)</option>
           <option value="CONSIGNED">Hàng ký gửi (CONS)</option>
         </select>
         <select name="location_kind" defaultValue={searchParams.location_kind ?? ""} className={`${inputCls} w-auto`}>

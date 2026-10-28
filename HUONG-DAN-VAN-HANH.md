@@ -26,7 +26,7 @@ Kết hợp thành 4 ô:
 
 | | Ở kho mình | Ở đối tác |
 |---|---|---|
-| **Hàng của mình (OWN)** | A — Hàng mình, kho mình | B — Hàng mình gửi đối tác ký gửi |
+| **Tồn kho (OWN)** | A — Hàng mình, kho mình | B — Hàng mình gửi đối tác ký gửi |
 | **Hàng ký gửi (CONS)** | C — Hàng NCC gửi tại kho mình | D — Hàng của NCC đang ở đối tác (**khoá mặc định** — chỉ mở khi nhà cung cấp cho phép ký gửi tiếp) |
 
 ### A2. Sổ cái biến động không thể sửa/xoá
@@ -53,7 +53,7 @@ Mỗi loại chứng từ có tiền tố riêng và số chạy liên tục, **
 
 ### A4. Nguyên tắc tiền — ba quy tắc không bao giờ phá
 
-1. **Giảm giá chỉ áp dụng trên phần hàng của mình (BH).** Giảm giá cho khách không bao giờ làm thay đổi số tiền phải trả nhà cung cấp cho hàng ký gửi.
+1. **Giảm giá chỉ áp dụng trên phần tồn kho (BH).** Giảm giá cho khách không bao giờ làm thay đổi số tiền phải trả nhà cung cấp cho hàng ký gửi.
 2. **Khoản phải trả nhà cung cấp chỉ sinh ra khi hàng ký gửi BÁN ĐƯỢC**, tính theo **giá ký gửi đã thoả thuận của đúng lô đó** — không sinh khi nhận hàng, không sinh khi gửi đi.
 3. **Phân bổ trước, hoá đơn sau.** Một lần tiêu thụ có thể gồm cả hàng mình và hàng ký gửi; hệ thống luôn phân bổ rõ từng dòng thuộc lô nào/tính chất nào trước, rồi mới xuất hoá đơn GTGT từ các dòng đã phân bổ. Một hoá đơn GTGT có thể chứa cả hai tính chất (mỗi tính chất một dòng), nhưng chứng từ nội bộ BH/KG luôn tách riêng và liên kết với hoá đơn ở cấp độ từng dòng — tiền hai phía không bao giờ trộn lẫn.
 
@@ -306,7 +306,7 @@ Quyền được thực thi ở tầng dữ liệu (không chỉ ẩn nút): vai
 | Thuật ngữ | Nghĩa |
 |---|---|
 | **Lô (batch)** | Đơn vị quản lý tồn kho: một lượng hàng về cùng một phiếu, cùng chủ sở hữu, cùng giá. |
-| **OWN / CONS** | Hàng của mình / hàng ký gửi của nhà cung cấp. |
+| **OWN / CONS** | Tồn kho / hàng ký gửi của nhà cung cấp. |
 | **Nhãn trắng / nhãn vàng** | Quy ước dán nhãn vật lý: trắng = hàng mình (OWN), vàng = ký gửi (CONS). |
 | **Ô D** | Hàng của nhà cung cấp đang nằm ở đối tác — trường hợp nhạy cảm, khoá mặc định. |
 | **Phân bổ** | Chia số lượng tiêu thụ/bán vào từng lô cụ thể để xác định phần của mình (BH) và phần ký gửi (KG). |
