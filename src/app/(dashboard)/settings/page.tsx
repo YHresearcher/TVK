@@ -64,7 +64,7 @@ export default async function SettingsPage() {
           </form>
         </Card>
 
-        <Card title="Kho / địa điểm của chúng ta">
+        <Card title="Kho / địa điểm của TVK">
           {warehouses.length === 0 ? <EmptyState message="Chưa có kho — hãy tạo kho đầu tiên." /> : (
             <ul className="space-y-1 text-sm">
               {warehouses.map((l) => (

@@ -168,6 +168,60 @@ export async function getPartnerRemainingEstimates(): Promise<Map<string, number
   return out;
 }
 
+/** Thống kê nhanh của từng đối tác cho cửa sổ bật lên ở dashboard: cùng
+ *  công thức với getPartnerDetail nhưng gộp một lần cho mọi đối tác. */
+export interface PartnerStat {
+  id: string;
+  name: string;
+  outstanding: number;
+  totalPaid: number;
+  invoiceCount: number;
+  invoiceTotal: number;
+  stillAtPartner: number;
+}
+
+export async function listPartnerStats(): Promise<PartnerStat[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+  const [partners, receivables, invoices, consignment] = await Promise.all([
+    supabase.from("partners").select("id, name").order("name").limit(500),
+    supabase.from("partner_receivables").select("partner_id, amount, amount_paid, status").limit(2000),
+    supabase.from("vat_invoices").select("partner_id, total_amount, status").limit(2000),
+    supabase.from("v_partner_consignment").select("partner_id, qty_still_at_partner").limit(500),
+  ]);
+  const byId = new Map<string, PartnerStat>();
+  for (const p of (partners.data ?? []) as AnyRow[]) {
+    byId.set(String(p.id), {
+      id: String(p.id),
+      name: String(p.name),
+      outstanding: 0,
+      totalPaid: 0,
+      invoiceCount: 0,
+      invoiceTotal: 0,
+      stillAtPartner: 0,
+    });
+  }
+  for (const r of (receivables.data ?? []) as AnyRow[]) {
+    const s = byId.get(String(r.partner_id));
+    if (!s) continue;
+    if (r.status === "UNPAID" || r.status === "PARTIAL") {
+      s.outstanding += Number(r.amount) - Number(r.amount_paid);
+    }
+    s.totalPaid += Number(r.amount_paid);
+  }
+  for (const i of (invoices.data ?? []) as AnyRow[]) {
+    const s = byId.get(String(i.partner_id));
+    if (!s || i.status !== "ISSUED") continue;
+    s.invoiceCount += 1;
+    s.invoiceTotal += Number(i.total_amount);
+  }
+  for (const c of (consignment.data ?? []) as AnyRow[]) {
+    const s = byId.get(String(c.partner_id));
+    if (s) s.stillAtPartner = Number(c.qty_still_at_partner ?? 0);
+  }
+  return Array.from(byId.values());
+}
+
 export async function getProductDetail(id: string) {
   const supabase = await client();
   if (!supabase)

@@ -335,21 +335,23 @@ export function HBarList({
   return (
     <ul className="space-y-3">
       {data.map((d, i) => (
-        <li key={i} className="flex items-center gap-3">
-          <span className="w-24 shrink-0 truncate text-xs text-slate-600 sm:w-44" title={d.label}>
+        <li key={i} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+          <span className="min-w-0 text-xs text-slate-600 sm:w-44 sm:shrink-0 sm:truncate" title={d.label}>
             {d.label}
           </span>
-          <span className="h-4 flex-1 overflow-hidden rounded bg-slate-100">
-            <span
-              className="block h-full rounded"
-              style={{
-                width: `${max > 0 ? Math.max((d.value / max) * 100, d.value > 0 ? 2 : 0) : 0}%`,
-                backgroundColor: d.color ?? "#2563eb",
-              }}
-            />
-          </span>
-          <span className="w-24 shrink-0 text-right text-sm font-medium text-slate-900">
-            {format(d.value)}
+          <span className="flex flex-1 items-center gap-3">
+            <span className="h-4 flex-1 overflow-hidden rounded bg-slate-100">
+              <span
+                className="block h-full rounded"
+                style={{
+                  width: `${max > 0 ? Math.max((d.value / max) * 100, d.value > 0 ? 2 : 0) : 0}%`,
+                  backgroundColor: d.color ?? "#2563eb",
+                }}
+              />
+            </span>
+            <span className="w-24 shrink-0 text-right text-sm font-medium text-slate-900">
+              {format(d.value)}
+            </span>
           </span>
         </li>
       ))}

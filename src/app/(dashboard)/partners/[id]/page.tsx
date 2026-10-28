@@ -50,7 +50,7 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
       <p className="mb-4 text-sm"><Link href="/partners" className="font-medium text-blue-700 hover:underline">← Quay lại danh sách đối tác</Link></p>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatBox label="Số dư còn phải thu" value={formatVND(stats.outstanding)} sub="Đối tác còn nợ chúng ta" />
+        <StatBox label="Số dư còn phải thu" value={formatVND(stats.outstanding)} sub="Đối tác còn nợ TVK" />
         <StatBox label="Đã thanh toán" value={formatVND(stats.totalPaid)} sub="Tổng tiền đã thu" />
         <StatBox label="Hoá đơn đã xuất" value={formatNumber(stats.invoiceCount)} sub="Hoá đơn đang hiệu lực" />
         <StatBox label="Giá trị hoá đơn" value={formatVND(stats.invoiceTotal)} sub="Tổng tiền hoá đơn đang hiệu lực" />

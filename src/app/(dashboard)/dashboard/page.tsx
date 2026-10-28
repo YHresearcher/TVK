@@ -1,9 +1,7 @@
-import Link from "next/link";
-import { Suspense } from "react";
-import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
 import { BarChart, DonutChart, GroupedBarChart, HBarList, formatCompactVND } from "@/components/Charts";
-import PartnerSelect from "@/components/PartnerSelect";
-import { getCurrentProfile, getDashboard, getPartnerDetail, listPartners } from "@/lib/queries";
+import PartnerStatsDialog from "@/components/PartnerStatsDialog";
+import { getCurrentProfile, getDashboard, listPartnerStats } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -18,14 +16,8 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: { partner?: string };
-}) {
-  const [d, profile, partners] = await Promise.all([getDashboard(), getCurrentProfile(), listPartners()]);
-  const selectedId = searchParams.partner ?? "";
-  const detail = selectedId ? await getPartnerDetail(selectedId) : null;
+export default async function DashboardPage() {
+  const [d, profile, partnerStats] = await Promise.all([getDashboard(), getCurrentProfile(), listPartnerStats()]);
   const canSeeMoney = ["OWNER", "ACCOUNTING", "CEO"].includes(profile.data?.role ?? "");
   // Giá vốn / lợi nhuận chỉ Chủ cửa hàng và Kế toán được coi — CEO chỉ coi
   // giá trị thật, nhân viên bán hàng/kho không thấy giá vốn và lợi nhuận.
@@ -65,7 +57,7 @@ export default async function DashboardPage({
         <StatCard label="Hàng ký gửi (số lượng)" value={formatNumber(d.consignedQty)} sub={formatVND(d.consignedValue) + " đang giữ hộ nhà cung cấp"} />
         <StatCard label="Hàng tại kho đối tác" value={formatNumber(d.atPartnersQty)} sub={formatVND(d.atPartnersValue) + " theo giá chuyển giao"} />
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" />
-        <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ chúng ta" />
+        <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ TVK" />
       </div>
 
       {canSeeCost && (
@@ -114,36 +106,8 @@ export default async function DashboardPage({
 
       <div className="mt-6">
         <Card title="Thống kê đối tác">
-          <div className="mb-4">
-            <label className={labelCls}>Chọn đối tác</label>
-            <Suspense>
-              <PartnerSelect
-                options={partners.data.map((p) => ({ value: p.id, label: p.name }))}
-                defaultValue={selectedId}
-                className={inputCls}
-              />
-            </Suspense>
-          </div>
-          {!detail ? (
-            <p className="text-sm text-slate-500">Chọn một đối tác ở trên để xem số dư, tiền đã trả, hoá đơn và hàng còn ở đối tác đó.</p>
-          ) : !detail.data.partner ? (
-            <EmptyState message="Không tìm thấy đối tác." />
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-                <StatCard label="Số dư còn phải thu" value={formatVND(detail.data.stats.outstanding)} sub="Đối tác còn nợ chúng ta" />
-                <StatCard label="Đã thanh toán" value={formatVND(detail.data.stats.totalPaid)} sub="Tổng tiền đã thu" />
-                <StatCard label="Hoá đơn đã xuất" value={formatNumber(detail.data.stats.invoiceCount)} sub="Hoá đơn đang hiệu lực" />
-                <StatCard label="Giá trị hoá đơn" value={formatVND(detail.data.stats.invoiceTotal)} sub="Tổng tiền hoá đơn đang hiệu lực" />
-                <StatCard label="Hàng còn ở đối tác" value={formatNumber(detail.data.stats.stillAtPartner)} sub="Số cái đang ở chỗ đối tác" />
-              </div>
-              <p className="mt-3 text-sm">
-                <Link href={`/partners/${detail.data.partner.id}`} className="font-medium text-blue-700 hover:underline">
-                  Mở trang chi tiết {detail.data.partner.name} →
-                </Link>
-              </p>
-            </>
-          )}
+          <p className="mb-4 text-sm text-slate-500">Chọn một đối tác để xem nhanh số dư, tiền đã trả, hoá đơn và hàng còn ở đối tác đó trong cửa sổ bật lên.</p>
+          <PartnerStatsDialog partners={partnerStats} />
         </Card>
       </div>
 
