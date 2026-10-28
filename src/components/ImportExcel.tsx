@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { mapHeaderColumns, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
+import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
+import { normCode } from "@/lib/product-match";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
 
@@ -238,6 +239,22 @@ export default function ImportExcel({
     !!supplierId &&
     !!warehouseId;
 
+  // Cảnh báo trùng tên: cùng tên nhưng khác mã là món khác nhau — hệ
+  // thống khớp theo mã nên vẫn nhập đúng; chỉ nhắc coi kỹ mã. Không
+  // chặn nhập (chỉ cảnh báo), khác với trùng mã trong file.
+  const duplicateNames = useMemo(() => {
+    const byName = new Map<string, { name: string; codes: Set<string> }>();
+    for (const r of preview) {
+      if (!r.name || !r.code) continue;
+      const key = normalizeHeader(r.name);
+      if (!key) continue;
+      const entry = byName.get(key) ?? { name: r.name, codes: new Set<string>() };
+      entry.codes.add(normCode(r.code));
+      byName.set(key, entry);
+    }
+    return Array.from(byName.values()).filter((e) => e.codes.size > 1);
+  }, [preview]);
+
   const payload = {
     kind,
     supplierId,
@@ -469,6 +486,14 @@ export default function ImportExcel({
         <p className="text-sm text-slate-600">
           Đã đọc file <span className="font-medium">{fileName}</span>: {preview.length} dòng,{" "}
           {importable.length} dòng sẵn sàng nhập, {preview.length - importable.length} dòng lỗi.
+        </p>
+      )}
+      {duplicateNames.length > 0 && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Trong file có tên hàng xuất hiện nhiều lần với mã khác nhau:{" "}
+          {duplicateNames.map((d) => `“${d.name}” (${d.codes.size} mã)`).join(", ")}.
+          Hệ thống vẫn nhập đúng từng món theo mã — coi kỹ cột Mã hàng
+          trước khi nhập.
         </p>
       )}
 
