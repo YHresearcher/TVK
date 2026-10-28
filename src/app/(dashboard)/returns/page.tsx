@@ -1,9 +1,10 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import ItemsRows from "@/components/ItemsRows";
+import ExportExcelButton from "@/components/ExportExcelButton";
 import { confirmReturnAction, createReturnAction } from "@/lib/actions";
 import { getCurrentProfile, listBatchStock, listPartners, listReturnDocuments, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
-import { OWNERSHIP_LABELS, RETURN_KINDS, RETURN_KIND_LABELS, RETURN_REASONS, RETURN_REASON_LABELS, isReadOnlyRole } from "@/lib/types";
+import { OWNERSHIP_LABELS, RETURN_KINDS, RETURN_KIND_LABELS, RETURN_REASONS, RETURN_REASON_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,13 @@ export default async function ReturnsPage({
   const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
   const supplierName = new Map(suppliers.data.map((s) => [s.id, s.name]));
+  const returnRows = docs.data.map((d) => ({
+    "Mã": d.doc_code,
+    "Loại": RETURN_KIND_LABELS[d.return_kind] ?? d.return_kind,
+    "Bên liên quan": d.partner_id ? partnerName.get(d.partner_id) ?? "—" : d.supplier_id ? supplierName.get(d.supplier_id) ?? "—" : "—",
+    "Ngày": formatDate(d.return_date),
+    "Trạng thái": STATUS_LABELS[d.status] ?? d.status,
+  }));
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
   const supplierOptions = suppliers.data.map((s) => ({ value: s.id, label: s.name }));
   const allBatches = Array.from(new Map(batchStock.data.map((r) => [r.batch_id, r])).values());
@@ -64,6 +72,10 @@ export default async function ReturnsPage({
         </Card>
         )}
 
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-800">Phiếu trả hàng</h2>
+          {docs.data.length > 0 && <ExportExcelButton filename="phieu-tra-hang.xlsx" rows={returnRows} />}
+        </div>
         {docs.data.length === 0 ? <EmptyState message="Chưa có phiếu trả hàng." /> : (
           <TableWrap>
             <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Bên liên quan</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>

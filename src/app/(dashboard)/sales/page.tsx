@@ -1,10 +1,11 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
 import PosSaleForm, { type PosBatch, type PosPartner, type PosProduct } from "@/components/PosSaleForm";
 import ImportDealerSale from "@/components/ImportDealerSale";
+import ExportExcelButton from "@/components/ExportExcelButton";
 import { createCounterSaleAction, importDealerSaleAction } from "@/lib/actions";
 import { buildProductCodeMap, getCurrentProfile, listBatchStock, listPartners, listProductCodes, listProductFitments, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
-import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
+import { OWNERSHIP_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
 import type { AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,19 @@ export default async function SalesPage({
   ]);
   const configured = orders.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
+  const orderRows = orders.data.map((o) => ({
+    "Mã": o.doc_code,
+    "Ngày": formatDate(o.order_date),
+    "Tổng": Number(o.total_amount) || 0,
+    "Trạng thái": STATUS_LABELS[o.status] ?? o.status,
+  }));
+  const documentRows = documents.data.map((d) => ({
+    "Mã": d.doc_code,
+    "Loại": d.doc_kind,
+    "Ngày": formatDate(d.doc_date),
+    "Tổng": Number(d.total_amount) || 0,
+    "Trạng thái": STATUS_LABELS[d.status] ?? d.status,
+  }));
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name, kind: p.partner_kind }));
   const posPartners: PosPartner[] = partners.data.map((p) => ({
     id: p.id,
@@ -129,12 +143,12 @@ export default async function SalesPage({
           <Card title="Nhập từ Excel (Bán hàng)">
             <p className="mb-4 text-sm text-slate-500">
               Một file là một đơn bán hàng sỉ hoặc lẻ (chọn đối tác hoặc
-              khách lẻ ở form), vào đúng ngày bán đã chọn. Nhập theo mã
-              hàng — tên trùng nhau cũng không sao vì mã khác nhau là món
-              khác nhau; hệ thống phân bổ theo lô cũ nhất còn hàng (FIFO).
-              Đơn giá để trống thì lấy giá theo loại khách đã chọn. Đơn tạo
-              xong xác nhận ngay như nhập tay — lô của mình vào BH, lô ký
-              gửi vào KG.
+              khách lẻ ở form), vào đúng ngày bán đã chọn. Nhập theo tên
+              phụ tùng + dòng xe (cột Mã hàng tùy chọn, chỉ cần khi tên
+              trùng nhau để phân biệt); hệ thống phân bổ theo lô cũ nhất
+              còn hàng (FIFO). Đơn giá để trống thì lấy giá theo loại khách
+              đã chọn. Đơn tạo xong xác nhận ngay như nhập tay — lô của
+              mình vào BH, lô ký gửi vào KG.
             </p>
             <ImportDealerSale
               partners={partnerOptions}
@@ -148,7 +162,10 @@ export default async function SalesPage({
 
         <div className="grid gap-6 lg:grid-cols-2">
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-slate-800">Đơn hàng gần đây</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-800">Đơn hàng gần đây</h2>
+              {orders.data.length > 0 && <ExportExcelButton filename="don-hang.xlsx" rows={orderRows} />}
+            </div>
             {orders.data.length === 0 ? <EmptyState message="Chưa có đơn hàng." /> : (
               <TableWrap>
                 <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Ngày</th><th className={thCls}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
@@ -166,7 +183,10 @@ export default async function SalesPage({
             )}
           </div>
           <div>
-            <h2 className="mb-3 text-sm font-semibold text-slate-800">Chứng từ quản lý (BH / KG)</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-800">Chứng từ quản lý (BH / KG)</h2>
+              {documents.data.length > 0 && <ExportExcelButton filename="chung-tu-ban-hang.xlsx" rows={documentRows} />}
+            </div>
             {documents.data.length === 0 ? <EmptyState message="Chưa có chứng từ." /> : (
               <TableWrap>
                 <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Ngày</th><th className={thCls}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>

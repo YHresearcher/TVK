@@ -1262,7 +1262,7 @@ export async function importDealerSaleAction(formData: FormData) {
     const vehicle = String(r.vehicle ?? "").trim();
     const code = String(r.code ?? "").trim();
     const qty = Math.trunc(Number(r.qty) || 0);
-    const label = name || code || "(dòng thiếu mã hàng)";
+    const label = name || code || "(dòng thiếu tên hàng và mã hàng)";
     const priceRaw =
       r.price === null || r.price === undefined || r.price === "" ? null : Number(r.price);
     let productId: string | undefined;
@@ -1280,7 +1280,7 @@ export async function importDealerSaleAction(formData: FormData) {
       }
       productId = matched.productId;
     } else {
-      invalid.push("(dòng thiếu mã hàng)");
+      invalid.push("(dòng thiếu tên hàng và mã hàng)");
       continue;
     }
     if (!(qty > 0)) {

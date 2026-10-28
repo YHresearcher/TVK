@@ -109,9 +109,13 @@ export default function ImportDealerSale({
       const aoa = await readFirstSheetAOA(await file.arrayBuffer());
       if (!aoa.length) throw new Error("File không có dữ liệu.");
       const { fieldCol, problems } = mapHeaderColumns(aoa[0], FIELD_ALIASES, [
-        { field: "code", label: "Mã hàng" },
         { field: "qty", label: "Số lượng" },
       ]);
+      // Cột Mã hàng không bắt buộc: chỉ cần có cột Mã hàng HOẶC cột Tên
+      // phụ tùng — tên đã tách biệt nên khớp theo tên + dòng xe, mã chỉ
+      // cần khi tên trùng nhau để phân biệt.
+      if (fieldCol.code === undefined && fieldCol.name === undefined)
+        problems.push("File phải có cột Mã hàng hoặc cột Tên phụ tùng để biết bán món nào.");
       const val = (cells: unknown[], field: string) => {
         const i = fieldCol[field];
         return i === undefined ? "" : cells[i] ?? "";
@@ -162,7 +166,7 @@ export default function ImportDealerSale({
       let productName: string | undefined;
       const codeKey = normCode(r.code);
       if (!codeKey && !r.name) {
-        error = "Thiếu mã hàng";
+        error = "Thiếu tên hàng và mã hàng";
       } else if (codeKey) {
         const byCode = codeMap[codeKey];
         if (!byCode) error = "Mã hàng chưa có trong hệ thống";
@@ -284,13 +288,12 @@ export default function ImportDealerSale({
         </div>
         <p className="mt-2 text-xs text-blue-900/70">
           Tải file mẫu về, xoá các dòng ví dụ rồi điền hàng cần bán — một
-          file là một đơn bán hàng. Hệ thống tìm hàng theo <b>mã hàng</b>
-          (cột Mã hàng), tên trùng nhau cũng không sao vì mã khác nhau là
-          món khác nhau; tên và dòng xe chỉ để đọc cho dễ. Không cần nhớ
-          mã lô: hệ thống tự lấy theo lô cũ nhất còn tại Kho TVK
-          (FIFO). Đơn giá để trống thì lấy giá theo loại khách đã chọn ở
-          form dưới. Hệ thống kiểm tra định dạng và cho xem trước ở bên
-          dưới trước khi tạo đơn.
+          file là một đơn bán hàng. Hệ thống tìm hàng theo <b>tên phụ tùng
+          + dòng xe</b> (tên đã tách biệt); cột Mã hàng chỉ cần khi tên
+          trùng nhau để phân biệt. Không cần nhớ mã lô: hệ thống tự lấy
+          theo lô cũ nhất còn tại Kho TVK (FIFO). Đơn giá để trống thì
+          lấy giá theo loại khách đã chọn ở form dưới. Hệ thống kiểm tra
+          định dạng và cho xem trước ở bên dưới trước khi tạo đơn.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-4">
@@ -351,20 +354,19 @@ export default function ImportDealerSale({
           </ul>
           <div className="rounded-md bg-white/70 px-3 py-2 text-xs leading-relaxed text-slate-700">
             <p className="font-semibold">Định dạng chuẩn của file bán sỉ/lẻ:</p>
-            <p className="mt-1 font-mono text-[11px]">STT · Mã hàng* · Dòng xe · Tên phụ tùng · Số lượng* · Đơn giá</p>
+            <p className="mt-1 font-mono text-[11px]">STT · Mã hàng · Dòng xe · Tên phụ tùng* · Số lượng* · Đơn giá</p>
             <p className="mt-1">
               Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là
-              bắt buộc). STT chỉ để đếm. Hệ thống tìm hàng theo mã hàng
-              (mã SKU hoặc mã đã đăng ký trong danh mục); tên phụ tùng và
-              dòng xe chỉ để đọc cho dễ, không dùng để khớp — hai món trùng
-              tên nhưng khác mã vẫn bán đúng từng món. Dòng nào thiếu mã
-              thì hệ thống mới tìm theo tên + dòng xe như trước. Đơn giá
-              tính bằng VNĐ — để trống thì lấy giá theo loại khách đã chọn
-              ở form (khách lẻ: giá lẻ; Gara: giá gara; đối tác khác: giá
-              đại lý), ghi số thì bán đúng giá đó. Ngày bán chọn ở form
-              trên, áp dụng cho cả đơn. File .csv phải lưu ở mã hoá UTF-8.
-              Dễ nhất: bấm “Tải file mẫu” ở trên, xoá dòng ví dụ rồi điền
-              vào.
+              bắt buộc; cột Mã hàng tùy chọn). STT chỉ để đếm. Hệ thống tìm
+              hàng theo tên phụ tùng + dòng xe; mã hàng (mã SKU hoặc mã đã
+              đăng ký trong danh mục) chỉ cần ghi khi tên trùng nhau để
+              phân biệt — khi đó mã mới là chìa khoá quyết định. Dòng nào
+              thiếu cả tên lẫn mã thì bị từ chối. Đơn giá tính bằng VNĐ —
+              để trống thì lấy giá theo loại khách đã chọn ở form (khách
+              lẻ: giá lẻ; Gara: giá gara; đối tác khác: giá đại lý), ghi
+              số thì bán đúng giá đó. Ngày bán chọn ở form trên, áp dụng
+              cho cả đơn. File .csv phải lưu ở mã hoá UTF-8. Dễ nhất: bấm
+              “Tải file mẫu” ở trên, xoá dòng ví dụ rồi điền vào.
             </p>
           </div>
         </div>

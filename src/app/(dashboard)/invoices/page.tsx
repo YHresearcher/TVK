@@ -1,8 +1,9 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { cancelVatInvoiceAction, createVatInvoiceAction } from "@/lib/actions";
+import ExportExcelButton from "@/components/ExportExcelButton";
 import { getCurrentProfile, getVatInvoiceMode, listPartners, listUninvoicedLines, listVatInvoices } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
-import { isReadOnlyRole } from "@/lib/types";
+import { STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,14 @@ export default async function InvoicesPage({
   const configured = invoices.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
+  const invoiceRows = invoices.data.map((inv) => ({
+    "Số hoá đơn": inv.invoice_no,
+    "Ký hiệu": inv.symbol,
+    "Đối tác": inv.partner_id ? partnerName.get(inv.partner_id) ?? "—" : "—",
+    "Ngày": formatDate(inv.invoice_date),
+    "Tổng": Number(inv.total_amount) || 0,
+    "Trạng thái": STATUS_LABELS[inv.status] ?? inv.status,
+  }));
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name }));
 
   return (
@@ -78,6 +87,10 @@ export default async function InvoicesPage({
         </Card>
         )}
 
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-800">Hoá đơn đã xuất</h2>
+          {invoices.data.length > 0 && <ExportExcelButton filename="hoa-don-gtgt.xlsx" rows={invoiceRows} />}
+        </div>
         {invoices.data.length === 0 ? <EmptyState message="Chưa có hoá đơn GTGT." /> : (
           <TableWrap>
             <thead><tr><th className={thCls}>Số hoá đơn</th><th className={thCls}>Ký hiệu</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Tổng</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
