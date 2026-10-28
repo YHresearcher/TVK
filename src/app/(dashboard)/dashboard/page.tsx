@@ -34,7 +34,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Tồn kho (số lượng)" value={formatNumber(d.ownedQty)} sub={formatVND(d.ownedValue) + " vốn đang nằm trong kho"} />
         <StatCard label="Hàng ký gửi (số lượng)" value={formatNumber(d.consignedQty)} sub={formatVND(d.consignedValue) + " đang giữ hộ nhà cung cấp"} />
-        <StatCard label="Hàng tại đối tác (số lượng)" value={formatNumber(d.atPartnersQty)} sub="Đã gửi ký gửi / đã giao, chưa tiêu thụ" />
+        <StatCard label="Hàng tại kho đối tác" value={formatNumber(d.atPartnersQty)} sub="Đã gửi ký gửi / đã giao, chưa tiêu thụ" />
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" />
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ chúng ta" />
       </div>
@@ -46,7 +46,7 @@ export default async function DashboardPage() {
         const compSegments = [
           { label: "Tồn kho tại kho", seg: comp.ownedOwn, color: "#10b981" },
           { label: "Hàng ký gửi tại kho", seg: comp.consignedOwn, color: "#f59e0b" },
-          { label: "Hàng tại đối tác", seg: comp.atPartners, color: "#0ea5e9" },
+          { label: "Hàng tại kho đối tác", seg: comp.atPartners, color: "#0ea5e9" },
         ].map((s) => ({
           label: s.label,
           value: canSeeMoney ? s.seg.value : s.seg.qty,
