@@ -71,7 +71,7 @@ export default async function PartnersPage({
               <div><label className={labelCls}>Mã số thuế</label><input name="tax_code" defaultValue={editing?.tax_code ?? ""} className={inputCls} /></div>
             </div>
             <div><label className={labelCls}>Địa chỉ</label><input name="address" defaultValue={editing?.address ?? ""} className={inputCls} /></div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <div><label className={labelCls}>Số ngày thanh toán</label><input name="payment_days" type="number" defaultValue={editing?.payment_days ?? 0} className={inputCls} /></div>
               <div><label className={labelCls}>Hạn mức tín dụng (₫)</label><input name="credit_limit" type="number" step="100000" defaultValue={editing?.credit_limit ?? 0} className={inputCls} /></div>
               <div><label className={labelCls}>Hạn mức ký gửi (₫)</label><input name="consignment_limit" type="number" step="100000" defaultValue={editing?.consignment_limit ?? 0} className={inputCls} /></div>

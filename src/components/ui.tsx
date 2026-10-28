@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { STATUS_LABELS } from "@/lib/types";
 
 export const inputCls =
-  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white";
+  "w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white sm:text-sm";
 export const labelCls = "block text-xs font-medium text-slate-600 mb-1";
 export const btnCls =
   "inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50";

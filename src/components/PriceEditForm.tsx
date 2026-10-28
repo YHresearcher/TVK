@@ -29,7 +29,7 @@ export default function PriceEditForm({
   };
   return (
     <form action={action} className="mt-4 space-y-2 border-t border-slate-100 pt-3">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid gap-2 sm:grid-cols-3">
         <div><label className={labelCls}>Giá lẻ</label><input name="retail_price" type="number" step="1000" min="0" value={retail} onChange={(e) => setRetail(Number(e.target.value))} className={inputCls} /></div>
         <div><label className={labelCls}>Cho gara</label><input name="garage_price" type="number" step="1000" min="0" value={garage} onChange={(e) => setGarage(Number(e.target.value))} className={inputCls} /></div>
         <div><label className={labelCls}>Giá đại lý</label><input name="wholesale_price" type="number" step="1000" min="0" value={wholesale} onChange={(e) => setWholesale(Number(e.target.value))} className={inputCls} /></div>

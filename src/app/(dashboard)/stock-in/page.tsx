@@ -61,7 +61,7 @@ export default async function StockInPage({
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       {searchParams.error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{searchParams.error}</p>}
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-wrap gap-2">
         <Link href="/stock-in?tab=purchase" className={tabCls(tab === "purchase", "bg-blue-600 text-white")}>Phiếu nhập mua (PN)</Link>
         <Link href="/stock-in?tab=consignment" className={tabCls(tab === "consignment", "bg-amber-500 text-white")}>Phiếu nhận ký gửi (NK)</Link>
         <Link href="/stock-in?tab=import" className={tabCls(tab === "import", "bg-emerald-600 text-white")}>Nhập từ Excel</Link>

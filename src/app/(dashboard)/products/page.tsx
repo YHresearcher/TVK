@@ -113,7 +113,7 @@ export default async function ProductsPage({
               <div><label className={labelCls}>Đơn vị</label><input name="unit" defaultValue="cái" className={inputCls} /></div>
               <div><label className={labelCls}>Tồn tối thiểu</label><input name="min_stock" type="number" defaultValue="0" className={inputCls} /></div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <div><label className={labelCls}>Giá lẻ</label><input name="retail_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
               <div><label className={labelCls}>Giá cho gara</label><input name="garage_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
               <div><label className={labelCls}>Giá đại lý</label><input name="wholesale_price" type="number" step="1000" defaultValue="0" className={inputCls} /></div>
