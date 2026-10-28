@@ -265,6 +265,7 @@ Quyền được thực thi ở tầng dữ liệu (không chỉ ẩn nút): vai
 
 ### Tài khoản & mật khẩu
 - Chỉ **Chủ cửa hàng** tạo/sửa/khoá/xoá tài khoản và gán vai trò (Cài đặt → Quản lý tài khoản). Sửa được họ tên và tên đăng nhập của từng tài khoản (kể cả tài khoản của chính mình); email không sửa được vì là danh tính đăng nhập. Đăng nhập bằng **tên đăng nhập hoặc email**. Quên mật khẩu: bấm **Quên mật khẩu?** ở trang đăng nhập để nhận email đặt lại, hoặc Chủ cửa hàng bấm **Đặt lại mật khẩu** trong Quản lý tài khoản.
+- Chốt an toàn ở database: tài khoản thường tự sửa chỉ được đổi họ tên, tên đăng nhập và gỡ cờ bắt đổi mật khẩu — không tự nâng vai trò, tự mở khoá hay đổi email được, kể cả gọi API trực tiếp (migration 0013, trigger `trg_profiles_privilege_guard`).
 - Tài khoản tạo bằng **mật khẩu tạm**, hoặc sau khi **đặt lại mật khẩu** (chủ cửa hàng bấm gửi, hay người dùng tự bấm "Quên mật khẩu"), sẽ **bị bắt buộc đổi mật khẩu ở lần đăng nhập kế tiếp** — chưa đổi xong thì chưa vào được hệ thống.
 - **Chuẩn mật khẩu mạnh** cho mật khẩu tự đặt: tối thiểu **8 ký tự**, có chữ thường, chữ HOA, chữ số và ký tự đặc biệt. Trang đặt/đổi mật khẩu có checklist đánh dấu từng yêu cầu khi gõ.
 
