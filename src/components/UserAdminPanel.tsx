@@ -25,13 +25,18 @@ function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
   const [formError, setFormError] = useState("");
   const router = useRouter();
 
-  // Gọi action trực tiếp để lỗi (vd: trùng tên đăng nhập) hiện ngay
-  // trong form thay vì vỡ cả trang — action ném lỗi thì bắt ở đây.
+  // Action trả về { ok, error } thay vì ném lỗi — lỗi phía server trong
+  // bản production bị rút gọn thành câu chung chung, không hiện được
+  // câu "trùng tên" trong form. Lỗi nào cũng hiện ngay trong form.
   async function handleSave(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setFormError("");
     try {
-      await updateUserInfoAction(new FormData(e.currentTarget));
+      const res = await updateUserInfoAction(new FormData(e.currentTarget));
+      if (!res.ok) {
+        setFormError(res.error ?? "Không lưu được, thử lại.");
+        return;
+      }
       setEditing(false);
       router.refresh();
     } catch (err) {

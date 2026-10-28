@@ -2135,20 +2135,24 @@ export async function inviteUserAction(formData: FormData) {
  * tra phía server). Sửa tên mình cũng được — khác với đổi vai trò/khoá/
  * xoá, những thứ bị cấm tự làm với chính mình. Email không sửa ở đây vì
  * nó là danh tính đăng nhập. Tên đăng nhập để trống = gỡ tên đăng nhập. */
-export async function updateUserInfoAction(formData: FormData) {
+export async function updateUserInfoAction(
+  formData: FormData
+): Promise<{ ok: boolean; error?: string }> {
   const { admin } = await requireOwnerAdmin();
   const id = str(formData, "profile_id");
   const fullName = str(formData, "full_name");
   const usernameRaw = optStr(formData, "username");
   const username = usernameRaw ? usernameRaw.toLowerCase() : null;
-  if (!fullName) throw new Error("Cần nhập họ tên.");
+  if (!fullName) return { ok: false, error: "Cần nhập họ tên." };
   if (
     username &&
     !/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)
   )
-    throw new Error(
-      "Tên đăng nhập chỉ gồm chữ thường, số, dấu chấm, gạch dưới, gạch ngang, dài 3–32 ký tự."
-    );
+    return {
+      ok: false,
+      error:
+        "Tên đăng nhập chỉ gồm chữ thường, số, dấu chấm, gạch dưới, gạch ngang, dài 3–32 ký tự.",
+    };
   await getTargetProfile(admin, id);
   if (username) {
     const { data: clash } = await admin
@@ -2157,7 +2161,7 @@ export async function updateUserInfoAction(formData: FormData) {
       .eq("username", username)
       .neq("id", id)
       .maybeSingle();
-    if (clash) throw new Error("Tên đăng nhập đã có người dùng.");
+    if (clash) return { ok: false, error: "Tên đăng nhập đã có người dùng." };
   }
   const upd = await admin
     .from("profiles")
@@ -2165,12 +2169,13 @@ export async function updateUserInfoAction(formData: FormData) {
     .eq("id", id);
   if (upd.error) {
     if (upd.error.code === "23505")
-      throw new Error("Tên đăng nhập đã có người dùng.");
+      return { ok: false, error: "Tên đăng nhập đã có người dùng." };
     if (upd.error.code === "23514")
-      throw new Error("Tên đăng nhập không đúng định dạng.");
-    throw new Error(`Cập nhật thông tin: ${upd.error.message}`);
+      return { ok: false, error: "Tên đăng nhập không đúng định dạng." };
+    return { ok: false, error: "Không lưu được, thử lại." };
   }
   revalidatePath("/settings");
+  return { ok: true };
 }
 
 export async function updateUserRoleAction(formData: FormData) {
