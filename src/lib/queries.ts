@@ -326,7 +326,7 @@ export async function getSalesDocumentCosts(
   const { data: lines } = await supabase
     .from("sales_document_lines")
     .select("document_id, qty, line_total, batch_id, allocation_line_id")
-    .in("document_id", [...confirmed])
+    .in("document_id", Array.from(confirmed))
     .limit(20000);
   const allLines = (lines ?? []) as AnyRow[];
   const allocIds = Array.from(new Set(allLines.map((l) => l.allocation_line_id).filter(Boolean)));
