@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import { formatNumber, formatVND, todayISO } from "@/lib/format";
-import { mapHeaderColumns, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
+import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import { matchByNameVehicle, normCode, tierPriceOf } from "@/lib/product-match";
 import { PRICE_TIER_LABELS, priceTierForKind } from "@/lib/types";
 import type { PosProduct } from "@/components/PosSaleForm";
@@ -244,6 +244,23 @@ export default function ImportDealerSale({
   const canSubmit =
     rawRows !== null && okRows.length > 0 && errorCount === 0 && !!saleDate;
 
+  // Cảnh báo trùng tên: cùng tên nhưng khác mã là món khác nhau — hệ
+  // thống khớp theo mã nên vẫn bán đúng; chỉ nhắc coi kỹ mã. Không
+  // chặn tạo đơn (chỉ cảnh báo), khác với trùng mã trong file. Cùng
+  // kiểu cảnh báo như ở import nhập kho.
+  const duplicateNames = useMemo(() => {
+    const byName = new Map<string, { name: string; codes: Set<string> }>();
+    for (const r of preview) {
+      if (!r.name || !r.code) continue;
+      const key = normalizeHeader(r.name);
+      if (!key) continue;
+      const entry = byName.get(key) ?? { name: r.name, codes: new Set<string>() };
+      entry.codes.add(normCode(r.code));
+      byName.set(key, entry);
+    }
+    return Array.from(byName.values()).filter((e) => e.codes.size > 1);
+  }, [preview]);
+
   // Payload giữ đúng thứ tự dòng gốc (chỉ dòng hợp lệ — server kiểm tra
   // lại toàn bộ và tự phân bổ FIFO, không tin bản xem trước ở client).
   const payloadRows = preview
@@ -383,6 +400,14 @@ export default function ImportDealerSale({
         <p className="text-sm text-slate-600">
           Đã đọc file <span className="font-medium">{fileName}</span>: {preview.length} dòng,{" "}
           {okRows.length} dòng sẵn sàng bán, {preview.length - okRows.length} dòng lỗi.
+        </p>
+      )}
+      {duplicateNames.length > 0 && (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Trong file có tên hàng xuất hiện nhiều lần với mã khác nhau:{" "}
+          {duplicateNames.map((d) => `“${d.name}” (${d.codes.size} mã)`).join(", ")}.
+          Hệ thống vẫn bán đúng từng món theo mã — coi kỹ cột Mã hàng
+          trước khi tạo đơn.
         </p>
       )}
 

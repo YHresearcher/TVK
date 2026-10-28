@@ -3,9 +3,10 @@ import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ImportConsignmentOut from "@/components/ImportConsignmentOut";
 import { confirmConsignmentOutAction, createConsignmentOutAction, importConsignmentOutAction } from "@/lib/actions";
-import { getCurrentProfile, listBatchStock, listConsignmentOutSlips, listPartners } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, listBatchStock, listConsignmentOutSlips, listPartners, listProductCodes, listProductFitments, listProducts, listSuppliers } from "@/lib/queries";
+import type { PosProduct } from "@/components/PosSaleForm";
 import { formatDate } from "@/lib/format";
-import { OWNERSHIP_LABELS, isReadOnlyRole } from "@/lib/types";
+import { OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,14 @@ export default async function ConsignmentOutPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [slips, partners, batchStock, profile] = await Promise.all([
+  const [slips, partners, batchStock, suppliers, products, productCodes, fitments, profile] = await Promise.all([
     listConsignmentOutSlips(),
     listPartners(),
     listBatchStock(),
+    listSuppliers(),
+    listProducts(),
+    listProductCodes(),
+    listProductFitments(),
     getCurrentProfile(),
   ]);
   const configured = slips.configured;
@@ -35,22 +40,61 @@ export default async function ConsignmentOutPage({
     value: r.batch_id,
     label: `${r.batch_code} — ${r.product_name} (${OWNERSHIP_LABELS[r.ownership] ?? r.ownership}${r.supplier_name ? " / " + r.supplier_name : ""})`,
   }));
-  // Danh mục lô tại kho mình cho import Excel: mỗi lô một dòng, lấy vị trí
-  // kho mình giữ nhiều nhất (đúng vị trí phiếu sẽ trừ khi xác nhận).
-  const ownByBatch = new Map<string, (typeof batchStock.data)[number]>();
+  // Danh mục cho import Excel (giống form bán hàng): khớp tên + dòng xe,
+  // tra mã, rồi phân bổ FIFO. Hàng đợi FIFO: lô cũ nhất trước, mỗi lô
+  // mang tồn tại vị trí kho mình giữ nhiều nhất (đúng vị trí phiếu sẽ
+  // trừ — cùng logic mainOwnLocations phía server). Lô ký gửi của nhà
+  // cung cấp chưa cho ký gửi tiếp (ô D khoá) thì loại khỏi hàng đợi.
+  const fitmentsByProduct = new Map<string, string[]>();
+  for (const f of fitments.data) {
+    const v = f.vehicles as AnyRow | AnyRow[] | null;
+    const model = Array.isArray(v) ? v[0]?.model : v?.model;
+    if (!model) continue;
+    const list = fitmentsByProduct.get(f.product_id) ?? [];
+    if (!list.includes(String(model))) list.push(String(model));
+    fitmentsByProduct.set(f.product_id, list);
+  }
+  const posProducts: PosProduct[] = products.data.map((p) => ({
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    retailPrice: Number(p.retail_price) || 0,
+    garagePrice: Number(p.garage_price) || 0,
+    wholesalePrice: Number(p.wholesale_price) || 0,
+    fitments: fitmentsByProduct.get(p.id) ?? [],
+  }));
+  const productById = new Map(products.data.map((p) => [p.id, p]));
+  const codeMapRaw = buildProductCodeMap(products.data, productCodes.data);
+  const gkCodeMap: Record<string, { productId: string; productName: string }> = {};
+  for (const [code, productId] of Object.entries(codeMapRaw)) {
+    const p = productById.get(productId);
+    if (p) gkCodeMap[code] = { productId, productName: p.name };
+  }
+  const subOkBySupplier = new Map(
+    suppliers.data.map((s) => [s.id, !!s.allow_sub_consignment])
+  );
+  const mainOwnQtyByBatch = new Map<string, number>();
   for (const r of batchStock.data) {
     if (r.location_kind !== "OWN_WAREHOUSE") continue;
-    const prev = ownByBatch.get(r.batch_id);
-    if (!prev || Number(r.qty) > Number(prev.qty)) ownByBatch.set(r.batch_id, r);
+    const prev = mainOwnQtyByBatch.get(r.batch_id) ?? 0;
+    if (Number(r.qty) > prev) mainOwnQtyByBatch.set(r.batch_id, Number(r.qty));
   }
-  const ownBatchCatalog = Array.from(ownByBatch.values()).map((r) => ({
-    batch_id: r.batch_id,
-    batch_code: r.batch_code,
-    product_name: r.product_name,
-    ownership: r.ownership,
-    supplier_name: r.supplier_name ?? null,
-    own_qty: Number(r.qty),
-  }));
+  const gkFifoBatches: Record<string, { batch_id: string; batch_code: string; ownership: string; mainOwnQty: number }[]> = {};
+  for (const r of [...ownBatches].sort(
+    (a, b) =>
+      String(a.received_date).localeCompare(String(b.received_date)) ||
+      String(a.batch_code).localeCompare(String(b.batch_code))
+  )) {
+    const q = mainOwnQtyByBatch.get(r.batch_id) ?? 0;
+    if (q <= 0) continue;
+    if (r.ownership === "CONSIGNED" && !subOkBySupplier.get(r.supplier_id)) continue;
+    (gkFifoBatches[r.product_id] ??= []).push({
+      batch_id: r.batch_id,
+      batch_code: r.batch_code,
+      ownership: OWNERSHIP_LABELS[r.ownership] ?? r.ownership,
+      mainOwnQty: q,
+    });
+  }
 
   return (
     <>
@@ -86,7 +130,7 @@ export default async function ConsignmentOutPage({
           </form>
         </Card>
         <Card title="Nhập từ Excel (GK)">
-          <ImportConsignmentOut partners={partners.data} ownBatches={ownBatchCatalog} action={importConsignmentOutAction} />
+          <ImportConsignmentOut partners={partners.data} products={posProducts} codeMap={gkCodeMap} fifoBatches={gkFifoBatches} action={importConsignmentOutAction} />
         </Card>
         </>
         )}
