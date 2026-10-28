@@ -126,7 +126,7 @@ Trang **Nhập kho** có 3 nút: **Phiếu nhập mua (PN)** · **Phiếu nhận
 | Mục | Ý nghĩa |
 |---|---|
 | **Nhà cung cấp \*** | Bên bán hàng cho mình. Hàng về từ ai thì chọn đúng người đó — công nợ mua hàng và đối soát đi theo nhà cung cấp này. |
-| **Kho \*** | Kho vật lý nhận hàng (kho của mình). Hàng nhập vào kho nào thì tồn và vị trí lô ghi theo kho đó. |
+| **Kho \*** | Kho vật lý nhận hàng (Kho TVK). Hàng nhập vào kho nào thì tồn và vị trí lô ghi theo kho đó. |
 | **Ngày nhập** | Ngày hàng thực tế về kho — dùng cho báo cáo và truy vết lô theo thời gian. |
 | **Số hoá đơn của nhà cung cấp** | Số hoá đơn GTGT mà nhà cung cấp xuất cho mình khi mua đứt — lưu để kế toán đối chiếu chứng từ mua vào. (Chỉ PN mới có ô này.) |
 

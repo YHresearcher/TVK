@@ -913,7 +913,7 @@ export async function createConsignmentOutAction(formData: FormData) {
   for (const r of raw) {
     const fromLocation = ownLocs.get(r.batch_id as string)?.locationId;
     if (!fromLocation)
-      throw new Error("Một lô đã chọn không còn hàng tại kho của mình.");
+      throw new Error("Một lô đã chọn không còn hàng tại Kho TVK.");
     items.push({
       slip_id: slip.id,
       batch_id: r.batch_id,
@@ -1000,11 +1000,11 @@ export async function importConsignmentOutAction(formData: FormData) {
     }
     const own = mainOwn.get(batch.id as string);
     if (!own) {
-      invalid.push(`${code} (không còn hàng tại kho của mình)`);
+      invalid.push(`${code} (không còn hàng tại Kho TVK)`);
       continue;
     }
     perBatchQty.set(batch.id as string, (perBatchQty.get(batch.id as string) ?? 0) + qty);
-    if ((perBatchQty.get(batch.id as string) ?? 0) > own.qty) invalid.push(`${code} (vượt tồn tại kho mình)`);
+    if ((perBatchQty.get(batch.id as string) ?? 0) > own.qty) invalid.push(`${code} (vượt tồn tại Kho TVK)`);
   }
   // Hạn mức ký gửi (cùng công thức RPC xác nhận): giá trị hàng đang nằm
   // tại đối tác + giá trị đợt này (chỉ tính dòng Ký gửi).
@@ -1122,7 +1122,7 @@ export async function createCounterSaleAction(formData: FormData) {
     const batch = batchMap.get(l.batch_id);
     if (!batch) throw new Error("Không tìm thấy lô hàng.");
     const fromLocation = ownLocs.get(l.batch_id as string)?.locationId;
-    if (!fromLocation) throw new Error("Một lô đã chọn không còn hàng tại kho của mình.");
+    if (!fromLocation) throw new Error("Một lô đã chọn không còn hàng tại Kho TVK.");
     groups[batch.ownership === "OWNED" ? "BH" : "KG"].push({
       product_id: batch.product_id,
       batch_id: l.batch_id,
@@ -1184,7 +1184,7 @@ export async function createCounterSaleAction(formData: FormData) {
  * Import đơn bán đại lý từ Excel. Một file = một đơn, đi đúng luồng bán
  * tại quầy (tạo đơn, tách BH/KG theo tính chất lô, xác nhận ngay, cập
  * nhật tồn + công nợ) vào đúng ngày bán của file. File chỉ ghi MÃ HÀNG —
- * server tự phân bổ FIFO: lô cũ nhất còn hàng tại kho của mình trước,
+ * server tự phân bổ FIFO: lô cũ nhất còn hàng tại Kho TVK trước,
  * một dòng có thể tách ra nhiều lô. Giá trống → giá đại lý của sản phẩm,
  * do server tự tra lại — bản xem trước ở client không được tin. Kiểm tra
  * toàn bộ file trước khi ghi — dòng lỗi nào cũng từ chối cả import.

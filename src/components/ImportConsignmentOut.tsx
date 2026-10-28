@@ -16,7 +16,7 @@ export interface OwnBatchCatalogRow {
   product_name: string;
   ownership: string;
   supplier_name: string | null;
-  /** Tồn tại kho của mình ở vị trí giữ nhiều nhất — đúng vị trí phiếu sẽ trừ. */
+  /** Tồn tại Kho TVK ở vị trí giữ nhiều nhất — đúng vị trí phiếu sẽ trừ. */
   own_qty: number;
 }
 
@@ -134,7 +134,7 @@ export default function ImportConsignmentOut({
       const term = parseTerm(r.termRaw);
       let error: string | undefined;
       if (!r.batchCode) error = "Thiếu mã lô";
-      else if (!matched) error = "Mã lô không có tại kho của mình";
+      else if (!matched) error = "Mã lô không có tại Kho TVK";
       else if (!(r.qty > 0)) error = "Số lượng phải lớn hơn 0";
       else if (term === null) error = "Điều khoản không hợp lệ (Ký gửi / Mua đứt)";
       else if (r.price < 0) error = "Giá chuyển giao không được âm";
@@ -142,7 +142,7 @@ export default function ImportConsignmentOut({
         const cum = (running.get(key) ?? 0) + r.qty;
         running.set(key, cum);
         if (cum > matched.own_qty)
-          error = `Vượt tồn tại kho mình (còn ${formatNumber(matched.own_qty)})`;
+          error = `Vượt tồn tại Kho TVK (còn ${formatNumber(matched.own_qty)})`;
       }
       return {
         ...r,
@@ -245,7 +245,7 @@ export default function ImportConsignmentOut({
             <p className="mt-1 font-mono text-[11px]">MaLo* · SoLuong* · DieuKhoan · GiaChuyenGiaoVND</p>
             <p className="mt-1">
               Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là bắt
-              buộc). MaLo là mã lô đang nằm tại kho của mình (vd. OWN-2610-0001).
+              buộc). MaLo là mã lô đang nằm tại Kho TVK (vd. OWN-2610-0001).
               DieuKhoan ghi “Ký gửi” hoặc “Mua đứt” (để trống = Ký gửi).
               GiaChuyenGiaoVND tính bằng VNĐ (để trống = 0) — giá này dùng để
               kiểm tra hạn mức ký gửi của đối tác khi xác nhận. Một file chỉ gửi
@@ -276,7 +276,7 @@ export default function ImportConsignmentOut({
               <th className={thCls}>STT</th>
               <th className={thCls}>Mã lô</th>
               <th className={thCls}>Sản phẩm</th>
-              <th className={thCls}>Tồn tại kho mình</th>
+              <th className={thCls}>Tồn tại Kho TVK</th>
               <th className={thCls}>SL gửi</th>
               <th className={thCls}>Điều khoản</th>
               <th className={thNumCls}>Giá chuyển giao</th>

@@ -66,7 +66,7 @@ export default function PosSaleForm({
   products: PosProduct[];
   /** Mã đã đăng ký hoặc SKU (trim + hoa) → product_id. */
   codeMap: Record<string, string>;
-  /** Lô còn hàng tại kho của mình, cũ nhất trước, theo từng sản phẩm. */
+  /** Lô còn hàng tại Kho TVK, cũ nhất trước, theo từng sản phẩm. */
   fifoBatches: Record<string, PosBatch[]>;
   action: (formData: FormData) => Promise<void>;
 }) {
@@ -145,7 +145,7 @@ export default function PosSaleForm({
     if (!p) return;
     const batches = fifoBatches[productId] ?? [];
     if (!batches.length) {
-      setSearchMsg(`“${p.name}” đã hết hàng tại kho của mình.`);
+      setSearchMsg(`“${p.name}” đã hết hàng tại Kho TVK.`);
       return;
     }
     const pick = batches[0];

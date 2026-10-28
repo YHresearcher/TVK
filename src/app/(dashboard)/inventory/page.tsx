@@ -39,7 +39,7 @@ export default async function InventoryPage({
         </select>
         <select name="location_kind" defaultValue={searchParams.location_kind ?? ""} className={`${inputCls} w-auto`}>
           <option value="">Tất cả vị trí</option>
-          <option value="OWN_WAREHOUSE">Kho của mình</option>
+          <option value="OWN_WAREHOUSE">Kho TVK</option>
           <option value="PARTNER_VIRTUAL">Kho đối tác</option>
         </select>
         <button className={btnCls} type="submit">Lọc</button>

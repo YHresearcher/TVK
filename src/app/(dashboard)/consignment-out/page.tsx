@@ -72,7 +72,7 @@ export default async function ConsignmentOutPage({
               <div><label className={labelCls}>Hạn trả</label><input name="return_by_date" type="date" className={inputCls} /></div>
             </div>
             <ItemsRows fields={[
-              { name: "batch_id", label: "Lô (tại kho của mình)", type: "select", options: batchOptions },
+              { name: "batch_id", label: "Lô (tại Kho TVK)", type: "select", options: batchOptions },
               { name: "qty", label: "Số lượng", type: "number" },
               { name: "term", label: "Điều khoản", type: "select", options: [
                 { value: "CONSIGNMENT", label: "Ký gửi (CONSIGNMENT)" },

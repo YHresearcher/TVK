@@ -124,9 +124,9 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Gửi ký gửi (GK) & hạn trả hàng ký gửi",
     roles: ["WAREHOUSE"],
     points: [
-      "Vào Gửi ký gửi: chọn đối tác, thêm dòng chọn Lô tại kho của mình, số lượng, Điều khoản (Ký gửi, hoặc Mua đứt — xuất hoá đơn sau) và giá chuyển giao; tạo phiếu nháp rồi bấm “Xác nhận → chuyển hàng tới đối tác”.",
+      "Vào Gửi ký gửi: chọn đối tác, thêm dòng chọn Lô tại Kho TVK, số lượng, Điều khoản (Ký gửi, hoặc Mua đứt — xuất hoá đơn sau) và giá chuyển giao; tạo phiếu nháp rồi bấm “Xác nhận → chuyển hàng tới đối tác”.",
       "Gửi hàng chỉ thay đổi nơi giữ hàng — quyền sở hữu không đổi, chưa ghi doanh thu và chưa ghi phải thu. Tiền chỉ phát sinh khi đối tác báo tiêu thụ và số lượng được phân bổ.",
-      "Gửi tiếp lô của nhà cung cấp (hàng ký gửi của NCC đang ở kho mình, gửi tiếp cho đối tác) bị hệ thống chặn, trừ khi nhà cung cấp đó đã bật “Cho phép ký gửi tiếp hàng của nhà cung cấp này (ô D)” ở menu Nhà cung cấp.",
+      "Gửi tiếp lô của nhà cung cấp (hàng ký gửi của NCC đang ở Kho TVK, gửi tiếp cho đối tác) bị hệ thống chặn, trừ khi nhà cung cấp đó đã bật “Cho phép ký gửi tiếp hàng của nhà cung cấp này (ô D)” ở menu Nhà cung cấp.",
       "Theo dõi hạn trả của các lô ký gửi ở Tổng quan (mục “Lô ký gửi phải trả trong 30 ngày tới”) và ở Tồn kho theo lô (cột Hạn trả) để trả hàng đúng hạn cho nhà cung cấp.",
     ],
   },

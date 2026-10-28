@@ -25,7 +25,7 @@ export default async function ReportsPage() {
           </div>
           {suppliers.data.length === 0 ? <EmptyState message="Chưa có dữ liệu." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Đã nhận</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn tại kho mình</th><th className={thCls}>Còn nợ phải trả</th></tr></thead>
+              <thead><tr><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Đã nhận</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn tại Kho TVK</th><th className={thCls}>Còn nợ phải trả</th></tr></thead>
               <tbody>
                 {suppliers.data.map((r) => (
                   <tr key={r.supplier_id} className="border-t border-slate-100">
@@ -77,7 +77,7 @@ export default async function ReportsPage() {
           </div>
           {stock.data.length === 0 ? <EmptyState message="Chưa có dữ liệu." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>SKU</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Của mình @ kho mình</th><th className={thCls}>Ký gửi @ kho mình</th><th className={thCls}>Của mình @ đối tác</th><th className={thCls}>Ký gửi @ đối tác</th><th className={thCls}>Tổng</th></tr></thead>
+              <thead><tr><th className={thCls}>SKU</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Của mình @ Kho TVK</th><th className={thCls}>Ký gửi @ Kho TVK</th><th className={thCls}>Của mình @ đối tác</th><th className={thCls}>Ký gửi @ đối tác</th><th className={thCls}>Tổng</th></tr></thead>
               <tbody>
                 {stock.data.map((r) => (
                   <tr key={r.product_id} className="border-t border-slate-100">

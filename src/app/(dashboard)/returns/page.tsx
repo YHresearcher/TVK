@@ -58,7 +58,7 @@ export default async function ReturnsPage({
               { name: "qty", label: "Số lượng", type: "number" },
               { name: "reason", label: "Lý do", type: "select", options: RETURN_REASONS.map((r) => ({ value: r, label: RETURN_REASON_LABELS[r] ?? r })) },
             ]} initialRows={1} />
-            <p className="text-xs text-slate-500">Vị trí được tự động xác định: khách trả vào kho đầu tiên của mình, đối tác trả di chuyển từ kho ảo của đối tác về kho của mình, trả nhà cung cấp xuất khỏi hệ thống từ kho của mình.</p>
+            <p className="text-xs text-slate-500">Vị trí được tự động xác định: khách trả vào kho TVK đầu tiên, đối tác trả di chuyển từ kho ảo của đối tác về Kho TVK, trả nhà cung cấp xuất khỏi hệ thống từ Kho TVK.</p>
             <button type="submit" className={btnCls}>Tạo phiếu trả nháp</button>
           </form>
         </Card>

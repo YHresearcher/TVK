@@ -82,7 +82,7 @@ export default function ImportDealerSale({
   products: PosProduct[];
   /** Mã hàng đã chuẩn hoá (trim + hoa) → sản phẩm (cột MaHang tùy chọn). */
   codeMap: Record<string, DealerProductRow>;
-  /** productId → các lô FIFO còn hàng tại kho của mình. */
+  /** productId → các lô FIFO còn hàng tại Kho TVK. */
   fifoBatches: Record<string, DealerFifoBatchRow[]>;
   action: (formData: FormData) => Promise<void>;
 }) {
@@ -287,7 +287,7 @@ export default function ImportDealerSale({
           file là một đơn bán hàng. Hệ thống tìm hàng theo <b>mã hàng</b>
           (cột Mã hàng), tên trùng nhau cũng không sao vì mã khác nhau là
           món khác nhau; tên và dòng xe chỉ để đọc cho dễ. Không cần nhớ
-          mã lô: hệ thống tự lấy theo lô cũ nhất còn tại kho của mình
+          mã lô: hệ thống tự lấy theo lô cũ nhất còn tại Kho TVK
           (FIFO). Đơn giá để trống thì lấy giá theo loại khách đã chọn ở
           form dưới. Hệ thống kiểm tra định dạng và cho xem trước ở bên
           dưới trước khi tạo đơn.
@@ -394,7 +394,7 @@ export default function ImportDealerSale({
               <th className={thCls}>Sản phẩm</th>
               <th className={thCls}>Lô (FIFO)</th>
               <th className={thCls}>Tính chất</th>
-              <th className={thCls}>Tồn tại kho mình</th>
+              <th className={thCls}>Tồn tại Kho TVK</th>
               <th className={thCls}>SL bán</th>
               <th className={thNumCls}>Đơn giá</th>
               <th className={thNumCls}>Thành tiền</th>
