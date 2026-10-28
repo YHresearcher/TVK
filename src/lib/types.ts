@@ -139,3 +139,22 @@ export const RETURN_REASONS = [
   "UNSOLD",
   "OTHER",
 ] as const;
+
+export const MOVEMENT_KIND_LABELS: Record<string, string> = {
+  IN_PURCHASE: "Nhập mua",
+  IN_CONSIGNMENT: "Nhập ký gửi",
+  IN_RETURN: "Nhập trả lại",
+  OUT_SALE: "Xuất bán",
+  OUT_CONSIGNMENT: "Xuất gửi ký gửi",
+  OUT_RETURN_SUPPLIER: "Trả nhà cung cấp",
+  TRANSFER: "Chuyển kho",
+  ADJUSTMENT: "Điều chỉnh",
+};
+
+export const REF_DOC_TYPE_LABELS: Record<string, string> = {
+  PURCHASE_RECEIPT: "Phiếu nhập kho",
+  CONSIGNMENT_RECEIPT: "Phiếu nhận ký gửi",
+  CONSIGNMENT_OUT: "Phiếu gửi ký gửi",
+  SALES_DOCUMENT: "Chứng từ bán hàng",
+  RETURN_DOCUMENT: "Phiếu trả hàng",
+};

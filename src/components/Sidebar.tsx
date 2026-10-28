@@ -33,6 +33,7 @@ const GROUPS: NavGroup[] = [
       { href: "/products", label: "Sản phẩm" },
       { href: "/inventory", label: "Tồn kho theo lô" },
       { href: "/stock-in", label: "Nhập kho" },
+      { href: "/ledger", label: "Sổ cái kho" },
     ],
   },
   {

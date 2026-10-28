@@ -100,6 +100,7 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 | **Hàng hoá & Kho** | Sản phẩm | Danh mục sản phẩm, mã OEM/mã tương đương, xe tương thích, giá lẻ + giá đại lý; trang chi tiết sửa được tên/thương hiệu/đơn vị/tồn tối thiểu và bảng giá (Chủ cửa hàng + Thủ kho; mã SKU không sửa được) |
 | | Tồn kho theo lô | Xem tồn theo từng lô OWN/CONS, vị trí giữ hàng, kiểm kê & điều chỉnh |
 | | Nhập kho | Tạo phiếu PN / NK thủ công, hoặc **Nhập từ Excel** (nút thứ ba trong trang) |
+| | Sổ cái kho | 200 bút toán kho mới nhất: lô, kho nguồn → kho đích, chứng từ, người làm; sổ cái chỉ ghi thêm, không sửa, không xoá; có lọc theo loại bút toán và tìm kiếm không dấu |
 | **Ký gửi** | Gửi ký gửi | Lập phiếu GK gửi hàng cho đối tác (có nhập từ Excel) |
 | | Tiêu thụ của đối tác | Nhập báo cáo tiêu thụ BT, xem phân bổ PB → BH/KG (BT và PB đều có nhập từ Excel) |
 | **Bán hàng & Hoá đơn** | Bán hàng | Bán tại quầy, chọn theo lô; bảng đơn hàng và chứng từ BH/KG có nút Xuất Excel; bảng chứng từ BH/KG có thêm cột Giá vốn và Lãi gộp, chỉ Chủ cửa hàng và Kế toán xem được (giá vốn theo lô thực tế đã xuất, chứng từ nháp chưa có giá vốn) |

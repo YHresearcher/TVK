@@ -799,3 +799,76 @@ export async function getPartnerDetail(id: string): Promise<QueryResult<PartnerD
     },
   };
 }
+
+export interface LedgerRow {
+  id: string;
+  created_at: string;
+  movement_kind: string;
+  qty: number;
+  from_name: string | null;
+  to_name: string | null;
+  ref_doc_type: string | null;
+  ref_doc_id: string | null;
+  reversal_of_id: string | null;
+  created_by_name: string | null;
+  batch_code: string;
+  sku: string;
+  product_name: string;
+}
+
+/** 200 bút toán kho mới nhất, kèm tên lô / sản phẩm / kho / người làm (nối tay, tránh join FK mơ hồ). */
+export async function listLedgerMovements(limit = 200): Promise<QueryResult<LedgerRow[]>> {
+  const supabase = await client();
+  if (!supabase) return empty([]);
+  const { data: rows, error } = await supabase
+    .from("stock_movements")
+    .select("id, created_at, movement_kind, qty, from_location_id, to_location_id, ref_doc_type, ref_doc_id, reversal_of_id, created_by, batch_id")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  const list = (rows ?? []) as AnyRow[];
+  const batchIds = Array.from(new Set(list.map((r) => r.batch_id as string)));
+  const batches = batchIds.length
+    ? ((await supabase.from("stock_batches").select("id, batch_code, product_id").in("id", batchIds)).data ?? [])
+    : [];
+  const productIds = Array.from(new Set((batches as AnyRow[]).map((b) => b.product_id as string)));
+  const products = productIds.length
+    ? ((await supabase.from("products").select("id, sku, name").in("id", productIds)).data ?? [])
+    : [];
+  const locIds = Array.from(
+    new Set(list.flatMap((r) => [r.from_location_id, r.to_location_id]).filter(Boolean) as string[]),
+  );
+  const locs = locIds.length
+    ? ((await supabase.from("locations").select("id, name").in("id", locIds)).data ?? [])
+    : [];
+  const userIds = Array.from(new Set(list.map((r) => r.created_by as string).filter(Boolean)));
+  const profs = userIds.length
+    ? ((await supabase.from("profiles").select("id, full_name").in("id", userIds)).data ?? [])
+    : [];
+  const batchMap = new Map((batches as AnyRow[]).map((b) => [b.id as string, b]));
+  const productMap = new Map((products as AnyRow[]).map((p) => [p.id as string, p]));
+  const locMap = new Map((locs as AnyRow[]).map((l) => [l.id as string, l.name as string]));
+  const profMap = new Map((profs as AnyRow[]).map((p) => [p.id as string, p.full_name as string]));
+  return {
+    configured: true,
+    data: list.map((r) => {
+      const batch = batchMap.get(r.batch_id as string);
+      const product = batch ? productMap.get(batch.product_id as string) : undefined;
+      return {
+        id: r.id as string,
+        created_at: r.created_at as string,
+        movement_kind: r.movement_kind as string,
+        qty: Number(r.qty),
+        from_name: r.from_location_id ? (locMap.get(r.from_location_id as string) ?? "—") : null,
+        to_name: r.to_location_id ? (locMap.get(r.to_location_id as string) ?? "—") : null,
+        ref_doc_type: (r.ref_doc_type as string) ?? null,
+        ref_doc_id: (r.ref_doc_id as string) ?? null,
+        reversal_of_id: (r.reversal_of_id as string) ?? null,
+        created_by_name: r.created_by ? (profMap.get(r.created_by as string) ?? null) : null,
+        batch_code: (batch?.batch_code as string) ?? "—",
+        sku: (product?.sku as string) ?? "—",
+        product_name: (product?.name as string) ?? "—",
+      };
+    }),
+  };
+}
