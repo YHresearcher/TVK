@@ -73,9 +73,19 @@ function done(result: { error: AnyRow | null }, what: string) {
   if (result.error) throw new Error(`${what}: ${result.error.message}`);
 }
 
-/** Chuẩn hoá mã tra cứu: bỏ khoảng trắng hai đầu, viết hoa hết. */
+/** Chuẩn hoá mã tra cứu: hoa hết, bỏ mọi khoảng trắng (kể cả xuống dòng
+ * trong ô Excel) — cùng luật với normCode, để mã gõ tay, mã quét và mã
+ * trong file đều khớp một mã đã lưu. */
 function normKey(v: unknown): string {
-  return String(v ?? "").trim().toUpperCase();
+  return String(v ?? "")
+    .toUpperCase()
+    .replace(/\s+/g, "");
+}
+
+/** Mã để LƯU vào danh mục: gộp mọi khoảng trắng trong ô (kể cả xuống
+ * dòng) thành một dấu cách — mã lưu luôn sạch để hiển thị, in tem, quét. */
+function storeCode(v: string): string {
+  return v.trim().replace(/\s+/g, " ");
 }
 
 /** Từ chối cả file import khi có dòng không hợp lệ (không nhập một phần). */
@@ -574,7 +584,7 @@ export async function importStockAction(formData: FormData) {
   // một phần, không tạo sản phẩm dở dang), kể cả khi giao diện bị bỏ qua.
   const invalid: string[] = [];
   for (const r of rawRows) {
-    const code = String(r.code ?? "").trim();
+    const code = storeCode(String(r.code ?? ""));
     const qty = Math.trunc(Number(r.qty) || 0);
     const { unitCost } = rowPrices(r);
     if (!code || qty <= 0 || unitCost <= 0) {
@@ -582,7 +592,7 @@ export async function importStockAction(formData: FormData) {
       continue;
     }
     const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
-      .map((a) => String(a ?? "").trim())
+      .map((a) => storeCode(String(a ?? "")))
       .filter(Boolean);
     let found = bySku.get(normKey(code)) ?? byCode.get(normKey(code));
     if (!found) {
@@ -619,11 +629,11 @@ export async function importStockAction(formData: FormData) {
   const pendingRef = (sku: string) => `pending:${normKey(sku)}`;
 
   for (const r of rawRows) {
-    const code = String(r.code ?? "").trim();
+    const code = storeCode(String(r.code ?? ""));
     const qty = Math.trunc(Number(r.qty) || 0);
     const { unitCost, salePrice, retailPrice } = rowPrices(r);
     const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
-      .map((a) => String(a ?? "").trim())
+      .map((a) => storeCode(String(a ?? "")))
       .filter(Boolean);
     if (!code || qty <= 0 || unitCost <= 0) continue; // đã chặn ở vòng kiểm tra trước
 
@@ -1183,8 +1193,9 @@ export async function importDealerSaleAction(formData: FormData) {
     tier = priceTierForKind(partner.partner_kind as string);
   }
 
-  // Phân giải hàng: mã hàng (cột MaHang tùy chọn) trước, tên + dòng xe
-  // sau — cùng luật khớp với bản xem trước ở client.
+  // Phân giải hàng: mã hàng (cột MaHang) trước — tên trùng nhau cũng
+  // không sao vì mã là chìa khoá; tên + dòng xe chỉ là dự phòng khi
+  // dòng nào đó thiếu mã — cùng luật khớp với bản xem trước ở client.
   const { data: allProducts } = await supabase
     .from("products")
     .select("id, name, sku, retail_price, garage_price, wholesale_price")
@@ -1230,7 +1241,7 @@ export async function importDealerSaleAction(formData: FormData) {
     const vehicle = String(r.vehicle ?? "").trim();
     const code = String(r.code ?? "").trim();
     const qty = Math.trunc(Number(r.qty) || 0);
-    const label = name || code || "(dòng thiếu tên)";
+    const label = name || code || "(dòng thiếu mã hàng)";
     const priceRaw =
       r.price === null || r.price === undefined || r.price === "" ? null : Number(r.price);
     let productId: string | undefined;
@@ -1248,7 +1259,7 @@ export async function importDealerSaleAction(formData: FormData) {
       }
       productId = matched.productId;
     } else {
-      invalid.push("(dòng thiếu tên)");
+      invalid.push("(dòng thiếu mã hàng)");
       continue;
     }
     if (!(qty > 0)) {

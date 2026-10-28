@@ -34,16 +34,19 @@ const templates = [
     ],
   },
   {
-    // STT chỉ để đếm. Khớp hàng theo tên + dòng xe (dòng xe để trống
-    // thì khớp theo tên). Đơn giá để trống = giá theo loại khách chọn ở
-    // form (dòng 1); ghi số = bán đúng giá đó (dòng 2). Tên hàng và
-    // dòng xe là giá trị thật đã đăng ký — hệ thống tự phân bổ FIFO
-    // theo lô, không nhập mã hàng hay mã lô.
+    // STT chỉ để đếm. Khớp hàng theo MÃ HÀNG — tên trùng nhau cũng
+    // không sao vì mã khác nhau là món khác nhau (hai dòng "Lọc dầu"
+    // dưới đây là ví dụ thật từ danh mục: cùng tên, cùng dòng xe, khác
+    // mã). Đơn giá để trống = giá theo loại khách chọn ở form (dòng 1);
+    // ghi số = bán đúng giá đó (dòng 2). Hệ thống tự phân bổ FIFO
+    // theo lô, không nhập mã lô.
     file: "public/mau-import-ban-dai-ly.xlsx",
     rows: [
-      ["STT", "Dòng xe", "Tên phụ tùng", "Số lượng", "Đơn giá"],
-      [1, "420", "Bầu hơi cabin trước", 10, ""],
-      [2, "420", "Bầu hơi cabin sau", 5, 1200000],
+      ["STT", "Mã hàng", "Dòng xe", "Tên phụ tùng", "Số lượng", "Đơn giá"],
+      [1, "AZ1664430120-SMS-30759", "420", "Bầu hơi cabin trước", 10, ""],
+      [2, "AZ1664440069-SMS-30705", "420", "Bầu hơi cabin sau", 5, 1200000],
+      [3, "VG1540080110-CX1020 SMS-10452", "420", "Lọc dầu", 10, ""],
+      [4, "WG1540080211-CX1017 SMS10453", "420", "Lọc dầu", 5, 1200000],
     ],
   },
 ];

@@ -1,6 +1,16 @@
 import { normalizeHeader } from "@/lib/excel-parse";
 import type { PriceTier } from "@/lib/types";
 
+/** Mã hàng chuẩn hoá để tra cứu: hoa hết, bỏ mọi khoảng trắng (kể cả
+ * xuống dòng trong ô Excel) — "VG1540080110-CX1020 SMS-10452" và
+ * "VG1540080110-CX1020\nSMS-10452" là một mã. Dùng chung cho mọi nơi
+ * tra cứu theo mã: quầy POS, import bán hàng, quét barcode. */
+export function normCode(v: unknown): string {
+  return String(v ?? "")
+    .toUpperCase()
+    .replace(/\s+/g, "");
+}
+
 /** Tên hàng chuẩn hoá để so khớp: bỏ dấu, hoa/thường và khoảng trắng đều như nhau. */
 export function normProductName(v: unknown): string {
   return normalizeHeader(v);

@@ -58,17 +58,19 @@ export async function listProductFitments(): Promise<QueryResult<AnyRow[]>> {
   return { configured: true, data: (data ?? []) as AnyRow[] };
 }
 
-/** Normalized (trim + uppercase) map: any known product code or SKU → product_id. Used by the barcode scan box. */
+import { normCode } from "@/lib/product-match";
+
+/** Normalized (hoa + bỏ mọi khoảng trắng) map: any known product code or SKU → product_id. Used by the barcode scan box. */
 export function buildProductCodeMap(
   products: AnyRow[],
   codes: AnyRow[]
 ): Record<string, string> {
   const map: Record<string, string> = {};
   for (const p of products) {
-    if (p.sku) map[String(p.sku).trim().toUpperCase()] = p.id;
+    if (p.sku) map[normCode(p.sku)] = p.id;
   }
   for (const c of codes) {
-    if (c.code) map[String(c.code).trim().toUpperCase()] = c.product_id;
+    if (c.code) map[normCode(c.code)] = c.product_id;
   }
   return map;
 }

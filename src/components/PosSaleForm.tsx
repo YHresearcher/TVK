@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { Card, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { formatVND } from "@/lib/format";
 import { normalizeHeader } from "@/lib/excel-parse";
-import { tierPriceOf } from "@/lib/product-match";
+import { normCode, tierPriceOf } from "@/lib/product-match";
 import { OWNERSHIP_LABELS, PRICE_TIER_LABELS, priceTierForKind, type PriceTier } from "@/lib/types";
 
 export interface PosPartner {
@@ -177,7 +177,7 @@ export default function PosSaleForm({
     const raw = search.trim();
     if (!raw) return;
     // Máy quét gửi đúng mã + Enter: khớp chính xác thì thêm ngay.
-    const exact = codeMap[raw.toUpperCase()];
+    const exact = codeMap[normCode(raw)];
     if (exact) {
       addProduct(exact);
       return;
