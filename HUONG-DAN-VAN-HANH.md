@@ -106,8 +106,8 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 | **Bán hàng & Hoá đơn** | Bán hàng | Bán tại quầy, chọn theo lô; bảng đơn hàng và chứng từ BH/KG có nút Xuất Excel; bảng chứng từ BH/KG có thêm cột Giá vốn và Lãi gộp, chỉ Chủ cửa hàng và Kế toán xem được (giá vốn theo lô thực tế đã xuất, chứng từ nháp chưa có giá vốn) |
 | | Hoá đơn GTGT | Phát hành/huỷ hoá đơn từ các dòng BH/KG đã xác nhận; bảng hoá đơn có nút Xuất Excel |
 | | Trả hàng & bảo hành | Lập phiếu trả hàng TH; bảng phiếu trả có nút Xuất Excel |
-| **Công nợ & Báo cáo** | Phải trả nhà cung cấp | Khoản phải trả phát sinh từ hàng ký gửi bán được; ghi thanh toán |
-| | Phải thu đối tác | Khoản đối tác/khách còn nợ; ghi thu tiền |
+| **Công nợ & Báo cáo** | Phải trả nhà cung cấp | Khoản phải trả phát sinh từ hàng ký gửi bán được; ghi thanh toán; bảng **Tuổi nợ phải trả** gom theo nhà cung cấp, 3 nhóm quá hạn 1–6 tháng |
+| | Phải thu đối tác | Khoản đối tác/khách còn nợ; ghi thu tiền; bảng **Tuổi nợ phải thu** gom theo đối tác, 3 nhóm quá hạn 1–6 tháng |
 | | Báo cáo | Đối soát nhà cung cấp/đối tác, xuất CSV |
 | **Danh mục** | Nhà cung cấp | Hồ sơ NCC, hạn trả mặc định, cho phép ký gửi tiếp (ô D) hay không |
 | | Đối tác | Hồ sơ đối tác (gara/cửa hàng/công ty), hạn mức ký gửi; bấm tên đối tác để mở trang chi tiết: số dư phải thu, đã thanh toán, số hoá đơn đã xuất + giá trị, hàng còn ở đối tác, đối soát ký gửi, các khoản phải thu và hoá đơn |

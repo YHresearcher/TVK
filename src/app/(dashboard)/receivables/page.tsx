@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
+import AgingTable from "@/components/AgingTable";
+import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordReceivablePaymentAction } from "@/lib/actions";
 import { getCurrentProfile, listPartners, listReceivables, listSettlements } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
@@ -33,6 +35,19 @@ export default async function ReceivablesPage({
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <p className="mb-4 text-sm text-slate-600">Tổng còn phải thu: <strong>{formatVND(totalOutstanding)}</strong></p>
+
+      {open.length > 0 && (
+        <div className="mb-4">
+          <AgingTable
+            title="Tuổi nợ phải thu"
+            partyLabel="Đối tác"
+            rows={buildAging(
+              open.map((r) => ({ partyId: r.partner_id, due_date: r.due_date, amount: r.amount, amount_paid: r.amount_paid })),
+              partnerName,
+            )}
+          />
+        </div>
+      )}
 
       {receivables.data.length === 0 ? <EmptyState message="Chưa có khoản phải thu." /> : (
         <TableWrap>

@@ -1,5 +1,7 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
+import AgingTable from "@/components/AgingTable";
+import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordPayablePaymentAction } from "@/lib/actions";
 import { getCurrentProfile, listPayables, listSettlements, listSuppliers } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
@@ -31,6 +33,19 @@ export default async function PayablesPage({
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <p className="mb-4 text-sm text-slate-600">Tổng còn nợ: <strong>{formatVND(totalOutstanding)}</strong></p>
+
+      {open.length > 0 && (
+        <div className="mb-4">
+          <AgingTable
+            title="Tuổi nợ phải trả"
+            partyLabel="Nhà cung cấp"
+            rows={buildAging(
+              open.map((p) => ({ partyId: p.supplier_id, due_date: p.due_date, amount: p.amount, amount_paid: p.amount_paid })),
+              supplierName,
+            )}
+          />
+        </div>
+      )}
 
       {payables.data.length === 0 ? <EmptyState message="Chưa có khoản phải trả. Bán một lô ký gửi để tạo khoản phải trả." /> : (
         <TableWrap>
