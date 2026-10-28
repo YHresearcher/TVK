@@ -119,13 +119,9 @@ export default async function ConsignmentOutPage({
             <ItemsRows fields={[
               { name: "batch_id", label: "Lô (tại Kho TVK)", type: "select", options: batchOptions },
               { name: "qty", label: "Số lượng", type: "number" },
-              { name: "term", label: "Điều khoản", type: "select", options: [
-                { value: "CONSIGNMENT", label: "Ký gửi (CONSIGNMENT)" },
-                { value: "PURCHASE", label: "Mua đứt, xuất hoá đơn sau (PURCHASE)" },
-              ] },
               { name: "transfer_price", label: "Giá chuyển giao / giá thoả thuận (₫)", type: "number", step: "1000" },
             ]} initialRows={2} />
-            <p className="text-xs text-slate-500">Kho nguồn được tự động xác định từ vị trí hiện tại của lô. Điều khoản quyết định hạn mức phân bổ sau này (vd. tối đa 5 MUA ĐỨT / 10 KÝ GỬI).</p>
+            <p className="text-xs text-slate-500">Kho nguồn được tự động xác định từ vị trí hiện tại của lô. Giá chuyển giao dùng để kiểm tra hạn mức ký gửi của đối tác khi xác nhận. Muốn bán đứt thì dùng mục Bán hàng — phiếu này chỉ gửi ký gửi.</p>
             <SubmitButton className={btnCls}>Tạo phiếu nháp</SubmitButton>
           </form>
         </Card>

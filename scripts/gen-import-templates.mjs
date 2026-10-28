@@ -9,15 +9,15 @@ const templates = [
   {
     // Cùng chuẩn như file bán hàng: khớp theo tên + dòng xe, mã hàng
     // tùy chọn (chỉ cần khi tên trùng); không nhập mã lô — hệ thống
-    // tự phân bổ FIFO. Hai dòng "Lọc dầu" giữ mã để minh hoạ trường
-    // hợp tên trùng nhau.
+    // tự phân bổ FIFO. Phiếu GK chỉ còn một bản chất: ký gửi — "mua
+    // đứt" đi qua mục bán sỉ nên không còn cột Điều khoản.
     file: "public/mau-import-gui-ky-gui.xlsx",
     rows: [
-      ["STT", "Mã hàng", "Dòng xe", "Tên phụ tùng", "Số lượng", "Điều khoản", "Giá chuyển giao VND"],
-      [1, "", "420", "Bầu hơi cabin trước", 2, "Ký gửi", ""],
-      [2, "", "420", "Bầu hơi cabin sau", 2, "Ký gửi", 1200000],
-      [3, "VG1540080110-CX1020 SMS-10452", "420", "Lọc dầu", 10, "Ký gửi", ""],
-      [4, "WG1540080211-CX1017 SMS10453", "420", "Lọc dầu", 5, "Mua đứt", 1200000],
+      ["STT", "Mã hàng", "Dòng xe", "Tên phụ tùng", "Số lượng", "Giá chuyển giao VND"],
+      [1, "", "420", "Bầu hơi cabin trước", 2, ""],
+      [2, "", "420", "Bầu hơi cabin sau", 2, 1200000],
+      [3, "VG1540080110-CX1020 SMS-10452", "420", "Lọc dầu", 10, ""],
+      [4, "WG1540080211-CX1017 SMS10453", "420", "Lọc dầu", 5, 1200000],
     ],
   },
   {

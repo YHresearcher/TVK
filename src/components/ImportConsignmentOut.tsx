@@ -20,7 +20,6 @@ interface RawRow {
   /** Mã hàng (SKU hoặc mã đã đăng ký) — chìa khoá khớp hàng khi tên trùng. */
   code: string;
   qty: number;
-  termRaw: string;
   /** null = ô giá để trống → giá chuyển giao 0 (như trước). */
   price: number | null;
 }
@@ -30,7 +29,6 @@ interface AllocLine {
   ownership: string;
   batchStock: number;
   qty: number;
-  term: "CONSIGNMENT" | "PURCHASE";
   price: number;
 }
 
@@ -50,17 +48,8 @@ const FIELD_ALIASES: Record<string, string[]> = {
   name: ["tenphutung", "tenhang", "ten", "name"],
   code: ["mahang", "mahanghoa", "masanpham", "masp", "maso", "sku", "code", "productcode", "maphutung"],
   qty: ["soluong", "sl", "qty", "quantity"],
-  term: ["dieukhoan", "hinhthuc", "term"],
   price: ["giachuyengiaovnd", "giachuyengiao", "giathoathuan", "giavnd", "dongia", "transferprice"],
 };
-
-function parseTerm(raw: string): "CONSIGNMENT" | "PURCHASE" | null {
-  const n = normalizeHeader(raw);
-  if (!n) return "CONSIGNMENT";
-  if (["kygui", "consignment", "consigned"].includes(n)) return "CONSIGNMENT";
-  if (["muadut", "muadutxuathoadonsau", "purchase", "purchased"].includes(n)) return "PURCHASE";
-  return null;
-}
 
 export default function ImportConsignmentOut({
   partners,
@@ -120,7 +109,6 @@ export default function ImportConsignmentOut({
           name: toStr(val(cells, "name")),
           code: toStr(val(cells, "code")),
           qty: toNum(val(cells, "qty")),
-          termRaw: toStr(val(cells, "term")),
           price: toStr(priceCell) === "" ? null : toNum(priceCell),
         });
       }
@@ -181,11 +169,9 @@ export default function ImportConsignmentOut({
           productName = productById.get(productId)?.name;
         }
       }
-      const term = parseTerm(r.termRaw);
       const price = r.price ?? 0;
       if (!error) {
         if (!(r.qty > 0)) error = "Số lượng phải lớn hơn 0";
-        else if (term === null) error = "Điều khoản không hợp lệ (Ký gửi / Mua đứt)";
         else if (r.price !== null && r.price < 0) error = "Giá chuyển giao không được âm";
         else if (productId) {
           let need = r.qty;
@@ -203,7 +189,6 @@ export default function ImportConsignmentOut({
                 ownership: b.ownership,
                 batchStock: b.mainOwnQty,
                 qty: take,
-                term: term ?? "CONSIGNMENT",
                 price,
               });
               remaining.set(b.batch_id, avail - take);
@@ -265,7 +250,10 @@ export default function ImportConsignmentOut({
       r.allocs.map((l) => ({
         batchCode: l.batchCode,
         qty: l.qty,
-        term: l.term,
+        // Phiếu GK chỉ còn một bản chất: ký gửi. "Mua đứt" đi qua
+        // mục bán sỉ. Server vốn đã mặc định mọi dòng không phải
+        // PURCHASE thành CONSIGNMENT.
+        term: "CONSIGNMENT",
         price: l.price,
       }))
     ),
@@ -341,15 +329,14 @@ export default function ImportConsignmentOut({
           </ul>
           <div className="rounded-md bg-white/70 px-3 py-2 text-xs leading-relaxed text-slate-700">
             <p className="font-semibold">Định dạng chuẩn của file gửi ký gửi:</p>
-            <p className="mt-1 font-mono text-[11px]">STT · Mã hàng · Dòng xe · Tên phụ tùng* · Số lượng* · Điều khoản · Giá chuyển giao VND</p>
+            <p className="mt-1 font-mono text-[11px]">STT · Mã hàng · Dòng xe · Tên phụ tùng* · Số lượng* · Giá chuyển giao VND</p>
             <p className="mt-1">
               Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là
               bắt buộc; cột Mã hàng tùy chọn). STT chỉ để đếm. Hệ thống tìm
               hàng theo tên phụ tùng + dòng xe; mã hàng (mã SKU hoặc mã đã
               đăng ký trong danh mục) chỉ cần ghi khi tên trùng nhau để
               phân biệt — khi đó mã mới là chìa khoá quyết định. Dòng nào
-              thiếu cả tên lẫn mã thì bị từ chối. Điều khoản ghi “Ký gửi”
-              hoặc “Mua đứt” (để trống = Ký gửi). Giá chuyển giao tính bằng
+              thiếu cả tên lẫn mã thì bị từ chối. Giá chuyển giao tính bằng
               VNĐ (để trống = 0) — giá này dùng để kiểm tra hạn mức ký gửi
               của đối tác khi xác nhận. Hệ thống tự lấy theo lô cũ nhất còn
               tại Kho TVK (FIFO), một dòng có thể tách ra nhiều lô; lô ký
@@ -396,7 +383,6 @@ export default function ImportConsignmentOut({
               <th className={thCls}>Tính chất</th>
               <th className={thCls}>Tồn tại Kho TVK</th>
               <th className={thCls}>SL gửi</th>
-              <th className={thCls}>Điều khoản</th>
               <th className={thNumCls}>Giá chuyển giao</th>
               <th className={thNumCls}>Thành tiền</th>
               <th className={thCls}>Trạng thái</th>
@@ -416,7 +402,6 @@ export default function ImportConsignmentOut({
                   <td className={tdCls}>{l?.ownership ?? "—"}</td>
                   <td className={tdCls}>{l ? formatNumber(l.batchStock) : "—"}</td>
                   <td className={tdCls}>{l ? formatNumber(l.qty) : "—"}</td>
-                  <td className={tdCls}>{l ? (l.term === "PURCHASE" ? "Mua đứt" : "Ký gửi") : "—"}</td>
                   <td className={tdNumCls}>{l && l.price > 0 ? formatVND(l.price) : "—"}</td>
                   <td className={tdNumCls}>{l && l.price > 0 ? formatVND(l.qty * l.price) : "—"}</td>
                   <td className={tdCls}>
@@ -439,7 +424,6 @@ export default function ImportConsignmentOut({
             <tr className="border-t border-slate-200 bg-slate-50 font-bold">
               <td className={tdCls} colSpan={8}>Tổng</td>
               <td className={tdCls}>{formatNumber(totalQty)}</td>
-              <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdNumCls}>{formatVND(totalAmount)}</td>
               <td className={tdCls}></td>
