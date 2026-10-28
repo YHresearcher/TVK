@@ -325,3 +325,57 @@ export async function getDashboard() {
     ),
   };
 }
+
+export interface PartnerDetail {
+  partner: AnyRow | null;
+  consignment: AnyRow | null;
+  receivables: AnyRow[];
+  invoices: AnyRow[];
+  stats: {
+    outstanding: number;
+    totalPaid: number;
+    invoiceCount: number;
+    invoiceTotal: number;
+    stillAtPartner: number;
+  };
+}
+
+/** Hồ sơ + thống kê của một đối tác cho trang chi tiết: gom từ đối soát ký gửi, phải thu và hoá đơn GTGT. Chỉ hoá đơn đang hiệu lực (ISSUED) mới tính vào số lượng/giá trị. */
+export async function getPartnerDetail(id: string): Promise<QueryResult<PartnerDetail>> {
+  const supabase = await client();
+  const blank: PartnerDetail = {
+    partner: null,
+    consignment: null,
+    receivables: [],
+    invoices: [],
+    stats: { outstanding: 0, totalPaid: 0, invoiceCount: 0, invoiceTotal: 0, stillAtPartner: 0 },
+  };
+  if (!supabase) return empty(blank);
+  const [partner, consignment, receivables, invoices] = await Promise.all([
+    supabase.from("partners").select("*").eq("id", id).maybeSingle(),
+    supabase.from("v_partner_consignment").select("*").eq("partner_id", id).maybeSingle(),
+    supabase.from("partner_receivables").select("*").eq("partner_id", id).order("created_at", { ascending: false }).limit(500),
+    supabase.from("vat_invoices").select("*").eq("partner_id", id).order("invoice_date", { ascending: false }).limit(500),
+  ]);
+  const receivableRows = (receivables.data ?? []) as AnyRow[];
+  const invoiceRows = (invoices.data ?? []) as AnyRow[];
+  const issued = invoiceRows.filter((i) => i.status === "ISSUED");
+  return {
+    configured: true,
+    data: {
+      partner: (partner.data ?? null) as AnyRow | null,
+      consignment: (consignment.data ?? null) as AnyRow | null,
+      receivables: receivableRows,
+      invoices: invoiceRows,
+      stats: {
+        outstanding: receivableRows
+          .filter((r) => r.status === "UNPAID" || r.status === "PARTIAL")
+          .reduce((a, r) => a + Number(r.amount) - Number(r.amount_paid), 0),
+        totalPaid: receivableRows.reduce((a, r) => a + Number(r.amount_paid), 0),
+        invoiceCount: issued.length,
+        invoiceTotal: issued.reduce((a, i) => a + Number(i.total_amount), 0),
+        stillAtPartner: Number(consignment.data?.qty_still_at_partner ?? 0),
+      },
+    },
+  };
+}

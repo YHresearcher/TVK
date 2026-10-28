@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import { createSettlementAction, recordReceivablePaymentAction } from "@/lib/actions";
 import { getCurrentProfile, listPartners, listReceivables, listSettlements } from "@/lib/queries";
@@ -40,7 +41,7 @@ export default async function ReceivablesPage({
               const overdue = r.due_date && r.due_date < today && (r.status === "UNPAID" || r.status === "PARTIAL");
               return (
                 <tr key={r.id} className="border-t border-slate-100">
-                  <td className={tdCls}>{partnerName.get(r.partner_id) ?? "—"}</td>
+                  <td className={tdCls}><Link href={`/partners/${r.partner_id}`} className="font-medium text-blue-700 hover:underline">{partnerName.get(r.partner_id) ?? "—"}</Link></td>
                   <td className={tdCls}>{formatVND(r.amount)}</td>
                   <td className={tdCls}>{formatVND(r.amount_paid)}</td>
                   <td className={`${tdCls} font-medium`}>{formatVND(Number(r.amount) - Number(r.amount_paid))}</td>

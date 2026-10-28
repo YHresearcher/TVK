@@ -32,7 +32,7 @@ export default async function PartnersPage({
               <tbody>
                 {partners.data.map((p) => (
                   <tr key={p.id} className="border-t border-slate-100">
-                    <td className={`${tdCls} font-medium`}>{p.name}</td>
+                    <td className={`${tdCls} font-medium`}><Link href={`/partners/${p.id}`} className="text-blue-700 hover:underline">{p.name}</Link></td>
                     <td className={tdCls}>{PARTNER_KIND_LABELS[p.partner_kind] ?? p.partner_kind}</td>
                     <td className={tdCls}>{p.phone ?? "—"}</td>
                     <td className={tdCls}>{p.tax_code ?? "—"}</td>

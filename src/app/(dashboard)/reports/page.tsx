@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
 import { listPartnerConsignment, listProductStock, listSupplierConsignment } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
@@ -54,7 +55,7 @@ export default async function ReportsPage() {
                   const ok = Number(r.qty_sent) === Number(r.qty_consumed) + Number(r.qty_returned) + Number(r.qty_still_at_partner);
                   return (
                     <tr key={r.partner_id} className="border-t border-slate-100">
-                      <td className={tdCls}>{r.partner_name}</td>
+                      <td className={tdCls}><Link href={`/partners/${r.partner_id}`} className="font-medium text-blue-700 hover:underline">{r.partner_name}</Link></td>
                       <td className={tdCls}>{formatNumber(r.qty_sent)}</td>
                       <td className={tdCls}>{formatNumber(r.qty_consumed)}</td>
                       <td className={tdCls}>{formatNumber(r.qty_returned)}</td>
