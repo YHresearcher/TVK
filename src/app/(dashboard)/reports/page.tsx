@@ -80,8 +80,8 @@ export default async function ReportsPage() {
             ở <strong className="text-slate-800">kho đối tác</strong> — và hàng là <strong className="text-slate-800">tự nhập</strong> (mình
             mua về, của mình), <strong className="text-slate-800">được ký gởi</strong> (nhà cung cấp gửi mình giữ/bán hộ),
             {" "}<strong className="text-slate-800">gửi ký gởi</strong> (mình gửi cho đối tác bán hộ, vẫn là của mình),
-            {" "}<strong className="text-slate-800">ký gởi tiếp</strong> (hàng của nhà cung cấp mà mình gửi tiếp cho đối tác —
-            mặc định khoá, chỉ mở khi nhà cung cấp đó đồng ý).
+            {" "}<strong className="text-slate-800">KG tầng 2</strong> (hàng của nhà cung cấp mà mình gửi tiếp cho đối tác —
+            tầng ký gởi thứ hai, mặc định khoá, chỉ mở khi nhà cung cấp đó đồng ý).
           </p>
           {stock.data.length === 0 ? <EmptyState message="Chưa có dữ liệu." /> : (
             <TableWrap>
@@ -97,7 +97,7 @@ export default async function ReportsPage() {
                   <th className={thCls}>Tự nhập</th>
                   <th className={thCls}>Được ký gởi</th>
                   <th className={thCls}>Gửi ký gởi</th>
-                  <th className={thCls}>Ký gởi tiếp</th>
+                  <th className={thCls}>KG tầng 2</th>
                 </tr>
               </thead>
               <tbody>
