@@ -65,12 +65,12 @@ export default async function DashboardPage() {
           <Card title="Theo sổ kế toán (giá vốn)">
             <p className="mb-3 text-sm leading-relaxed text-slate-600">
               Tồn kho trên sổ ghi theo giá vốn, không theo giá bán. Hàng giữ hộ của nhà cung cấp không phải
-              tài sản của cửa hàng nên không gộp vào tồn kho thuộc sở hữu.
+              tài sản của cửa hàng nên không gộp vào tổng hàng tồn kho của TVK.
             </p>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <StatCard label="Tồn kho trong kho (giá vốn)" value={formatVND(d.bookOwnedOwnValue)} />
-              <StatCard label="Hàng của mình tại đối tác (giá vốn)" value={formatVND(d.bookAtPartnersOwnedValue)} />
-              <StatCard label="Tổng tồn kho thuộc sở hữu (giá vốn)" value={formatVND(d.bookInventoryValue)} />
+              <StatCard label="Tổng tiền hàng trong kho (giá vốn)" value={formatVND(d.bookOwnedOwnValue)} />
+              <StatCard label="Hàng của TVK ký gởi" value={formatVND(d.bookAtPartnersOwnedValue)} />
+              <StatCard label="Tổng hàng tồn kho của TVK (kho + ký gởi)" value={formatVND(d.bookInventoryValue)} />
               <StatCard label="Hàng giữ hộ (không phải tài sản)" value={formatVND(d.bookConsignedCustodyValue)} sub="Chỉ theo dõi, không ghi vào tài sản" />
             </div>
           </Card>
