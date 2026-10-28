@@ -129,11 +129,12 @@ export default async function SalesPage({
           <Card title="Nhập từ Excel (Bán hàng)">
             <p className="mb-4 text-sm text-slate-500">
               Một file là một đơn bán hàng sỉ hoặc lẻ (chọn đối tác hoặc
-              khách lẻ ở form), vào đúng ngày bán đã chọn. Nhập theo tên
-              phụ tùng + dòng xe — hệ thống tự tìm hàng rồi phân bổ theo
-              lô cũ nhất còn hàng (FIFO). Đơn giá để trống thì lấy giá theo
-              loại khách đã chọn. Đơn tạo xong xác nhận ngay như nhập tay
-              — lô của mình vào BH, lô ký gửi vào KG.
+              khách lẻ ở form), vào đúng ngày bán đã chọn. Nhập theo mã
+              hàng — tên trùng nhau cũng không sao vì mã khác nhau là món
+              khác nhau; hệ thống phân bổ theo lô cũ nhất còn hàng (FIFO).
+              Đơn giá để trống thì lấy giá theo loại khách đã chọn. Đơn tạo
+              xong xác nhận ngay như nhập tay — lô của mình vào BH, lô ký
+              gửi vào KG.
             </p>
             <ImportDealerSale
               partners={partnerOptions}
