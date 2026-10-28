@@ -867,7 +867,7 @@ export async function listLedgerMovements(limit = 200): Promise<QueryResult<Ledg
       idsByType.set(r.ref_doc_type as string, arr);
     }
   }
-  for (const [docType, ids] of idsByType) {
+  for (const [docType, ids] of Array.from(idsByType.entries())) {
     const table = docTables[docType];
     if (!table) continue;
     const { data: docs } = await supabase.from(table).select("id, doc_code").in("id", Array.from(new Set(ids)));
