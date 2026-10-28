@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   deleteUserAction,
   inviteUserAction,
@@ -21,6 +22,24 @@ const dangerBtn =
 
 function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
   const [editing, setEditing] = useState(false);
+  const [formError, setFormError] = useState("");
+  const router = useRouter();
+
+  // Gọi action trực tiếp để lỗi (vd: trùng tên đăng nhập) hiện ngay
+  // trong form thay vì vỡ cả trang — action ném lỗi thì bắt ở đây.
+  async function handleSave(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setFormError("");
+    try {
+      await updateUserInfoAction(new FormData(e.currentTarget));
+      setEditing(false);
+      router.refresh();
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : "Không lưu được, thử lại."
+      );
+    }
+  }
   return (
     <div className="py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -98,12 +117,12 @@ function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
           Xoá
         </button>
       </form>
-        <button type="button" onClick={() => setEditing(!editing)} className={smallBtn}>
+        <button type="button" onClick={() => { setEditing(!editing); setFormError(""); }} className={smallBtn}>
           {editing ? "Đóng" : "Sửa"}
         </button>
       </div>
       {editing && (
-        <form action={updateUserInfoAction} className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+        <form onSubmit={handleSave} className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
           <input type="hidden" name="profile_id" value={u.id} />
           <div>
             <label className={labelCls}>Họ tên</label>
@@ -115,6 +134,9 @@ function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
           </div>
           <button type="submit" className={btnCls}>Lưu thay đổi</button>
           <button type="button" onClick={() => setEditing(false)} className={smallBtn}>Huỷ</button>
+          {formError && (
+            <p className="w-full text-sm text-red-600">{formError}</p>
+          )}
         </form>
       )}
     </div>
