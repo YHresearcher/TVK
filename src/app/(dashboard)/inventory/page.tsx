@@ -1,4 +1,5 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { createStockAdjustmentAction } from "@/lib/actions";
 import { getCurrentProfile, listBatchStock, listLocations } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
@@ -97,7 +98,7 @@ export default async function InventoryPage({
               <label className={labelCls}>Lý do / ghi chú</label>
               <input name="note" className={inputCls} placeholder="Kiểm kê 30/10, kệ B2…" />
             </div>
-            <button type="submit" className={`${btnCls} w-full`}>Ghi điều chỉnh</button>
+            <SubmitButton className={`${btnCls} w-full`}>Ghi điều chỉnh</SubmitButton>
           </form>
         </Card>
       </div>

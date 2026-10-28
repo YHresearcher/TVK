@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import { normCode } from "@/lib/product-match";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
 
 /** Cột tiền: căn phải để dễ dò số. */
@@ -578,9 +579,9 @@ export default function ImportExcel({
         </TableWrap>
       )}
 
-      <button type="submit" disabled={!canSubmit} className={btnCls}>
+      <SubmitButton disabled={!canSubmit} className={btnCls}>
         Xác nhận nhập
-      </button>
+      </SubmitButton>
       {!canSubmit && rawRows !== null && (
         <p className="text-xs text-slate-500">
           {errorCount > 0

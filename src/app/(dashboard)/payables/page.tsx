@@ -1,4 +1,5 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { createSettlementAction, recordPayablePaymentAction } from "@/lib/actions";
 import { getCurrentProfile, listPayables, listSettlements, listSuppliers } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
@@ -70,7 +71,7 @@ export default async function PayablesPage({
                 <select name="method" className={inputCls}><option value="BANK">Chuyển khoản</option><option value="CASH">Tiền mặt</option></select></div>
             </div>
             <div><label className={labelCls}>Ngày thanh toán</label><input name="payment_date" type="date" className={inputCls} /></div>
-            <button type="submit" className={`${btnCls} w-full`}>Ghi nhận thanh toán</button>
+            <SubmitButton className={`${btnCls} w-full`}>Ghi nhận thanh toán</SubmitButton>
           </form>
         </Card>
 
@@ -95,7 +96,7 @@ export default async function PayablesPage({
                 </label>
               ))}
             </div>
-            <button type="submit" className={`${btnCls} w-full`}>Tạo đối soát</button>
+            <SubmitButton className={`${btnCls} w-full`}>Tạo đối soát</SubmitButton>
           </form>
         </Card>
       </div>

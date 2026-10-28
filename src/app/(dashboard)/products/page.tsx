@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import LabelPrintButton from "@/components/LabelPrintButton";
 import { createProductAction } from "@/lib/actions";
 import { getCurrentProfile, listProductStock, listProducts } from "@/lib/queries";
@@ -120,7 +121,7 @@ export default async function ProductsPage({
               <label className={labelCls}>Mã tra cứu (mỗi dòng một mã, định dạng: MÃ hoặc MÃ|LOẠI — LOẠI: OEM, MANUFACTURER, AFTERMARKET, EQUIVALENT)</label>
               <textarea name="codes" rows={3} className={inputCls} placeholder={"90915-YZZD4|OEM\n90915-20001|EQUIVALENT"} />
             </div>
-            <button type="submit" className={`${btnCls} w-full`}>Tạo sản phẩm</button>
+            <SubmitButton className={`${btnCls} w-full`}>Tạo sản phẩm</SubmitButton>
           </form>
         </Card>
         )}

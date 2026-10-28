@@ -1,4 +1,5 @@
 import { BackLink, Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import PriceEditForm from "@/components/PriceEditForm";
 import { createFitmentAction, createProductCodeAction, updateProductInfoAction, updateProductPricesAction } from "@/lib/actions";
 import { getCurrentProfile, getProductDetail } from "@/lib/queries";
@@ -52,7 +53,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
               </div>
             </div>
             <p className="text-xs text-slate-500">Mã hàng (SKU) không sửa được — nó là chìa khoá khớp hàng của import, quầy bán và tem mã vạch.</p>
-            <button type="submit" className={`${btnCls} w-full`}>Lưu thông tin</button>
+            <SubmitButton className={`${btnCls} w-full`}>Lưu thông tin</SubmitButton>
           </form>
           )}
         </Card>
@@ -89,7 +90,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
                 {CODE_KINDS.map((k) => <option key={k} value={k}>{CODE_KIND_LABELS[k] ?? k}</option>)}
               </select>
             </div>
-            <button type="submit" className={`${btnCls} w-full`}>Thêm mã</button>
+            <SubmitButton className={`${btnCls} w-full`}>Thêm mã</SubmitButton>
           </form>
           )}
         </Card>
@@ -113,7 +114,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
               <input name="year_to" type="number" placeholder="Đến năm" className={inputCls} />
             </div>
             <input name="engine" placeholder="Động cơ (1.5)" className={inputCls} />
-            <button type="submit" className={`${btnCls} w-full`}>Thêm xe</button>
+            <SubmitButton className={`${btnCls} w-full`}>Thêm xe</SubmitButton>
           </form>
           )}
         </Card>

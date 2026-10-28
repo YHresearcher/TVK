@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ImportExcel from "@/components/ImportExcel";
 import DeleteReceiptButton from "@/components/DeleteReceiptButton";
@@ -131,7 +132,7 @@ export default async function StockInPage({
                   Xác nhận ngay → tạo lô (không qua phiếu nháp)
                 </label>
               </div>
-              <button type="submit" className={btnCls}>Tạo phiếu</button>
+              <SubmitButton className={btnCls}>Tạo phiếu</SubmitButton>
             </form>
           </Card>
           )}
@@ -175,7 +176,7 @@ export default async function StockInPage({
                   Xác nhận ngay → tạo lô (không qua phiếu nháp)
                 </label>
               </div>
-              <button type="submit" className={btnCls}>Tạo phiếu</button>
+              <SubmitButton className={btnCls}>Tạo phiếu</SubmitButton>
             </form>
           </Card>
           )}
@@ -226,7 +227,7 @@ function DraftsCard({
               {!readOnly && (
                 <form action={confirmAction}>
                   <input type="hidden" name="id" value={r.id} />
-                  <button type="submit" className={btnCls}>Xác nhận → tạo lô</button>
+                  <SubmitButton className={btnCls}>Xác nhận → tạo lô</SubmitButton>
                 </form>
               )}
               {canDelete && (

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { createPartnerAction, updatePartnerAction } from "@/lib/actions";
 import { getCurrentProfile, listPartners } from "@/lib/queries";
 import { formatVND } from "@/lib/format";
@@ -76,7 +77,7 @@ export default async function PartnersPage({
               <div><label className={labelCls}>Hạn mức ký gửi (₫)</label><input name="consignment_limit" type="number" step="100000" defaultValue={editing?.consignment_limit ?? 0} className={inputCls} /></div>
             </div>
             <div><label className={labelCls}>Ghi chú</label><textarea name="notes" rows={2} defaultValue={editing?.notes ?? ""} className={inputCls} /></div>
-            <button type="submit" className={`${btnCls} w-full`}>{editing ? "Lưu thay đổi" : "Tạo đối tác"}</button>
+            <SubmitButton className={`${btnCls} w-full`}>{editing ? "Lưu thay đổi" : "Tạo đối tác"}</SubmitButton>
             {editing && (
               <Link href="/partners" className="block text-center text-sm font-medium text-slate-600 hover:underline">
                 Huỷ — quay lại tạo mới

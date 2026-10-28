@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ImportAllocation from "@/components/ImportAllocation";
 import ImportConsumptionReport from "@/components/ImportConsumptionReport";
@@ -96,7 +97,7 @@ export default async function PartnerConsumptionPage({
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty_consumed", label: "Số lượng đã tiêu thụ", type: "number" },
               ]} initialRows={2} />
-              <button type="submit" className={btnCls}>Tạo báo cáo nháp</button>
+              <SubmitButton className={btnCls}>Tạo báo cáo nháp</SubmitButton>
             </form>
           </Card>
           <Card title="Nhập từ Excel (BT)">
@@ -119,7 +120,7 @@ export default async function PartnerConsumptionPage({
                         <form action={setConsumptionReportStatusAction}>
                           <input type="hidden" name="id" value={r.id} />
                           <input type="hidden" name="status" value="CONFIRMED" />
-                          <button type="submit" className={btnGhostCls}>Xác nhận báo cáo</button>
+                          <SubmitButton className={btnGhostCls}>Xác nhận báo cáo</SubmitButton>
                         </form>
                       )}
                     </td>
@@ -152,7 +153,7 @@ export default async function PartnerConsumptionPage({
                 { name: "unit_price", label: "Đơn giá (₫)", type: "number", step: "1000" },
               ]} initialRows={2} />
               <p className="text-xs text-slate-500">Khi xác nhận, cơ sở dữ liệu kiểm tra 3 chốt: không vượt quá lượng tiêu thụ đã báo, không vượt quá hạn mức đã giao theo từng tính chất, và lô phải còn đủ hàng tại đối tác.</p>
-              <button type="submit" className={btnCls}>Tạo phiếu phân bổ nháp</button>
+              <SubmitButton className={btnCls}>Tạo phiếu phân bổ nháp</SubmitButton>
             </form>
           </Card>
           <Card title="Nhập từ Excel (PB)">

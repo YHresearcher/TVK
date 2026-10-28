@@ -1,4 +1,5 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ImportConsignmentOut from "@/components/ImportConsignmentOut";
 import { confirmConsignmentOutAction, createConsignmentOutAction, importConsignmentOutAction } from "@/lib/actions";
@@ -81,7 +82,7 @@ export default async function ConsignmentOutPage({
               { name: "transfer_price", label: "Giá chuyển giao / giá thoả thuận (₫)", type: "number", step: "1000" },
             ]} initialRows={2} />
             <p className="text-xs text-slate-500">Kho nguồn được tự động xác định từ vị trí hiện tại của lô. Điều khoản quyết định hạn mức phân bổ sau này (vd. tối đa 5 MUA ĐỨT / 10 KÝ GỬI).</p>
-            <button type="submit" className={btnCls}>Tạo phiếu nháp</button>
+            <SubmitButton className={btnCls}>Tạo phiếu nháp</SubmitButton>
           </form>
         </Card>
         <Card title="Nhập từ Excel (GK)">
@@ -105,7 +106,7 @@ export default async function ConsignmentOutPage({
                     {s.status === "DRAFT" && !readOnly && (
                       <form action={confirmConsignmentOutAction}>
                         <input type="hidden" name="id" value={s.id} />
-                        <button type="submit" className={btnGhostCls}>Xác nhận → chuyển hàng tới đối tác</button>
+                        <SubmitButton className={btnGhostCls}>Xác nhận → chuyển hàng tới đối tác</SubmitButton>
                       </form>
                     )}
                   </td>

@@ -1,6 +1,7 @@
 "use client";
 
 import { btnGhostCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 
 /** Nút xoá phiếu nhập — chỉ Chủ cửa hàng thấy (quyền kiểm tra lại phía server). */
 export default function DeleteReceiptButton({
@@ -31,9 +32,9 @@ export default function DeleteReceiptButton({
       <input type="hidden" name="id" value={receiptId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="tab" value={tab} />
-      <button type="submit" className={btnGhostCls}>
+      <SubmitButton className={btnGhostCls}>
         Xoá
-      </button>
+      </SubmitButton>
     </form>
   );
 }

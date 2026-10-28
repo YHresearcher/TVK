@@ -3,6 +3,7 @@ import HelpButton from "@/components/HelpButton";
 import MobileTopBar from "@/components/MobileTopBar";
 import Sidebar from "@/components/Sidebar";
 import { signOutAction } from "@/lib/actions";
+import SubmitButton from "@/components/SubmitButton";
 import { getCurrentProfile } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { ROLE_LABELS } from "@/lib/types";
@@ -33,12 +34,11 @@ export default async function DashboardLayout({
               &amp; vai trò), rồi đăng nhập lại.
             </p>
             <form action={signOutAction} className="mt-5">
-              <button
-                type="submit"
+              <SubmitButton
                 className="w-full rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800"
               >
                 Đăng xuất
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </div>

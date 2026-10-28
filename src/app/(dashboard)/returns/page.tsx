@@ -1,4 +1,5 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ExportExcelButton from "@/components/ExportExcelButton";
 import { confirmReturnAction, createReturnAction } from "@/lib/actions";
@@ -67,7 +68,7 @@ export default async function ReturnsPage({
               { name: "reason", label: "Lý do", type: "select", options: RETURN_REASONS.map((r) => ({ value: r, label: RETURN_REASON_LABELS[r] ?? r })) },
             ]} initialRows={1} />
             <p className="text-xs text-slate-500">Vị trí được tự động xác định: khách trả vào kho TVK đầu tiên, đối tác trả di chuyển từ kho ảo của đối tác về Kho TVK, trả nhà cung cấp xuất khỏi hệ thống từ Kho TVK.</p>
-            <button type="submit" className={btnCls}>Tạo phiếu trả nháp</button>
+            <SubmitButton className={btnCls}>Tạo phiếu trả nháp</SubmitButton>
           </form>
         </Card>
         )}
@@ -91,7 +92,7 @@ export default async function ReturnsPage({
                     {d.status === "DRAFT" && !readOnly && (
                       <form action={confirmReturnAction}>
                         <input type="hidden" name="id" value={d.id} />
-                        <button type="submit" className={btnGhostCls}>Xác nhận → di chuyển hàng</button>
+                        <SubmitButton className={btnGhostCls}>Xác nhận → di chuyển hàng</SubmitButton>
                       </form>
                     )}
                   </td>

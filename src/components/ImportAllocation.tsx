@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import type { AnyRow } from "@/lib/types";
@@ -384,9 +385,9 @@ export default function ImportAllocation({
         </TableWrap>
       )}
 
-      <button type="submit" disabled={!canSubmit} className={btnCls}>
+      <SubmitButton disabled={!canSubmit} className={btnCls}>
         Tạo phiếu phân bổ
-      </button>
+      </SubmitButton>
       {!canSubmit && rawRows !== null && (
         <p className="text-xs text-slate-500">
           {errorCount > 0

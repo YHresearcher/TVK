@@ -1,4 +1,5 @@
 import { BackLink, Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { confirmAllocationAction, createAllocationDocumentsAction } from "@/lib/actions";
 import { getAllocationDetail, getCurrentProfile, listProducts } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
@@ -54,15 +55,15 @@ export default async function AllocationDetailPage({
           {!readOnly && slip.status === "DRAFT" && (
             <form action={confirmAllocationAction}>
               <input type="hidden" name="id" value={slip.id} />
-              <button type="submit" className={btnCls}>Xác nhận phân bổ (kiểm tra 3 chốt)</button>
+              <SubmitButton className={btnCls}>Xác nhận phân bổ (kiểm tra 3 chốt)</SubmitButton>
             </form>
           )}
           {!readOnly && slip.status === "CONFIRMED" && pendingCount > 0 && (
             <form action={createAllocationDocumentsAction}>
               <input type="hidden" name="id" value={slip.id} />
-              <button type="submit" className={btnCls}>
+              <SubmitButton className={btnCls}>
                 Tạo chứng từ BH/KG cho {pendingCount} dòng đang chờ
-              </button>
+              </SubmitButton>
             </form>
           )}
           {slip.status === "CONFIRMED" && pendingCount === 0 && (

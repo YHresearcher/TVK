@@ -1,4 +1,5 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { cancelVatInvoiceAction, createVatInvoiceAction } from "@/lib/actions";
 import ExportExcelButton from "@/components/ExportExcelButton";
 import { getCurrentProfile, getVatInvoiceMode, listPartners, listUninvoicedLines, listVatInvoices } from "@/lib/queries";
@@ -81,7 +82,7 @@ export default async function InvoicesPage({
                   </label>
                 ))}
               </div>
-              <button type="submit" className={btnCls}>Phát hành hoá đơn</button>
+              <SubmitButton className={btnCls}>Phát hành hoá đơn</SubmitButton>
             </form>
           )}
         </Card>
@@ -107,7 +108,7 @@ export default async function InvoicesPage({
                     {inv.status === "ISSUED" && !readOnly && (
                       <form action={cancelVatInvoiceAction}>
                         <input type="hidden" name="id" value={inv.id} />
-                        <button type="submit" className={btnGhostCls}>Huỷ hoá đơn</button>
+                        <SubmitButton className={btnGhostCls}>Huỷ hoá đơn</SubmitButton>
                       </form>
                     )}
                   </td>

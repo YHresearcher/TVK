@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOutAction } from "@/lib/actions";
+import SubmitButton from "@/components/SubmitButton";
 
 interface NavItem {
   href: string;
@@ -289,12 +290,11 @@ export default function Sidebar({
         <p className="truncate text-sm font-medium text-slate-900">{userName}</p>
         <p className="text-xs text-slate-500">{role}</p>
         <form action={signOutAction} className="mt-3">
-          <button
-            type="submit"
+          <SubmitButton
             className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100"
           >
             Đăng xuất
-          </button>
+          </SubmitButton>
         </form>
         <div className="mt-4 border-t border-slate-200 pt-3 text-center">
           <p className="text-[11px] text-slate-400">TVK management system by Thanh Phan</p>

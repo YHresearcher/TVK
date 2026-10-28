@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { createSettlementAction, recordReceivablePaymentAction } from "@/lib/actions";
 import { getCurrentProfile, listPartners, listReceivables, listSettlements } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
@@ -73,7 +74,7 @@ export default async function ReceivablesPage({
                 <select name="method" className={inputCls}><option value="BANK">Chuyển khoản</option><option value="CASH">Tiền mặt</option></select></div>
             </div>
             <div><label className={labelCls}>Ngày thu</label><input name="payment_date" type="date" className={inputCls} /></div>
-            <button type="submit" className={`${btnCls} w-full`}>Ghi nhận thu tiền</button>
+            <SubmitButton className={`${btnCls} w-full`}>Ghi nhận thu tiền</SubmitButton>
           </form>
         </Card>
 
@@ -98,7 +99,7 @@ export default async function ReceivablesPage({
                 </label>
               ))}
             </div>
-            <button type="submit" className={`${btnCls} w-full`}>Tạo đối soát</button>
+            <SubmitButton className={`${btnCls} w-full`}>Tạo đối soát</SubmitButton>
           </form>
         </Card>
       </div>

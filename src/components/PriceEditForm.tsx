@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { btnCls, inputCls, labelCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 
 /**
  * Price-edit form for the product detail "Bảng giá" card. The suggestion
@@ -36,7 +37,7 @@ export default function PriceEditForm({
       <button type="button" onClick={suggestRetail} disabled={wholesale <= 0} className="text-sm text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline">
         Gợi ý: Giá lẻ = Giá đại lý × 1,50/1,35
       </button>
-      <button type="submit" className={`${btnCls} w-full`}>Lưu giá</button>
+      <SubmitButton className={`${btnCls} w-full`}>Lưu giá</SubmitButton>
     </form>
   );
 }

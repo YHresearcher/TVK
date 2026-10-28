@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Card, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { formatVND } from "@/lib/format";
 import { normalizeHeader } from "@/lib/excel-parse";
 import { normCode, tierPriceOf } from "@/lib/product-match";
@@ -392,9 +393,9 @@ export default function PosSaleForm({
               </div>
             )}
           </div>
-          <button type="submit" className={btnCls} disabled={lines.length === 0}>
+          <SubmitButton className={btnCls} disabled={lines.length === 0}>
             Bán hàng
-          </button>
+          </SubmitButton>
         </div>
         {searchMsg && <p className="text-sm text-amber-700">{searchMsg}</p>}
 

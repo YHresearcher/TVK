@@ -1,4 +1,5 @@
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import UserAdminPanel from "@/components/UserAdminPanel";
 import UsernameForm from "@/components/UsernameForm";
 import { createWarehouseAction, updateVatModeAction } from "@/lib/actions";
@@ -59,7 +60,7 @@ export default async function SettingsPage() {
               dòng hoá đơn luôn liên kết với đúng một chứng từ. Cài đặt này chỉ quyết định cách
               nhóm các dòng khi phát hành hoá đơn pháp lý.
             </p>
-            <button type="submit" className={btnCls}>Lưu</button>
+            <SubmitButton className={btnCls}>Lưu</SubmitButton>
           </form>
         </Card>
 
@@ -76,7 +77,7 @@ export default async function SettingsPage() {
               <input name="name" required placeholder="Tên kho (Kho chính)" className={inputCls} />
               <input name="detail" placeholder="Chi tiết (địa chỉ / khu vực kệ)" className={inputCls} />
             </div>
-            <button type="submit" className={`${btnCls} w-full`}>Thêm kho</button>
+            <SubmitButton className={`${btnCls} w-full`}>Thêm kho</SubmitButton>
           </form>
           {partnerWarehouses.length > 0 && (
             <p className="mt-4 text-xs text-slate-500">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { createSupplierAction, updateSupplierAction } from "@/lib/actions";
 import { getCurrentProfile, listSuppliers } from "@/lib/queries";
 import { isReadOnlyRole } from "@/lib/types";
@@ -73,7 +74,7 @@ export default async function SuppliersPage({
               Cho phép ký gửi tiếp hàng của nhà cung cấp này (ô D)
             </label>
             <div><label className={labelCls}>Ghi chú</label><textarea name="notes" rows={2} defaultValue={editing?.notes ?? ""} className={inputCls} /></div>
-            <button type="submit" className={`${btnCls} w-full`}>{editing ? "Lưu thay đổi" : "Tạo nhà cung cấp"}</button>
+            <SubmitButton className={`${btnCls} w-full`}>{editing ? "Lưu thay đổi" : "Tạo nhà cung cấp"}</SubmitButton>
             {editing && (
               <Link href="/suppliers" className="block text-center text-sm font-medium text-slate-600 hover:underline">
                 Huỷ — quay lại tạo mới

@@ -11,6 +11,7 @@ import {
   updateUserRoleAction,
 } from "@/lib/actions";
 import { btnCls, inputCls, labelCls } from "@/components/ui";
+import SubmitButton from "@/components/SubmitButton";
 import { ROLE_LABELS, type AnyRow } from "@/lib/types";
 
 const ROLES = Object.keys(ROLE_LABELS) as (keyof typeof ROLE_LABELS)[];
@@ -84,9 +85,9 @@ function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
       <form action={setUserActiveAction}>
         <input type="hidden" name="profile_id" value={u.id} />
         <input type="hidden" name="active" value={u.is_active ? "0" : "1"} />
-        <button type="submit" disabled={isSelf} className={smallBtn}>
+        <SubmitButton disabled={isSelf} className={smallBtn}>
           {u.is_active ? "Khoá" : "Mở khoá"}
-        </button>
+        </SubmitButton>
       </form>
 
       <form
@@ -101,9 +102,9 @@ function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
         }}
       >
         <input type="hidden" name="email" value={u.email ?? ""} />
-        <button type="submit" className={smallBtn}>
+        <SubmitButton className={smallBtn}>
           Đặt lại mật khẩu
-        </button>
+        </SubmitButton>
       </form>
 
       <form
@@ -118,9 +119,9 @@ function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
         }}
       >
         <input type="hidden" name="profile_id" value={u.id} />
-        <button type="submit" disabled={isSelf} className={dangerBtn}>
+        <SubmitButton disabled={isSelf} className={dangerBtn}>
           Xoá
-        </button>
+        </SubmitButton>
       </form>
         <button type="button" onClick={() => { setEditing(!editing); setFormError(""); }} className={smallBtn}>
           {editing ? "Đóng" : "Sửa"}
@@ -137,7 +138,7 @@ function UserRow({ u, isSelf }: { u: AnyRow; isSelf: boolean }) {
             <label className={labelCls}>Tên đăng nhập</label>
             <input name="username" defaultValue={u.username ?? ""} placeholder="Để trống = không có tên đăng nhập" className={inputCls} />
           </div>
-          <button type="submit" className={btnCls}>Lưu thay đổi</button>
+          <SubmitButton className={btnCls}>Lưu thay đổi</SubmitButton>
           <button type="button" onClick={() => setEditing(false)} className={smallBtn}>Huỷ</button>
           {formError && (
             <p className="w-full text-sm text-red-600">{formError}</p>
@@ -237,9 +238,9 @@ export default function UserAdminPanel({
           </div>
         )}
         <div className="sm:col-span-2">
-          <button type="submit" className={btnCls}>
+          <SubmitButton className={btnCls}>
             Tạo tài khoản
-          </button>
+          </SubmitButton>
         </div>
       </form>
 
