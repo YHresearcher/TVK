@@ -114,6 +114,60 @@ export const listPartnerConsignment = () => list("v_partner_consignment");
 export const listConsumptionProgress = () => list("v_consumption_progress");
 export const listPartnerTermBalance = () => list("v_partner_term_balance");
 
+/** Giá trị ước tính của hàng còn giữ ở từng đối tác: số lượng × giá chuyển
+ *  giao mới nhất của lô (phiếu GK đã xác nhận), không có thì giá bán của
+ *  sản phẩm. Chỉ để ước lượng số tiền sẽ thu khi đối tác bán hết hàng —
+ *  chưa phải khoản phải thu (phải thu chỉ phát sinh khi tiêu thụ). */
+export async function getPartnerRemainingEstimates(): Promise<Map<string, number>> {
+  const supabase = await client();
+  const out = new Map<string, number>();
+  if (!supabase) return out;
+  const [stock, slips, products] = await Promise.all([
+    supabase
+      .from("v_batch_stock")
+      .select("batch_id, product_id, partner_id, qty")
+      .eq("location_kind", "PARTNER_VIRTUAL")
+      .limit(2000),
+    supabase.from("consignment_out_slips").select("id, created_at").eq("status", "CONFIRMED").limit(500),
+    supabase.from("products").select("id, retail_price, wholesale_price"),
+  ]);
+  const slipCreated = new Map(
+    ((slips.data ?? []) as AnyRow[]).map((s) => [String(s.id), String(s.created_at)])
+  );
+  const latestTransfer = new Map<string, number>();
+  if ((slips.data ?? []).length) {
+    const { data: items } = await supabase
+      .from("consignment_out_items")
+      .select("slip_id, batch_id, transfer_price")
+      .in("slip_id", (slips.data ?? []).map((s) => s.id))
+      .limit(5000);
+    const sorted = ((items ?? []) as AnyRow[]).sort((a, b) =>
+      String(slipCreated.get(String(b.slip_id)) ?? "").localeCompare(
+        String(slipCreated.get(String(a.slip_id)) ?? "")
+      )
+    );
+    for (const it of sorted) {
+      const key = String(it.batch_id);
+      if (!latestTransfer.has(key)) latestTransfer.set(key, Number(it.transfer_price ?? 0));
+    }
+  }
+  const sellPrice = new Map(
+    ((products.data ?? []) as AnyRow[]).map((p) => [
+      String(p.id),
+      Number(p.retail_price ?? 0) > 0 ? Number(p.retail_price) : Number(p.wholesale_price ?? 0),
+    ])
+  );
+  for (const r of (stock.data ?? []) as AnyRow[]) {
+    const qty = Number(r.qty ?? 0);
+    if (!qty || !r.partner_id) continue;
+    const tp = latestTransfer.get(String(r.batch_id));
+    const unit = tp !== undefined ? tp : sellPrice.get(String(r.product_id)) ?? 0;
+    const pid = String(r.partner_id);
+    out.set(pid, (out.get(pid) ?? 0) + qty * unit);
+  }
+  return out;
+}
+
 export async function getProductDetail(id: string) {
   const supabase = await client();
   if (!supabase)
