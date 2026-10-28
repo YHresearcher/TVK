@@ -33,6 +33,8 @@ export default async function DashboardPage({
   const grossMargin = d.revenueAll > 0 ? Math.round((d.grossProfitAll / d.revenueAll) * 100) : 0;
   const revenue14Total = d.revenue14.reduce((a, r) => a + r.value, 0);
   const cogsAll = d.revenueAll - d.grossProfitAll;
+  // ROI: lãi trên vốn hàng đã bán (giá vốn). ROS: lãi trên doanh thu.
+  const roiAll = cogsAll > 0 ? Math.round((d.grossProfitAll / cogsAll) * 100) : 0;
   if (!d.configured) {
     return (
       <>
@@ -132,8 +134,9 @@ export default async function DashboardPage({
               Doanh thu <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
               {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
               {" · "}Lợi nhuận gộp <strong className="text-slate-900">{formatVND(d.grossProfitAll)}</strong>
-              {" "}(biên gộp {grossMargin}%)
-              {" · "}30 ngày gần nhất: doanh thu {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn.
+              {" "}(ROS {grossMargin}% · ROI {roiAll}%).
+              ROS là lãi chia cho doanh thu, ROI là lãi chia cho vốn hàng đã bán.
+              {" "}30 ngày gần nhất: doanh thu {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn.
             </p>
             {d.orderAnalysis.length === 0 ? (
               <EmptyState message="Chưa có đơn hàng nào được xác nhận." />
@@ -146,7 +149,7 @@ export default async function DashboardPage({
                 />
                 <div className="mt-4">
                   <TableWrap>
-                    <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Ngày</th><th className={thCls}>Khách hàng</th><th className={`${thCls} text-right`}>Doanh thu</th><th className={`${thCls} text-right`}>Giá vốn</th><th className={`${thCls} text-right`}>Lợi nhuận</th><th className={`${thCls} text-right`}>Biên</th></tr></thead>
+                    <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Ngày</th><th className={thCls}>Khách hàng</th><th className={`${thCls} text-right`}>Doanh thu</th><th className={`${thCls} text-right`}>Giá vốn</th><th className={`${thCls} text-right`}>Lợi nhuận</th><th className={`${thCls} text-right`}>ROS</th><th className={`${thCls} text-right`}>ROI</th></tr></thead>
                     <tbody>
                       {d.orderAnalysis.map((o) => (
                         <tr key={o.code} className="border-t border-slate-100">
@@ -157,6 +160,7 @@ export default async function DashboardPage({
                           <td className={`${tdCls} text-right`}>{formatVND(o.cogs)}</td>
                           <td className={`${tdCls} text-right font-medium`}>{formatVND(o.profit)}</td>
                           <td className={`${tdCls} text-right`}>{o.revenue > 0 ? `${Math.round((o.profit / o.revenue) * 100)}%` : "—"}</td>
+                          <td className={`${tdCls} text-right`}>{o.cogs > 0 ? `${Math.round((o.profit / o.cogs) * 100)}%` : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
