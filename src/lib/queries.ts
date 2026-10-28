@@ -809,6 +809,7 @@ export interface LedgerRow {
   to_name: string | null;
   ref_doc_type: string | null;
   ref_doc_id: string | null;
+  doc_code: string | null;
   reversal_of_id: string | null;
   created_by_name: string | null;
   batch_code: string;
@@ -849,6 +850,29 @@ export async function listLedgerMovements(limit = 200): Promise<QueryResult<Ledg
   const productMap = new Map((products as AnyRow[]).map((p) => [p.id as string, p]));
   const locMap = new Map((locs as AnyRow[]).map((l) => [l.id as string, l.name as string]));
   const profMap = new Map((profs as AnyRow[]).map((p) => [p.id as string, p.full_name as string]));
+  // Mã chứng từ (PN/GK/BH/…) theo từng loại chứng từ nguồn — để bút toán truy vết được tới chứng từ gốc.
+  const docTables: Record<string, string> = {
+    PURCHASE_RECEIPT: "purchase_receipts",
+    CONSIGNMENT_RECEIPT: "consignment_receipts",
+    CONSIGNMENT_OUT: "consignment_out_slips",
+    SALES_DOCUMENT: "sales_documents",
+    RETURN_DOCUMENT: "return_documents",
+  };
+  const docCodeMap = new Map<string, string>();
+  const idsByType = new Map<string, string[]>();
+  for (const r of list) {
+    if (r.ref_doc_type && r.ref_doc_id) {
+      const arr = idsByType.get(r.ref_doc_type as string) ?? [];
+      arr.push(r.ref_doc_id as string);
+      idsByType.set(r.ref_doc_type as string, arr);
+    }
+  }
+  for (const [docType, ids] of idsByType) {
+    const table = docTables[docType];
+    if (!table) continue;
+    const { data: docs } = await supabase.from(table).select("id, doc_code").in("id", Array.from(new Set(ids)));
+    for (const d of (docs ?? []) as AnyRow[]) docCodeMap.set(d.id as string, d.doc_code as string);
+  }
   return {
     configured: true,
     data: list.map((r) => {
@@ -863,6 +887,7 @@ export async function listLedgerMovements(limit = 200): Promise<QueryResult<Ledg
         to_name: r.to_location_id ? (locMap.get(r.to_location_id as string) ?? "—") : null,
         ref_doc_type: (r.ref_doc_type as string) ?? null,
         ref_doc_id: (r.ref_doc_id as string) ?? null,
+        doc_code: r.ref_doc_id ? (docCodeMap.get(r.ref_doc_id as string) ?? null) : null,
         reversal_of_id: (r.reversal_of_id as string) ?? null,
         created_by_name: r.created_by ? (profMap.get(r.created_by as string) ?? null) : null,
         batch_code: (batch?.batch_code as string) ?? "—",

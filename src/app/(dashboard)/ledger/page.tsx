@@ -34,7 +34,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: { q?:
         description="Mọi lần hàng vào, ra, chuyển kho, gửi ký gửi hay bán hàng đều để lại một bút toán. Sổ cái chỉ ghi thêm, không sửa, không xoá."
       />
       <Card>
-        <form method="get" className="flex flex-wrap items-end gap-3">
+        <form key={`${q}|${searchParams.kind ?? ""}`} method="get" className="flex flex-wrap items-end gap-3">
           <div className="min-w-0 flex-1">
             <label className={labelCls} htmlFor="q">
               Tìm theo mã hàng, tên, lô, kho, người làm
@@ -107,7 +107,10 @@ export default async function LedgerPage({ searchParams }: { searchParams: { q?:
                     <td className={tdCls}>{r.from_name ?? "Ngoài hệ thống"}</td>
                     <td className={tdCls}>{r.to_name ?? "Ra khỏi hệ thống"}</td>
                     <td className={`${tdCls} text-right font-medium`}>{formatNumber(r.qty)}</td>
-                    <td className={tdCls}>{r.ref_doc_type ? (REF_DOC_TYPE_LABELS[r.ref_doc_type] ?? r.ref_doc_type) : "—"}</td>
+                    <td className={tdCls}>
+                      {r.ref_doc_type ? (REF_DOC_TYPE_LABELS[r.ref_doc_type] ?? r.ref_doc_type) : "—"}
+                      {r.doc_code && <div className="text-xs text-slate-500">{r.doc_code}</div>}
+                    </td>
                     <td className={tdCls}>{r.created_by_name ?? "—"}</td>
                   </tr>
                 ))}
