@@ -126,32 +126,11 @@ export default async function DashboardPage() {
             {d.orderAnalysis.length === 0 ? (
               <EmptyState message="Chưa có đơn hàng nào được xác nhận." />
             ) : (
-              <>
-                <GroupedBarChart
-                  data={d.orderAnalysis.slice(0, 8).map((o) => ({ label: o.code, a: o.revenue, b: o.cogs }))}
-                  labelA="Doanh thu"
-                  labelB="Giá vốn"
-                />
-                <div className="mt-4">
-                  <TableWrap>
-                    <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Ngày</th><th className={thCls}>Khách hàng</th><th className={`${thCls} text-right`}>Doanh thu</th><th className={`${thCls} text-right`}>Giá vốn</th><th className={`${thCls} text-right`}>Lợi nhuận</th><th className={`${thCls} text-right`}>ROS</th><th className={`${thCls} text-right`}>ROI</th></tr></thead>
-                    <tbody>
-                      {d.orderAnalysis.map((o) => (
-                        <tr key={o.code} className="border-t border-slate-100">
-                          <td className={`${tdCls} font-mono text-xs`}>{o.code}</td>
-                          <td className={tdCls}>{formatDate(o.date)}</td>
-                          <td className={tdCls}>{o.customer}</td>
-                          <td className={`${tdCls} text-right`}>{formatVND(o.revenue)}</td>
-                          <td className={`${tdCls} text-right`}>{formatVND(o.cogs)}</td>
-                          <td className={`${tdCls} text-right font-medium`}>{formatVND(o.profit)}</td>
-                          <td className={`${tdCls} text-right`}>{o.revenue > 0 ? `${Math.round((o.profit / o.revenue) * 100)}%` : "—"}</td>
-                          <td className={`${tdCls} text-right`}>{o.cogs > 0 ? `${Math.round((o.profit / o.cogs) * 100)}%` : "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </TableWrap>
-                </div>
-              </>
+              <GroupedBarChart
+                data={d.orderAnalysis.slice(0, 8).map((o) => ({ label: o.code, a: o.revenue, b: o.cogs }))}
+                labelA="Doanh thu"
+                labelB="Giá vốn"
+              />
             )}
           </Card>
         </div>
