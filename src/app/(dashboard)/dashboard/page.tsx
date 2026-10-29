@@ -172,26 +172,26 @@ export default async function DashboardPage({
     </section>
   );
 
-  // Tầng 2 — Hàng hoá và quyền sở hữu: của mình, giữ hộ, gửi đối tác.
+  // Tầng 2 — Hàng hoá và quyền sở hữu: của mình, được ký gửi, gửi đối tác.
   const layer2 = (
     <section className="mt-10">
       <LayerHeading n={2} title="Hàng hoá và quyền sở hữu" desc="Hàng của mình, hàng nhận ký gửi và hàng đang gửi ở đối tác — tách biệt theo từng lô." />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <StatCard label="Tồn kho (số lượng)" value={`${formatNumber(d.ownedQty)} đơn vị`} sub={`${formatVND(d.ownedValue)} theo giá bán · ${formatNumber(d.ownedLotCount)} lô`} tone="emerald" />
-        <StatCard label="Hàng nhận ký gửi (số lượng)" value={`${formatNumber(d.consignedQty)} đơn vị`} sub={`${formatVND(d.consignedValue)} đang giữ hộ nhà cung cấp · ${formatNumber(d.consignedLotCount)} lô`} tone="amber" />
+        <StatCard label="Hàng nhận ký gửi (số lượng)" value={`${formatNumber(d.consignedQty)} đơn vị`} sub={`${formatVND(d.consignedValue)} được nhà cung cấp ký gửi · ${formatNumber(d.consignedLotCount)} lô`} tone="amber" />
         <StatCard label="Hàng TVK tại đối tác" value={`${formatNumber(d.atPartnersQty)} đơn vị`} sub={`${formatVND(d.atPartnersValue)} theo giá chuyển giao · ${formatNumber(d.atPartnersLotCount)} lô`} tone="sky" />
       </div>
       {canSeeCost && (
         <div className="mt-6">
           <Card title="Theo sổ kế toán (giá vốn)" tone="slate">
             <p className="mb-3 text-sm leading-relaxed text-slate-600">
-              Theo giá vốn; hàng giữ hộ không phải tài sản, không gộp vào tổng.
+              Theo giá vốn; hàng được ký gửi không phải tài sản, không gộp vào tổng.
             </p>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <StatCard label="Tổng tiền hàng trong kho (giá vốn)" value={formatVND(d.bookOwnedOwnValue)} sub={bookShare(d.bookOwnedOwnValue)} />
               <StatCard label="Hàng của TVK ký gởi" value={formatVND(d.bookAtPartnersOwnedValue)} sub={bookShare(d.bookAtPartnersOwnedValue)} />
               <StatCard label="Tổng hàng tồn kho của TVK (kho + ký gởi)" value={formatVND(d.bookInventoryValue)} />
-              <StatCard label="Hàng giữ hộ (không phải tài sản)" value={formatVND(d.bookConsignedCustodyValue)} sub="Chỉ theo dõi, không ghi vào tài sản" />
+              <StatCard label="Hàng được ký gửi (không phải tài sản)" value={formatVND(d.bookConsignedCustodyValue)} sub="Chỉ theo dõi, không ghi vào tài sản" />
             </div>
           </Card>
         </div>

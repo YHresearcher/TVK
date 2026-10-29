@@ -50,7 +50,7 @@ export default async function InventoryPage({
 
       <p className="mb-3 text-sm text-slate-600">
         Đang hiển thị <strong>{formatNumber(totalQty)}</strong> đơn vị{!isSales && (<> · giá trị tồn <strong>{formatVND(totalValue)}</strong></>)}
-        {!isSales && (<span className="text-slate-400"> (giá trị ký gửi là hàng giữ hộ nhà cung cấp, không phải vốn của mình)</span>)}
+        {!isSales && (<span className="text-slate-400"> (hàng được ký gửi không phải vốn của mình)</span>)}
       </p>
 
       {rows.length === 0 ? <EmptyState message="Không có dòng tồn kho nào khớp." /> : (

@@ -572,8 +572,8 @@ export async function getDashboard() {
   const ownedOwn = compOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
   const ownedAtPartners = compOf((r) => owned(r) && r.location_kind === "PARTNER_VIRTUAL");
   const consignedAll = compOf(consigned);
-  // Sổ kế toán: tồn kho ghi theo GIÁ VỐN, không theo giá bán. Hàng giữ hộ
-  // của nhà cung cấp không phải tài sản — chỉ theo dõi riêng, không gộp
+  // Sổ kế toán: tồn kho ghi theo GIÁ VỐN, không theo giá bán. Hàng được ký gửi
+  // không phải tài sản — chỉ theo dõi riêng, không gộp
   // vào tồn kho thuộc sở hữu.
   const costOf = (filter: (r: AnyRow) => boolean) => ({
     qty: sum(filter, (r) => Number(r.qty)),

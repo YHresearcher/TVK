@@ -13,8 +13,8 @@ function pct(n: number): string {
 
 /** Thẻ cơ cấu tồn kho: biểu đồ 3 vòng đồng tâm (sở hữu × vị trí × trạng
  *  thái), cả ba vòng cùng phạm vi (toàn bộ hàng đang quản lý, kể cả hàng
- *  giữ hộ) và cùng chuẩn giá vốn lô. Ở giữa vòng là TỔNG GIÁ TRỊ HÀNG ĐANG
- *  QUẢN LÝ theo giá vốn, kèm dòng tách rõ hàng TVK sở hữu với hàng giữ hộ.
+ *  được ký gửi) và cùng chuẩn giá vốn lô. Ở giữa vòng là TỔNG GIÁ TRỊ HÀNG ĐANG
+ *  QUẢN LÝ theo giá vốn, kèm dòng tách rõ hàng TVK sở hữu với hàng được ký gửi.
  *  Ba mức giá vốn/sỉ/lẻ bên dưới chỉ tính hàng của TVK trong kho — đó là ba
  *  cách định giá cùng một lượng hàng, không phải ba phần của một tổng nên
  *  không vẽ thành vòng. */
@@ -50,7 +50,7 @@ export default function StockCompositionCard({
             ⓘ
           </summary>
           <div className="absolute right-0 top-8 z-10 w-72 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg">
-            <p>Ba vòng là ba chiều của cùng một lượng hàng, đều theo giá vốn lô. Hàng giữ hộ không phải tài sản.</p>
+            <p>Ba vòng là ba chiều của cùng một lượng hàng, đều theo giá vốn lô. Hàng được ký gửi không phải tài sản.</p>
             <p className="mt-2">&ldquo;Giữ cho chứng từ nháp&rdquo; là lượng hàng trên chứng từ nháp, tối đa bằng tồn thực tế. Ba mức giá dưới chỉ tính hàng trong kho.</p>
           </div>
         </details>
@@ -64,13 +64,13 @@ export default function StockCompositionCard({
           centerLines={
             canSeeMoney
               ? ["Tổng giá trị hàng đang quản lý", "theo giá vốn"]
-              : ["Tổng hàng đang quản lý", "kể cả hàng giữ hộ"]
+              : ["Tổng hàng đang quản lý", "kể cả hàng được ký gửi"]
           }
         />
         <p className="mt-2 text-xs leading-relaxed text-slate-500">
           {canSeeMoney
-            ? `Trong đó: hàng TVK sở hữu ${formatVND(ownedBookValue)} · hàng giữ hộ ${formatVND(custodyBookValue)} (không phải tài sản).`
-            : `Trong đó: hàng TVK ${formatNumber(ownedQty)} đơn vị · giữ hộ ${formatNumber(custodyQty)} đơn vị.`}
+            ? `Trong đó: hàng TVK sở hữu ${formatVND(ownedBookValue)} · hàng được ký gửi ${formatVND(custodyBookValue)} (không phải tài sản).`
+            : `Trong đó: hàng TVK ${formatNumber(ownedQty)} đơn vị · được ký gửi ${formatNumber(custodyQty)} đơn vị.`}
         </p>
       </div>
 

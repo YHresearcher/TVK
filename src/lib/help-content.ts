@@ -19,7 +19,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     points: [
       "Đăng nhập bằng tên đăng nhập hoặc email và mật khẩu. Quên mật khẩu: nhờ Chủ cửa hàng (OWNER) bấm “Đặt lại mật khẩu” cho bạn trong Cài đặt → Quản lý tài khoản — email đặt lại mật khẩu sẽ gửi về hộp thư của bạn.",
       "Menu bên trái được gộp theo nhóm công việc: Hàng hoá & Kho (Sản phẩm, Tồn kho theo lô, Nhập kho) · Ký gửi (Gửi ký gửi, Tiêu thụ của đối tác) · Bán hàng & Hoá đơn (Bán hàng, Hoá đơn GTGT (theo dõi nội bộ), Trả hàng & bảo hành) · Công nợ & Báo cáo (Phải trả, Phải thu, Báo cáo) · Danh mục (Nhà cung cấp, Đối tác). Bấm vào tên nhóm để mở — mở nhóm khác thì nhóm đang mở tự thu lại (mỗi lúc chỉ một nhóm mở); nhóm chứa trang bạn đang xem sẽ tự mở, và hệ thống nhớ lựa chọn của riêng bạn. Nhập hàng từ Excel nằm ngay trong trang Nhập kho (nút “Nhập từ Excel”).",
-      "Nguyên tắc cốt lõi: mọi hàng hoá thuộc một trong hai loại — Tồn kho (mua đứt, lô OWN) và Hàng ký gửi (giữ hộ nhà cung cấp, lô CONS). Cùng một sản phẩm có thể có cả hai loại lô, nên hãy luôn chọn đúng lô khi bán, gửi đi hoặc trả hàng.",
+      "Nguyên tắc cốt lõi: mọi hàng hoá thuộc một trong hai loại — Tồn kho (mua đứt, lô OWN) và Hàng được ký gửi (nhà cung cấp gửi cho TVK bán hộ, lô CONS). Cùng một sản phẩm có thể có cả hai loại lô, nên hãy luôn chọn đúng lô khi bán, gửi đi hoặc trả hàng.",
       "Quét mã vạch: các form có ô “Quét mã vạch / nhập mã hàng” (Nhập kho, Tiêu thụ của đối tác) nhận mã từ máy quét mã vạch hoặc gõ tay rồi Enter — hệ thống khớp theo SKU hoặc bất kỳ mã tra cứu nào đã đăng ký cho sản phẩm; quét lại cùng một mã sẽ cộng thêm 1 số lượng.",
       "Tồn kho không bao giờ sửa trực tiếp: mọi thay đổi đều đi qua chứng từ (PN, NK, GK, BT, PB, BH, KG, TH) và được ghi vào sổ cái biến động không thể sửa/xoá, nên số liệu luôn truy vết được.",
       "Nút Trợ giúp ở góc trên bên phải luôn hiển thị hướng dẫn đúng với vai trò của bạn.",
@@ -102,7 +102,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Nhập kho PN / NK",
     roles: ["WAREHOUSE"],
     points: [
-      "Vào Nhập kho: tab “Phiếu nhập mua (PN)” dùng cho hàng mua đứt — nhập giá vốn; tab “Phiếu nhận ký gửi (NK)” dùng cho hàng giữ hộ nhà cung cấp — nhập giá ký gửi và hạn trả nếu khác mặc định của nhà cung cấp đó.",
+      "Vào Nhập kho: tab “Phiếu nhập mua (PN)” dùng cho hàng mua đứt — nhập giá vốn; tab “Phiếu nhận ký gửi (NK)” dùng cho hàng được nhà cung cấp ký gửi — nhập giá ký gửi và hạn trả nếu khác mặc định của nhà cung cấp đó.",
       "Chọn nhà cung cấp, kho, ngày nhập; thêm từng dòng bằng cách chọn sản phẩm hoặc quét mã vạch vào ô “Quét mã vạch”, nhập số lượng và đơn giá; bấm “Tạo phiếu nháp”.",
       "Kiểm tra lại phiếu nháp rồi bấm “Xác nhận → tạo lô”: PN tạo lô OWN (của mình), NK tạo lô CONS (ký gửi). Hàng ký gửi khi mới nhận CHƯA tạo công nợ — khoản phải trả chỉ phát sinh khi hàng ký gửi bán được.",
       "Phiếu đã xác nhận không sửa trực tiếp được: nếu sai, báo Chủ cửa hàng / Kế toán để xử lý bằng chứng từ phù hợp (phiếu trả, điều chỉnh) thay vì cố sửa số tồn.",
