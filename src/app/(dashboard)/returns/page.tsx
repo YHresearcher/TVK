@@ -3,7 +3,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ExportExcelButton from "@/components/ExportExcelButton";
 import { confirmReturnAction, createReturnAction } from "@/lib/actions";
-import { getCurrentProfile, listBatchStock, listPartners, listReturnDocuments, listSuppliers } from "@/lib/queries";
+import { getCurrentProfile, listBatchesForSales, listPartners, listReturnDocuments, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
 import { OWNERSHIP_LABELS, RETURN_KINDS, RETURN_KIND_LABELS, RETURN_REASONS, RETURN_REASON_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
 
@@ -16,7 +16,7 @@ export default async function ReturnsPage({
 }) {
   const [docs, batchStock, partners, suppliers, profile] = await Promise.all([
     listReturnDocuments(),
-    listBatchStock(),
+    listBatchesForSales(),
     listPartners(),
     listSuppliers(),
     getCurrentProfile(),

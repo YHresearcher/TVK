@@ -260,6 +260,8 @@ Nút **In tem mã vạch** ở trang **Sản phẩm**: tick chọn các mã cầ
 
 Quyền được thực thi ở tầng dữ liệu (không chỉ ẩn nút): vai trò không có quyền thì dù biết đường dẫn cũng không đọc/ghi được dữ liệu ngoài phạm vi.
 
+Từ migration 0018, mọi thao tác xác nhận (phiếu nhập, gửi ký gửi, phân bổ, chứng từ bán hàng, hoá đơn GTGT, trả hàng, điều chỉnh kho) đều kiểm tra vai trò NGAY TRONG hàm database — CEO và mọi vai trò ngoài danh sách đều bị chặn kể cả khi gọi API trực tiếp, kể cả tài khoản chưa có hồ sơ; các hàm cũng chỉ cho tài khoản đã đăng nhập gọi (thu hồi quyền chạy khỏi public). Bán hàng không đọc được giá vốn: bảng lô chỉ cho Chủ/Thủ kho/Kế toán/CEO đọc trực tiếp, Bán hàng chỉ đọc qua view an toàn (không có giá vốn); trang Tồn kho theo lô ẩn cột Giá vốn và tổng giá trị tồn với Bán hàng; trang Báo cáo ẩn phần đối soát nhà cung cấp với Bán hàng/Thủ kho, ẩn cột ước tính theo giá chuyển giao với Bán hàng/Thủ kho và ẩn cột phải thu với Thủ kho.
+
 | Vai trò | Thấy & làm được | Giới hạn chính |
 |---|---|---|
 | **Chủ cửa hàng (OWNER)** | Toàn quyền: mọi số liệu (giá vốn, giá ký gửi, lãi), mọi thao tác, quản lý tài khoản | — |

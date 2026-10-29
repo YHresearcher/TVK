@@ -3,7 +3,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ImportConsignmentOut from "@/components/ImportConsignmentOut";
 import { confirmConsignmentOutAction, createConsignmentOutAction, importConsignmentOutAction } from "@/lib/actions";
-import { buildProductCodeMap, getCurrentProfile, listBatchStock, listConsignmentOutSlips, listPartners, listProductCodes, listProductFitments, listProducts, listSuppliers } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, listBatchesForSales, listConsignmentOutSlips, listPartners, listProductCodes, listProductFitments, listProducts, listSuppliers } from "@/lib/queries";
 import type { PosProduct } from "@/components/PosSaleForm";
 import { formatDate } from "@/lib/format";
 import { compareLotOrder, isOilGroup } from "@/lib/product-match";
@@ -19,7 +19,7 @@ export default async function ConsignmentOutPage({
   const [slips, partners, batchStock, suppliers, products, productCodes, fitments, profile] = await Promise.all([
     listConsignmentOutSlips(),
     listPartners(),
-    listBatchStock(),
+    listBatchesForSales(),
     listSuppliers(),
     listProducts(),
     listProductCodes(),

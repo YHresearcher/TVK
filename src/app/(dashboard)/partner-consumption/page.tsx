@@ -11,7 +11,7 @@ import {
   importConsumptionReportAction,
   setConsumptionReportStatusAction,
 } from "@/lib/actions";
-import { buildProductCodeMap, getCurrentProfile, listAllocations, listBatchStock, listConsumptionReports, listPartners, listProductCodes, listProducts } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, listAllocations, listBatchesForSales, listConsumptionReports, listPartners, listProductCodes, listProducts } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
 
@@ -27,7 +27,7 @@ export default async function PartnerConsumptionPage({
     listAllocations(),
     listPartners(),
     listProducts(),
-    listBatchStock(),
+    listBatchesForSales(),
     listProductCodes(),
     getCurrentProfile(),
   ]);

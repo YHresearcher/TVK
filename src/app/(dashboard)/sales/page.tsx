@@ -3,7 +3,7 @@ import PosSaleForm, { type PosBatch, type PosPartner, type PosProduct } from "@/
 import ImportDealerSale from "@/components/ImportDealerSale";
 import ExportExcelButton from "@/components/ExportExcelButton";
 import { createCounterSaleAction, importDealerSaleAction } from "@/lib/actions";
-import { buildProductCodeMap, getCurrentProfile, getSalesDocumentCosts, listBatchStock, listPartners, listProductCodes, listProductFitments, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
+import { buildProductCodeMap, getCurrentProfile, getSalesDocumentCosts, listBatchesForSales, listPartners, listProductCodes, listProductFitments, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { compareLotOrder, isOilGroup } from "@/lib/product-match";
 import { OWNERSHIP_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
@@ -20,7 +20,7 @@ export default async function SalesPage({
     listSalesOrders(),
     listSalesDocuments(),
     listPartners(),
-    listBatchStock(),
+    listBatchesForSales(),
     listProducts(),
     listProductCodes(),
     listProductFitments(),

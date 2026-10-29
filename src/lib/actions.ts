@@ -24,6 +24,16 @@ async function userId() {
   return user?.id ?? null;
 }
 
+/** Chặn ghi trái quyền ở tầng action (phòng thủ thêm sau RLS + kiểm tra
+ *  trong hàm RPC): chỉ các vai trò trong danh sách mới được chạy tiếp. */
+async function requireRole(roles: string[], message: string) {
+  const supabase = await db();
+  const uid = await userId();
+  if (!uid) throw new Error("Chưa đăng nhập.");
+  const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+  if (!prof || !roles.includes(prof.role)) throw new Error(message);
+}
+
 function str(formData: FormData, name: string): string {
   return String(formData.get(name) ?? "").trim();
 }
@@ -478,6 +488,7 @@ export async function createPurchaseReceiptAction(formData: FormData) {
 
 export async function confirmPurchaseReceiptAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được xác nhận phiếu nhập.");
   const { error } = await supabase.rpc("confirm_purchase_receipt", {
     p_receipt_id: str(formData, "id"),
   });
@@ -553,6 +564,7 @@ export async function createConsignmentReceiptAction(formData: FormData) {
 
 export async function confirmConsignmentReceiptAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được xác nhận phiếu nhận ký gửi.");
   const { error } = await supabase.rpc("confirm_consignment_receipt", {
     p_receipt_id: str(formData, "id"),
   });
@@ -590,6 +602,7 @@ interface ImportPayloadRow {
  */
 export async function importStockAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được nhập kho.");
   let payload: AnyRow;
   try {
     payload = JSON.parse(str(formData, "payload"));
@@ -985,6 +998,7 @@ export async function createConsignmentOutAction(formData: FormData) {
 
 export async function confirmConsignmentOutAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được xác nhận phiếu gửi ký gửi.");
   const { error } = await supabase.rpc("confirm_consignment_out", {
     p_slip_id: str(formData, "id"),
   });
@@ -1001,6 +1015,7 @@ export async function confirmConsignmentOutAction(formData: FormData) {
  */
 export async function importConsignmentOutAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được gửi ký gửi.");
   let payload: AnyRow;
   try {
     payload = JSON.parse(str(formData, "payload"));
@@ -1136,16 +1151,18 @@ export async function importConsignmentOutAction(formData: FormData) {
 // ------------------------------------------------------------------ sales
 export async function createCounterSaleAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","SALES"], "Chỉ Chủ cửa hàng và Bán hàng mới được bán hàng.");
   const lines = zipItems(formData, ["batch_id", "qty", "unit_price"]).filter(
     (r) => r.batch_id && Number(r.qty) > 0
   );
   if (!lines.length) throw new Error("Đơn bán cần ít nhất một dòng lô hàng.");
 
   const batchIds = lines.map((l) => l.batch_id);
-  const { data: batches, error } = await supabase
-    .from("stock_batches")
-    .select("id, product_id, ownership")
-    .in("id", batchIds);
+  const { data: batchRows, error } = await supabase
+    .from("v_batches_for_sales")
+    .select("batch_id, product_id, ownership")
+    .in("batch_id", batchIds);
+  const batches = ((batchRows ?? []) as AnyRow[]).map((b) => ({ ...b, id: b.batch_id }));
   if (error) throw new Error(error.message);
   const batchMap = new Map((batches ?? []).map((b: AnyRow) => [b.id, b]));
 
@@ -1246,6 +1263,7 @@ export async function createCounterSaleAction(formData: FormData) {
  */
 export async function importDealerSaleAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","SALES"], "Chỉ Chủ cửa hàng và Bán hàng mới được bán hàng.");
   let payload: AnyRow;
   try {
     payload = JSON.parse(str(formData, "payload"));
@@ -1360,12 +1378,13 @@ export async function importDealerSaleAction(formData: FormData) {
   // trước; nhớt thì FEFO — hạn dùng gần nhất trước, lô không hạn xếp
   // sau cùng rồi mới theo FIFO. Tồn khả dụng của mỗi lô = tồn tại vị
   // trí kho mình giữ nhiều nhất — đúng vị trí phiếu sẽ trừ.
-  const { data: batches } = productIds.length
+  const { data: batchRows } = productIds.length
     ? await supabase
-        .from("stock_batches")
-        .select("id, batch_code, product_id, ownership, received_date, expiry_date")
+        .from("v_batches_for_sales")
+        .select("batch_id, batch_code, product_id, ownership, received_date, expiry_date")
         .in("product_id", productIds)
     : { data: [] as AnyRow[] };
+  const batches = ((batchRows ?? []) as AnyRow[]).map((b) => ({ ...b, id: b.batch_id }));
   const { data: groupRows } = productIds.length
     ? await supabase
         .from("products")
@@ -1503,6 +1522,7 @@ export async function createAllocationAction(formData: FormData) {
 
 export async function confirmAllocationAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","SALES","ACCOUNTING"], "Chỉ Chủ cửa hàng, Bán hàng và Kế toán mới được xác nhận phân bổ.");
   const { error } = await supabase.rpc("confirm_allocation", {
     p_allocation_id: str(formData, "id"),
   });
@@ -1597,6 +1617,7 @@ export async function importConsumptionReportAction(formData: FormData) {
  */
 export async function importAllocationAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","SALES","ACCOUNTING"], "Chỉ Chủ cửa hàng, Bán hàng và Kế toán mới được nhập phân bổ.");
   let payload: AnyRow;
   try {
     payload = JSON.parse(str(formData, "payload"));
@@ -1626,10 +1647,11 @@ export async function importAllocationAction(formData: FormData) {
   const bySku = new Map(((allProducts ?? []) as AnyRow[]).map((p) => [normKey(p.sku), p.id as string]));
   const byCode = new Map(((allCodes ?? []) as AnyRow[]).map((c) => [normKey(c.code), c.product_id as string]));
   const batchCodes = Array.from(new Set(rawRows.map((r) => String(r.batchCode ?? "").trim()))).filter(Boolean);
-  const { data: batches } = await supabase
-    .from("stock_batches")
-    .select("id, batch_code, product_id")
+  const { data: batchRows } = await supabase
+    .from("v_batches_for_sales")
+    .select("batch_id, batch_code, product_id")
     .in("batch_code", batchCodes);
+  const batches = ((batchRows ?? []) as AnyRow[]).map((b) => ({ ...b, id: b.batch_id }));
   const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [normKey(b.batch_code), b]));
   const batchIds = Array.from(batchByCode.values()).map((b) => b.id as string);
   const { data: batchLocs } = batchIds.length
@@ -1739,6 +1761,7 @@ export async function importAllocationAction(formData: FormData) {
 /** Turn a CONFIRMED allocation into BH/KG documents (one per nature), then confirm them. */
 export async function createAllocationDocumentsAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","SALES"], "Chỉ Chủ cửa hàng và Bán hàng mới được lập chứng từ từ phân bổ.");
   const allocationId = str(formData, "id");
   const { data: slip, error } = await supabase
     .from("allocation_slips")
@@ -1814,6 +1837,7 @@ export async function createAllocationDocumentsAction(formData: FormData) {
 // ---------------------------------------------------------------- invoices
 export async function createVatInvoiceAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được xuất hoá đơn GTGT.");
   const lineIds = formData.getAll("line_id").map((v) => String(v));
   if (!lineIds.length) throw new Error("Chọn ít nhất một dòng chứng từ để xuất hoá đơn.");
   const partnerId = optStr(formData, "partner_id");
@@ -1890,6 +1914,7 @@ export async function createVatInvoiceAction(formData: FormData) {
 
 export async function cancelVatInvoiceAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được huỷ hoá đơn GTGT.");
   const { error } = await supabase.rpc("cancel_vat_invoice", {
     p_invoice_id: str(formData, "id"),
   });
@@ -1958,6 +1983,7 @@ export async function createReturnAction(formData: FormData) {
 
 export async function confirmReturnAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được xác nhận phiếu trả hàng.");
   const { error } = await supabase.rpc("confirm_return_document", {
     p_return_id: str(formData, "id"),
   });
@@ -2070,6 +2096,7 @@ export async function updateVatModeAction(formData: FormData) {
 
 export async function createStockAdjustmentAction(formData: FormData) {
   const supabase = await db();
+  await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được điều chỉnh kho.");
   const { error } = await supabase.rpc("create_stock_adjustment", {
     p_batch_id: str(formData, "batch_id"),
     p_location_id: str(formData, "location_id"),

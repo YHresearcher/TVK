@@ -1,25 +1,33 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
-import { getPartnerRemainingEstimates, listPartnerConsignment, listProductStock, listSupplierConsignment } from "@/lib/queries";
+import { getCurrentProfile, getPartnerRemainingEstimates, listPartnerConsignment, listProductStock, listSupplierConsignment } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
-  const [suppliers, partners, stock, estimates] = await Promise.all([
+  const [suppliers, partners, stock, estimates, profile] = await Promise.all([
     listSupplierConsignment(),
     listPartnerConsignment(),
     listProductStock(),
     getPartnerRemainingEstimates(),
+    getCurrentProfile(),
   ]);
   const configured = suppliers.configured;
+  // Phải trả NCC: chỉ Chủ/Kế toán/CEO. Ước tính theo giá chuyển giao là
+  // giá ký gửi: Bán hàng và Thủ kho không được coi. Phải thu đối tác thì
+  // Bán hàng được coi (đúng policy bảng), Thủ kho thì không.
+  const role = profile.data?.role;
+  const canSeePayables = ["OWNER", "ACCOUNTING", "CEO"].includes(role ?? "");
+  const canSeeEstimates = ["OWNER", "ACCOUNTING", "CEO"].includes(role ?? "");
+  const canSeeReceivables = ["OWNER", "ACCOUNTING", "CEO", "SALES"].includes(role ?? "");
 
   return (
     <>
       <PageHeader title="Báo cáo" description="Các báo cáo đối soát lấy thẳng từ cơ sở dữ liệu. Liên kết xuất CSV ở đầu mỗi phần." />
       {!configured && <NotConfigured />}
       <div className="space-y-8">
-        <section>
+        {canSeePayables && (<section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">Đối soát ký gửi nhà cung cấp (đã nhận – đã bán – đã trả – còn trên kệ – còn nợ)</h2>
             <a href="/api/export?view=v_supplier_consignment" className="text-sm text-blue-600 hover:underline">Xuất CSV</a>
@@ -41,21 +49,21 @@ export default async function ReportsPage() {
               </tbody>
             </TableWrap>
           )}
-        </section>
+        </section>)}
 
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">Đối soát ký gửi đối tác — kiểm soát: đã gửi = đã tiêu thụ + đã trả + còn giữ</h2>
-            <a href="/api/export?view=v_partner_consignment" className="text-sm text-blue-600 hover:underline">Xuất CSV</a>
+            {canSeeReceivables && (<a href="/api/export?view=v_partner_consignment" className="text-sm text-blue-600 hover:underline">Xuất CSV</a>)}
           </div>
-          <p className="mb-3 text-sm leading-relaxed text-slate-600">
+          {canSeeEstimates && (<p className="mb-3 text-sm leading-relaxed text-slate-600">
             Cột “Giá trị còn giữ (ước tính)” tính theo giá chuyển giao của phiếu gửi gần nhất — là số tiền sẽ thu
             khi đối tác bán hết số hàng còn giữ. Đây chỉ là ước tính để dễ hình dung, chưa phải khoản phải thu:
             phải thu chỉ phát sinh khi đối tác tiêu thụ hàng.
-          </p>
+          </p>)}
           {partners.data.length === 0 ? <EmptyState message="Chưa có dữ liệu." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã tiêu thụ</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th><th className={thCls}>Giá trị còn giữ (ước tính)</th><th className={thCls}>Kiểm tra</th><th className={thCls}>Còn phải thu</th></tr></thead>
+              <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã tiêu thụ</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th>{canSeeEstimates && (<th className={thCls}>Giá trị còn giữ (ước tính)</th>)}<th className={thCls}>Kiểm tra</th>{canSeeReceivables && (<th className={thCls}>Còn phải thu</th>)}</tr></thead>
               <tbody>
                 {partners.data.map((r) => {
                   const ok = Number(r.qty_sent) === Number(r.qty_consumed) + Number(r.qty_returned) + Number(r.qty_still_at_partner);
@@ -67,9 +75,9 @@ export default async function ReportsPage() {
                       <td className={tdCls}>{formatNumber(r.qty_consumed)}</td>
                       <td className={tdCls}>{formatNumber(r.qty_returned)}</td>
                       <td className={tdCls}>{formatNumber(r.qty_still_at_partner)}</td>
-                      <td className={`${tdCls} font-medium`}>{est > 0 ? (<>{formatVND(est)} <span className="text-slate-400">(ước tính)</span></>) : formatVND(0)}</td>
+                      {canSeeEstimates && (<td className={`${tdCls} font-medium`}>{est > 0 ? (<>{formatVND(est)} <span className="text-slate-400">(ước tính)</span></>) : formatVND(0)}</td>)}
                       <td className={`${tdCls} ${ok ? "text-green-600" : "font-semibold text-red-600"}`}>{ok ? "Khớp" : "LỆCH"}</td>
-                      <td className={`${tdCls} font-medium`}>{formatVND(r.receivable_outstanding)}</td>
+                      {canSeeReceivables && (<td className={`${tdCls} font-medium`}>{formatVND(r.receivable_outstanding)}</td>)}
                     </tr>
                   );
                 })}

@@ -91,6 +91,10 @@ export function buildProductCodeMap(
 export const listProductStock = () => list("v_product_stock", { column: "name", ascending: true });
 export const listBatchStock = () =>
   list("v_batch_stock", { column: "received_date", ascending: false });
+/** View an toàn cho SALES: tồn theo lô, không có giá vốn. Dùng cho mọi
+ *  luồng bán hàng / ký gửi / phân bổ mà SALES được phép thao tác. */
+export const listBatchesForSales = () =>
+  list("v_batches_for_sales", { column: "received_date", ascending: false });
 export const listSuppliers = () =>
   list("suppliers", { column: "name", ascending: true });
 export const listPartners = () =>
@@ -247,7 +251,10 @@ export async function getProductDetail(id: string) {
       .from("product_fitments")
       .select("*, vehicles(*)")
       .eq("product_id", id),
-    supabase.from("v_batch_stock").select("*").eq("product_id", id),
+    supabase
+      .from("v_batches_for_sales")
+      .select("batch_id, batch_code, product_id, sku, product_name, ownership, supplier_id, supplier_name, location_id, location_name, location_kind, partner_id, qty, received_date, status, return_by_date, expiry_date")
+      .eq("product_id", id),
   ]);
   return {
     configured: true,
@@ -404,11 +411,13 @@ export async function getDashboard() {
       balances: { payablesUnpaid: 0, payablesPartial: 0, receivablesUnpaid: 0, receivablesPartial: 0 },
     };
   }
+  const { data: me } = await getCurrentProfile();
+  const isSales = me?.role === "SALES";
   const dayMs = 864e5;
   const isoDay = (daysAgo: number) =>
     new Date(Date.now() - daysAgo * dayMs).toISOString().slice(0, 10);
   const [batchStock, payables, receivables, productStock, partnerCons, productMins, partnersList, salesDocs] = await Promise.all([
-    supabase.from("v_batch_stock").select("*").limit(2000),
+    supabase.from(isSales ? "v_batches_for_sales" : "v_batch_stock").select("*").limit(2000),
     supabase.from("supplier_payables").select("amount, amount_paid, status, due_date").in("status", ["UNPAID", "PARTIAL"]),
     supabase.from("partner_receivables").select("amount, amount_paid, status, due_date").in("status", ["UNPAID", "PARTIAL"]),
     supabase.from("v_product_stock").select("*").limit(2000),
@@ -519,7 +528,7 @@ export async function getDashboard() {
       if (tp !== undefined) return qty * tp;
     }
     const sp = sellPrice.get(r.product_id) ?? 0;
-    return qty * (sp > 0 ? sp : Number(r.unit_cost));
+    return qty * (sp > 0 ? sp : Number(r.unit_cost ?? 0));
   };
   // Giá trị một dòng tồn theo từng cơ sở định giá. Hàng ở kho đối tác tính
   // theo giá chuyển giao mới nhất, trừ cơ sở giá vốn thì tính theo giá vốn
@@ -528,14 +537,14 @@ export async function getDashboard() {
     const tp = latestTransfer.get(String(r.batch_id));
     return tp !== undefined ? Number(r.qty) * tp : null;
   };
-  const costValueOf = (r: AnyRow) => Number(r.qty) * Number(r.unit_cost);
+  const costValueOf = (r: AnyRow) => Number(r.qty) * Number(r.unit_cost ?? 0);
   const wholesaleValueOf = (r: AnyRow) => {
     if (r.location_kind === "PARTNER_VIRTUAL") {
       const tv = transferValueOf(r);
       if (tv !== null) return tv;
     }
     const wp = wholesalePrice.get(r.product_id) ?? 0;
-    return Number(r.qty) * (wp > 0 ? wp : Number(r.unit_cost));
+    return Number(r.qty) * (wp > 0 ? wp : Number(r.unit_cost ?? 0));
   };
   const retailValueOf = (r: AnyRow) => {
     if (r.location_kind === "PARTNER_VIRTUAL") {
@@ -543,7 +552,7 @@ export async function getDashboard() {
       if (tv !== null) return tv;
     }
     const rp = sellPrice.get(r.product_id) ?? 0; // lẻ trước, sỉ sau
-    return Number(r.qty) * (rp > 0 ? rp : Number(r.unit_cost));
+    return Number(r.qty) * (rp > 0 ? rp : Number(r.unit_cost ?? 0));
   };
   const compOf = (filter: (r: AnyRow) => boolean) => {
     const rs = rows.filter(filter);
@@ -565,7 +574,7 @@ export async function getDashboard() {
   // vào tồn kho thuộc sở hữu.
   const costOf = (filter: (r: AnyRow) => boolean) => ({
     qty: sum(filter, (r) => Number(r.qty)),
-    value: sum(filter, (r) => Number(r.qty) * Number(r.unit_cost)),
+    value: sum(filter, (r) => Number(r.qty) * Number(r.unit_cost ?? 0)),
   });
   const bookOwnedOwn = costOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
   const bookAtPartnersOwned = costOf((r) => owned(r) && r.location_kind === "PARTNER_VIRTUAL");
@@ -579,7 +588,7 @@ export async function getDashboard() {
       (r) => owned(r) && r.location_kind === "OWN_WAREHOUSE",
       (r) => {
         const wp = wholesalePrice.get(r.product_id) ?? 0;
-        return Number(r.qty) * (wp > 0 ? wp : Number(r.unit_cost));
+        return Number(r.qty) * (wp > 0 ? wp : Number(r.unit_cost ?? 0));
       }
     ),
     retail: ownedOwn.real,
@@ -860,9 +869,10 @@ export async function listLedgerMovements(limit = 200): Promise<QueryResult<Ledg
   if (error) throw error;
   const list = (rows ?? []) as AnyRow[];
   const batchIds = Array.from(new Set(list.map((r) => r.batch_id as string)));
-  const batches = batchIds.length
-    ? ((await supabase.from("stock_batches").select("id, batch_code, product_id").in("id", batchIds)).data ?? [])
+  const batchRows = batchIds.length
+    ? ((await supabase.from("v_batches_for_sales").select("batch_id, batch_code, product_id").in("batch_id", batchIds)).data ?? [])
     : [];
+  const batches = (batchRows as AnyRow[]).map((b) => ({ ...b, id: b.batch_id }));
   const productIds = Array.from(new Set((batches as AnyRow[]).map((b) => b.product_id as string)));
   const products = productIds.length
     ? ((await supabase.from("products").select("id, sku, name").in("id", productIds)).data ?? [])
@@ -980,12 +990,12 @@ export async function getSlowMoving(days = 90): Promise<{ rows: SlowMovingRow[];
   const [stock, movements, batches, products] = await Promise.all([
     supabase.from("v_product_stock").select("product_id, total_qty").limit(5000),
     supabase.from("stock_movements").select("batch_id, movement_kind, created_at").limit(5000),
-    supabase.from("stock_batches").select("id, product_id").limit(5000),
+    supabase.from("v_batches_for_sales").select("batch_id, product_id").limit(5000),
     supabase.from("products").select("id, sku, name").limit(5000),
   ]);
   if (stock.error || movements.error || batches.error || products.error) return { rows: [], total: 0 };
   const cutoff = Date.now() - days * 86400000;
-  const productOfBatch = new Map(((batches.data ?? []) as AnyRow[]).map((b) => [b.id as string, b.product_id as string]));
+  const productOfBatch = new Map(((batches.data ?? []) as AnyRow[]).map((b) => [b.batch_id as string, b.product_id as string]));
   const lastOut = new Map<string, number>();
   const firstIn = new Map<string, number>();
   for (const m of (movements.data ?? []) as AnyRow[]) {
@@ -1110,11 +1120,16 @@ export async function getPartnerConsignmentGoods(partnerId: string): Promise<Par
   );
   if (batchIds.length === 0) return [];
   const { data: batches } = await supabase
-    .from("stock_batches")
-    .select("id, batch_code, product_id")
-    .in("id", batchIds)
-    .limit(2000);
-  const batchRows = (batches ?? []) as AnyRow[];
+    .from("v_batches_for_sales")
+    .select("batch_id, batch_code, product_id")
+    .in("batch_id", batchIds)
+    .limit(5000);
+  // View trả một dòng mỗi vị trí — gộp theo lô để bảng không trùng dòng.
+  const batchRows: AnyRow[] = Array.from(
+    new Map<string, AnyRow>(
+      ((batches ?? []) as AnyRow[]).map((b) => [String(b.batch_id), { ...b, id: b.batch_id } as AnyRow]),
+    ).values(),
+  );
   const productIds = Array.from(new Set(batchRows.map((b) => String(b.product_id))));
   const { data: products } = await supabase.from("products").select("id, sku, name").in("id", productIds).limit(2000);
   const productOf = new Map(((products ?? []) as AnyRow[]).map((p) => [String(p.id), p]));
