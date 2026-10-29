@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { AnyRow, Profile } from "@/lib/types";
+import type { AnyRow, Profile, RingSegment, StockRings } from "@/lib/types";
 
 export interface QueryResult<T> {
   configured: boolean;
@@ -408,6 +408,7 @@ export async function getDashboard() {
         ownedAtPartners: { qty: 0, real: 0, cost: 0, wholesale: 0, retail: 0 },
         consignedAll: { qty: 0, real: 0, cost: 0, wholesale: 0, retail: 0 },
       },
+      rings: { ownership: [], location: [], status: [] },
       balances: { payablesUnpaid: 0, payablesPartial: 0, receivablesUnpaid: 0, receivablesPartial: 0 },
     };
   }
@@ -593,6 +594,109 @@ export async function getDashboard() {
     ),
     retail: ownedOwn.real,
   };
+  // Ba vòng đồng tâm của biểu đồ cơ cấu tồn kho: sở hữu × vị trí × trạng
+  // thái. Ba vòng độc lập, cùng phạm vi (toàn bộ hàng đang quản lý) và cùng
+  // chuẩn định giá (giá vốn lô) để tỷ lệ so sánh được với nhau. Vòng trạng
+  // thái: "giữ cho chứng từ nháp" = số lượng các dòng chứng từ NHÁP (bán
+  // hàng, gửi ký gửi, phân bổ) đang trỏ vào lô, chặn trên bằng tồn thực tế
+  // của lô; phần còn lại là "bán được". Phiếu trả nháp và phiếu nhập nháp
+  // không giữ hàng (trả nháp chưa trừ kho, nhập nháp chưa tạo lô) nên không
+  // tính. Bán hàng không đọc được phiếu GK nên phần giữ cho GK nháp sẽ
+  // thiếu ở góc Bán hàng; góc đó vẫn đủ số của phiếu bán và phân bổ nháp.
+  const segOf = (
+    key: string,
+    label: string,
+    color: string,
+    rs: AnyRow[],
+    href: string | null
+  ): RingSegment => {
+    const lots = new Set<string>();
+    const skus = new Set<string>();
+    let qty = 0;
+    let value = 0;
+    for (const r of rs) {
+      const q = Number(r.qty);
+      if (q <= 0) continue;
+      qty += q;
+      value += q * Number(r.unit_cost ?? 0);
+      lots.add(String(r.batch_id));
+      skus.add(String(r.product_id));
+    }
+    return { key, label, color, qty, value, lots: lots.size, skus: skus.size, href };
+  };
+  const heldByBatch = new Map<string, number>();
+  const addHeld = (batchId: unknown, q: unknown) => {
+    const id = String(batchId ?? "");
+    if (!id) return;
+    heldByBatch.set(id, (heldByBatch.get(id) ?? 0) + Math.max(Number(q ?? 0), 0));
+  };
+  const [draftSaleDocs, draftGkSlips, draftAllocSlips] = await Promise.all([
+    supabase.from("sales_documents").select("id").eq("status", "DRAFT").limit(500),
+    supabase.from("consignment_out_slips").select("id").eq("status", "DRAFT").limit(500),
+    supabase.from("allocation_slips").select("id").eq("status", "DRAFT").limit(500),
+  ]);
+  const saleIds = ((draftSaleDocs.data ?? []) as AnyRow[]).map((d) => d.id);
+  const gkIds = ((draftGkSlips.data ?? []) as AnyRow[]).map((d) => d.id);
+  const draftAllocIds = ((draftAllocSlips.data ?? []) as AnyRow[]).map((d) => d.id);
+  const [saleLines, gkItems, allocLines] = await Promise.all([
+    saleIds.length
+      ? supabase.from("sales_document_lines").select("batch_id, qty").in("document_id", saleIds).limit(5000)
+      : Promise.resolve({ data: [] as AnyRow[] }),
+    gkIds.length
+      ? supabase.from("consignment_out_items").select("batch_id, qty").in("slip_id", gkIds).limit(5000)
+      : Promise.resolve({ data: [] as AnyRow[] }),
+    draftAllocIds.length
+      ? supabase.from("allocation_lines").select("batch_id, qty").in("allocation_id", draftAllocIds).limit(5000)
+      : Promise.resolve({ data: [] as AnyRow[] }),
+  ]);
+  for (const l of (saleLines.data ?? []) as AnyRow[]) addHeld(l.batch_id, l.qty);
+  for (const l of (gkItems.data ?? []) as AnyRow[]) addHeld(l.batch_id, l.qty);
+  for (const l of (allocLines.data ?? []) as AnyRow[]) addHeld(l.batch_id, l.qty);
+  let heldQty = 0;
+  let heldValue = 0;
+  let sellQty = 0;
+  let sellValue = 0;
+  const heldLots = new Set<string>();
+  const heldSkus = new Set<string>();
+  const sellLots = new Set<string>();
+  const sellSkus = new Set<string>();
+  const batchOnHand = new Map<string, { product_id: string; unit_cost: number; onHand: number }>();
+  for (const r of rows) {
+    const id = String(r.batch_id);
+    const a = batchOnHand.get(id) ?? { product_id: String(r.product_id), unit_cost: Number(r.unit_cost ?? 0), onHand: 0 };
+    a.onHand += Number(r.qty);
+    batchOnHand.set(id, a);
+  }
+  for (const [id, a] of Array.from(batchOnHand.entries())) {
+    const h = Math.min(heldByBatch.get(id) ?? 0, Math.max(a.onHand, 0));
+    const s = Math.max(a.onHand, 0) - h;
+    if (h > 0) {
+      heldQty += h;
+      heldValue += h * a.unit_cost;
+      heldLots.add(id);
+      heldSkus.add(a.product_id);
+    }
+    if (s > 0) {
+      sellQty += s;
+      sellValue += s * a.unit_cost;
+      sellLots.add(id);
+      sellSkus.add(a.product_id);
+    }
+  }
+  const rings: StockRings = {
+    ownership: [
+      segOf("owned", "Hàng thuộc TVK", "#2563eb", rows.filter(owned), "/inventory?ownership=OWNED"),
+      segOf("consigned", "Hàng nhận ký gửi", "#8b5cf6", rows.filter(consigned), "/inventory?ownership=CONSIGNED"),
+    ],
+    location: [
+      segOf("own", "Hàng tại kho TVK", "#10b981", rows.filter((r) => r.location_kind === "OWN_WAREHOUSE"), "/inventory?location_kind=OWN_WAREHOUSE"),
+      segOf("partner", "Hàng tại kho đối tác", "#f59e0b", rows.filter((r) => r.location_kind === "PARTNER_VIRTUAL"), "/inventory?location_kind=PARTNER_VIRTUAL"),
+    ],
+    status: [
+      { key: "sellable", label: "Bán được", color: "#0d9488", qty: sellQty, value: sellValue, lots: sellLots.size, skus: sellSkus.size, href: null },
+      { key: "held", label: "Giữ cho chứng từ nháp", color: "#f43f5e", qty: heldQty, value: heldValue, lots: heldLots.size, skus: heldSkus.size, href: null },
+    ],
+  };
   // Doanh thu / lợi nhuận gộp / số đơn — mọi chứng từ đã xác nhận, không
   // giới hạn ngày (ngày chứng từ có thể ghi lùi so với ngày nhập máy).
   // Giá vốn của mỗi dòng lấy từ lô đã bán của dòng đó (luồng đối tác thì
@@ -768,6 +872,7 @@ export async function getDashboard() {
       ownedAtPartners,
       consignedAll,
     },
+    rings,
     balances: {
       payablesUnpaid: remainingByStatus(payables.data as AnyRow[] | null, "UNPAID"),
       payablesPartial: remainingByStatus(payables.data as AnyRow[] | null, "PARTIAL"),

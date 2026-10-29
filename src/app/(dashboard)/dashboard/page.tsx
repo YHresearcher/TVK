@@ -71,7 +71,8 @@ export default async function DashboardPage() {
   const grossMargin = d.revenueAll > 0 ? Math.round((d.grossProfitAll / d.revenueAll) * 100) : 0;
   const revenue14Total = d.revenue14.reduce((a, r) => a + r.value, 0);
   const cogsAll = d.revenueAll - d.grossProfitAll;
-  // ROI: lãi trên vốn hàng đã bán (giá vốn). ROS: lãi trên doanh thu.
+  // Gross Margin: lãi gộp trên doanh thu thuần. Markup on Cost: lãi gộp
+  // trên giá vốn hàng đã bán. Chỉ đổi tên gọi, cách tính giữ nguyên.
   const roiAll = cogsAll > 0 ? Math.round((d.grossProfitAll / cogsAll) * 100) : 0;
   if (!d.configured) {
     return (
@@ -81,13 +82,6 @@ export default async function DashboardPage() {
       </>
     );
   }
-  // Ba nhóm không trùng nhau: hàng TVK tại kho, hàng TVK tại đối tác, và
-  // hàng nhận ký gửi của nhà cung cấp.
-  const compSegments = [
-    { label: "Hàng TVK tại kho", color: "#10b981", ...d.stockComposition.ownedOwn },
-    { label: "Hàng TVK tại đối tác", color: "#0ea5e9", ...d.stockComposition.ownedAtPartners },
-    { label: "Hàng nhận ký gửi", color: "#f59e0b", ...d.stockComposition.consignedAll },
-  ];
   const ownedRealValue = d.ownedValue + d.atPartnersValue;
 
   const role = profile.data?.role ?? "";
@@ -101,7 +95,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Doanh thu thuần (lũy kế)" value={formatVND(d.revenueAll)} sub={`${formatNumber(d.orderCountAll)} đơn đã xác nhận`} tone="blue" />
         {canSeeCost && (
-          <StatCard label="Lợi nhuận gộp (lũy kế)" value={formatVND(d.grossProfitAll)} sub={`ROS ${grossMargin}% · ROI ${roiAll}%`} tone="emerald" />
+          <StatCard label="Lợi nhuận gộp (lũy kế)" value={formatVND(d.grossProfitAll)} sub={`Gross Margin ${grossMargin}% · Markup on Cost ${roiAll}%`} tone="emerald" />
         )}
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ TVK" tone="violet" />
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" tone="rose" />
@@ -140,7 +134,7 @@ export default async function DashboardPage() {
       )}
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <StockCompositionCard
-          segments={compSegments}
+          rings={d.rings}
           tierValues={d.warehouseTierValues}
           ownedBookValue={d.bookInventoryValue}
           ownedQty={d.ownedQty + d.atPartnersQty}
@@ -208,12 +202,12 @@ export default async function DashboardPage() {
               Doanh thu thuần <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
               {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
               {" · "}Lợi nhuận gộp <strong className="text-slate-900">{formatVND(d.grossProfitAll)}</strong>
-              {" "}(ROS {grossMargin}% · ROI {roiAll}%).
+              {" "}(Gross Margin {grossMargin}% · Markup on Cost {roiAll}%).
               Giá vốn tính theo lô thực tế đã xuất (nhập trước – xuất trước); giảm giá đã trừ vào doanh thu thuần.
               {" "}30 ngày gần nhất: doanh thu thuần {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn.
             </p>
-            <p className="text-xs leading-relaxed text-slate-500">ROS là lãi chia cho doanh thu thuần.</p>
-            <p className="mb-3 text-xs leading-relaxed text-slate-500">ROI là lãi chia cho vốn hàng đã bán.</p>
+            <p className="text-xs leading-relaxed text-slate-500">Gross Margin là lãi gộp chia cho doanh thu thuần.</p>
+            <p className="mb-3 text-xs leading-relaxed text-slate-500">Markup on Cost là lãi gộp chia cho giá vốn hàng đã bán.</p>
             {d.orderAnalysis.length === 0 ? (
               <EmptyState message="Chưa có đơn hàng nào được xác nhận." />
             ) : (

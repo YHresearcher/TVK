@@ -1,113 +1,73 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { DonutChart, formatCompactVND, formatCompactVND2 } from "@/components/Charts";
-import { formatNumber, formatVND } from "@/lib/format";
-
-export interface CompositionSegmentInput {
-  label: string;
-  color: string;
-  qty: number;
-  real: number;
-  cost: number;
-  wholesale: number;
-  retail: number;
-}
-
-type Basis = "real" | "cost" | "wholesale" | "retail";
-
-const BASIS_LABELS: Record<Basis, string> = {
-  real: "Giá trị thật (quản trị)",
-  cost: "Giá vốn",
-  wholesale: "Giá sỉ",
-  retail: "Giá lẻ",
-};
-
-const BASIS_NOTES: Record<Basis, string> = {
-  real: "Hàng trong kho tính theo giá bán (lẻ trước, sỉ sau); hàng tại đối tác theo giá chuyển giao.",
-  cost: "Mọi nhóm đều tính theo giá vốn lô — cùng một chuẩn kế toán.",
-  wholesale: "Hàng trong kho tính theo giá sỉ; hàng tại đối tác theo giá chuyển giao (không có giá sỉ).",
-  retail: "Hàng trong kho tính theo giá lẻ; hàng tại đối tác theo giá chuyển giao (không có giá lẻ).",
-};
+import { formatCompactVND, formatCompactVND2 } from "@/components/Charts";
+import MultiRingDonut from "@/components/MultiRingDonut";
+import { formatNumber } from "@/lib/format";
+import type { StockRings } from "@/lib/types";
 
 function pct(n: number): string {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: 1, minimumFractionDigits: 1 }) + "%";
 }
 
+/** Thẻ cơ cấu tồn kho: biểu đồ 3 vòng đồng tâm (sở hữu × vị trí × trạng
+ *  thái), cả ba vòng cùng tính theo giá vốn lô. Ở giữa vòng là tổng giá trị
+ *  hàng TVK sở hữu theo giá vốn (kho TVK + hàng tại đối tác, không gồm
+ *  hàng nhận ký gửi). Ba mức giá vốn/sỉ/lẻ bên dưới chỉ tính hàng của TVK
+ *  trong kho — đó là ba cách định giá cùng một lượng hàng, không phải ba
+ *  phần của một tổng nên không vẽ thành vòng. */
 export default function StockCompositionCard({
-  segments,
+  rings,
   tierValues,
   ownedBookValue,
   ownedQty,
   canSeeMoney,
   canSeeCost,
 }: {
-  segments: CompositionSegmentInput[];
+  rings: StockRings;
   tierValues: { cost: number; wholesale: number; retail: number };
   ownedBookValue: number;
   ownedQty: number;
   canSeeMoney: boolean;
   canSeeCost: boolean;
 }) {
-  const [basis, setBasis] = useState<Basis>("real");
-  const valueOf = (s: CompositionSegmentInput) => (canSeeMoney ? s[basis] : s.qty);
-  const donutSegments = segments.map((s) => ({ label: s.label, value: valueOf(s), color: s.color }));
-  const total = donutSegments.reduce((a, s) => a + Math.max(s.value, 0), 0);
   const { cost, wholesale, retail } = tierValues;
   const marginPct = retail > 0 ? ((retail - cost) / retail) * 100 : 0;
 
   return (
     <Card title="Cơ cấu tồn kho" tone="violet">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tổng giá trị hàng TVK sở hữu</p>
-          <p className="mt-1 text-2xl font-bold leading-tight text-slate-900">
-            {canSeeMoney ? formatVND(ownedBookValue) : `${formatNumber(ownedQty)} cái`}
-          </p>
-          <p className="text-xs text-slate-500">
-            {canSeeMoney ? "Theo giá vốn — kho TVK + hàng tại đối tác, không gồm hàng nhận ký gửi" : "Hàng TVK tại kho và tại đối tác, không gồm hàng nhận ký gửi"}
-          </p>
-        </div>
+        <p className="text-xs leading-relaxed text-slate-500">
+          Ba vòng độc lập, cùng phạm vi hàng đang quản lý, cùng tính theo giá vốn.
+        </p>
         <details className="relative shrink-0">
           <summary className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 text-sm text-slate-500 hover:bg-slate-50" title="Cách tính">
             ⓘ
           </summary>
           <div className="absolute right-0 top-8 z-10 w-72 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg">
-            <p>Ba nhóm không trùng nhau, phủ hết hàng đang quản lý: hàng TVK tại kho, hàng TVK tại đối tác, và hàng nhận ký gửi (của nhà cung cấp, TVK chỉ giữ hộ).</p>
-            <p className="mt-2">Hàng giữ hộ không phải tài sản của cửa hàng. Hàng tại đối tác tính theo giá chuyển giao mới nhất của từng lô, trừ khi xem theo giá vốn thì tính theo giá vốn lô.</p>
+            <p>Ba vòng thể hiện ba chiều độc lập của cùng một lượng hàng đang quản lý, đều tính theo giá vốn lô: quyền sở hữu (của TVK / nhận ký gửi), vị trí (kho TVK / kho đối tác), trạng thái (bán được / giữ cho chứng từ nháp).</p>
+            <p className="mt-2">Hàng nhận ký gửi là hàng giữ hộ, không phải tài sản của cửa hàng. &ldquo;Giữ cho chứng từ nháp&rdquo; là số lượng các dòng chứng từ nháp (bán hàng, gửi ký gửi, phân bổ) đang trỏ vào lô, tối đa bằng tồn thực tế của lô.</p>
             <p className="mt-2">Ba mức giá dưới đây chỉ tính hàng của TVK trong kho, chưa gồm hàng ở đối tác.</p>
           </div>
         </details>
       </div>
 
-      {canSeeMoney && (
-        <div className="mt-4 flex items-center gap-2">
-          <label htmlFor="donut-basis" className="text-sm text-slate-600">Cơ sở định giá</label>
-          <select
-            id="donut-basis"
-            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800"
-            value={basis}
-            onChange={(e) => setBasis(e.target.value as Basis)}
-          >
-            {(Object.keys(BASIS_LABELS) as Basis[]).map((b) => (
-              <option key={b} value={b}>{BASIS_LABELS[b]}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <div className="mt-4">
-        <DonutChart
-          segments={donutSegments}
-          format={canSeeMoney ? formatCompactVND : (v) => formatNumber(v)}
-          centerLabel={canSeeMoney ? formatCompactVND(total) : formatNumber(total)}
-          centerSub="Tổng hàng đang quản lý"
-          size={136}
+        <MultiRingDonut
+          rings={rings}
+          canSeeMoney={canSeeMoney}
+          centerLabel={canSeeMoney ? formatCompactVND(ownedBookValue) : `${formatNumber(ownedQty)} cái`}
+          centerLines={
+            canSeeMoney
+              ? ["Tổng giá trị hàng TVK sở hữu", "theo giá vốn"]
+              : ["Hàng TVK tại kho", "và tại đối tác"]
+          }
         />
         {canSeeMoney && (
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">{BASIS_NOTES[basis]}</p>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">
+            Ở giữa: tổng giá trị hàng TVK sở hữu theo giá vốn, kể cả hàng đang ở đối tác, không gồm hàng nhận ký gửi.
+          </p>
         )}
       </div>
 

@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { inputCls, labelCls } from "@/components/ui";
+import { labelCls } from "@/components/ui";
 import { formatNumber, formatVND } from "@/lib/format";
 import type { PartnerStat } from "@/lib/queries";
 
-/** Chọn đối tác là mở cửa sổ bật lên xem nhanh 5 số liệu, không tải lại
+/** Bấm tên đối tác là mở cửa sổ bật lên xem nhanh 5 số liệu, không tải lại
  *  trang. Cuối cửa sổ có link mở trang chi tiết của đối tác đó. */
 export default function PartnerStatsDialog({ partners }: { partners: PartnerStat[] }) {
   const [selectedId, setSelectedId] = useState("");
@@ -33,19 +33,31 @@ export default function PartnerStatsDialog({ partners }: { partners: PartnerStat
 
   return (
     <div>
-      <label className={labelCls}>Chọn đối tác</label>
-      <select
-        value={selectedId}
-        className={inputCls}
-        onChange={(e) => setSelectedId(e.target.value)}
-      >
-        <option value="">— Chọn đối tác —</option>
-        {partners.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      <p className={labelCls}>Chọn đối tác</p>
+      {partners.length === 0 ? (
+        <p className="text-sm text-slate-500">Chưa có đối tác.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {partners.map((p) => {
+            const active = p.id === selectedId;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setSelectedId(p.id)}
+                className={
+                  active
+                    ? "rounded-full border border-blue-600 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700"
+                    : "rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-blue-500 hover:text-blue-700"
+                }
+              >
+                {p.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {selected && (
         <div

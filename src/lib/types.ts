@@ -3,6 +3,27 @@ export type AnyRow = Record<string, any>;
 
 export type AppRole = "OWNER" | "SALES" | "WAREHOUSE" | "ACCOUNTING" | "CEO";
 export type Ownership = "OWNED" | "CONSIGNED";
+
+/** Một đoạn của một vòng trong biểu đồ 3 vòng đồng tâm (cơ cấu tồn kho).
+ *  value luôn tính theo giá vốn lô; qty là số cái. href là link lọc trang
+ *  tồn kho, null khi vòng đó chưa có bộ lọc tương ứng. */
+export interface RingSegment {
+  key: string;
+  label: string;
+  color: string;
+  qty: number;
+  value: number;
+  lots: number;
+  skus: number;
+  href: string | null;
+}
+
+/** Ba vòng độc lập của cùng một lượng hàng đang quản lý, cùng chuẩn giá vốn. */
+export interface StockRings {
+  ownership: RingSegment[];
+  location: RingSegment[];
+  status: RingSegment[];
+}
 export type DocStatus = "DRAFT" | "CONFIRMED" | "CANCELLED";
 export type BalanceStatus = "UNPAID" | "PARTIAL" | "PAID" | "CANCELLED";
 
