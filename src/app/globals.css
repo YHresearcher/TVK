@@ -30,3 +30,24 @@ body {
     break-after: auto;
   }
 }
+
+/* Thiết bị cảm ứng: vùng chạm tối thiểu 44px cho nút bấm, ô nhập và
+   điều hướng. Chỉ áp dụng khi thiết bị không có hover và dùng con trỏ
+   thô (cảm ứng), nên không ảnh hưởng giao diện chuột/bàn phím. */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  select,
+  input,
+  textarea {
+    min-height: 44px;
+  }
+  aside a,
+  aside button,
+  nav a,
+  nav button {
+    min-height: 44px;
+  }
+  .touch-control {
+    min-height: 44px;
+  }
+}

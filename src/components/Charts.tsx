@@ -373,7 +373,7 @@ export function HBarList({
         return (
           <li key={i} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
             {d.href ? (
-              <a href={d.href} className="flex flex-1 flex-col gap-1 hover:opacity-80 sm:flex-row sm:items-center sm:gap-3">
+              <a href={d.href} className="touch-control flex flex-1 flex-col gap-1 hover:opacity-80 sm:flex-row sm:items-center sm:gap-3">
                 {row}
               </a>
             ) : (
@@ -488,7 +488,7 @@ export function StackedBarList({
       {rows.map((r) => (
         <li key={r.name} className="flex flex-col gap-1">
           <span className="flex flex-wrap items-baseline justify-between gap-2">
-            <a href={r.href} className="min-w-0 text-sm font-medium text-slate-900 hover:text-blue-700">
+            <a href={r.href} className="touch-control min-w-0 text-sm font-medium text-slate-900 hover:text-blue-700">
               {r.name}
             </a>
             <span className="text-xs text-slate-500">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
 import { ComposedChart, formatCompactVND, GroupedBarChart, HBarList, StackedBarList } from "@/components/Charts";
 import PartnerStatsDialog from "@/components/PartnerStatsDialog";
+import QuickShortcuts from "@/components/QuickShortcuts";
 import StockCompositionCard from "@/components/StockCompositionCard";
 import {
   getCurrentProfile,
@@ -287,8 +288,8 @@ export default async function DashboardPage({
                   href={`/dashboard?period=${p.key}`}
                   className={
                     period === p.key
-                      ? "rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white"
-                      : "rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                      ? "touch-control inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white"
+                      : "touch-control inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50"
                   }
                 >
                   {p.label}
@@ -560,6 +561,7 @@ export default async function DashboardPage({
         title="Tổng quan"
         description="Tồn kho và hàng ký gửi luôn được theo dõi tách biệt."
       />
+      <QuickShortcuts role={role} />
       {role === "SALES" ? (
         <>{layer1}{layer3}{layer2}{layer4}{layer5}</>
       ) : role === "WAREHOUSE" ? (
