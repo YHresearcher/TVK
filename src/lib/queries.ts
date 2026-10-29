@@ -399,6 +399,7 @@ export async function getDashboard() {
       revenue30: 0, grossProfit30: 0, orderCount30: 0, orderAnalysis: [] as AnyRow[],
       bookOwnedOwnValue: 0, bookAtPartnersOwnedValue: 0, bookInventoryValue: 0,
       bookConsignedCustodyValue: 0, warehouseTierValues: { cost: 0, wholesale: 0, retail: 0 },
+      ownedLotCount: 0, consignedLotCount: 0, atPartnersLotCount: 0,
       overduePayables: 0, overdueReceivables: 0,
       lowStock: [] as AnyRow[], expiring: [] as AnyRow[], discrepancies: [] as AnyRow[],
       revenue14: [] as { label: string; value: number }[],
@@ -686,17 +687,26 @@ export async function getDashboard() {
   const rings: StockRings = {
     ownership: [
       segOf("owned", "Hàng thuộc TVK", "#2563eb", rows.filter(owned), "/inventory?ownership=OWNED"),
-      segOf("consigned", "Hàng nhận ký gửi", "#8b5cf6", rows.filter(consigned), "/inventory?ownership=CONSIGNED"),
+      segOf("consigned", "Hàng nhận ký gửi", "#d97706", rows.filter(consigned), "/inventory?ownership=CONSIGNED"),
     ],
     location: [
-      segOf("own", "Hàng tại kho TVK", "#10b981", rows.filter((r) => r.location_kind === "OWN_WAREHOUSE"), "/inventory?location_kind=OWN_WAREHOUSE"),
-      segOf("partner", "Hàng tại kho đối tác", "#f59e0b", rows.filter((r) => r.location_kind === "PARTNER_VIRTUAL"), "/inventory?location_kind=PARTNER_VIRTUAL"),
+      segOf("own", "Hàng tại kho TVK", "#059669", rows.filter((r) => r.location_kind === "OWN_WAREHOUSE"), "/inventory?location_kind=OWN_WAREHOUSE"),
+      segOf("partner", "Hàng tại kho đối tác", "#7c3aed", rows.filter((r) => r.location_kind === "PARTNER_VIRTUAL"), "/inventory?location_kind=PARTNER_VIRTUAL"),
     ],
     status: [
-      { key: "sellable", label: "Bán được", color: "#0d9488", qty: sellQty, value: sellValue, lots: sellLots.size, skus: sellSkus.size, href: null },
-      { key: "held", label: "Giữ cho chứng từ nháp", color: "#f43f5e", qty: heldQty, value: heldValue, lots: heldLots.size, skus: heldSkus.size, href: null },
+      { key: "sellable", label: "Bán được", color: "#64748b", qty: sellQty, value: sellValue, lots: sellLots.size, skus: sellSkus.size, href: null },
+      { key: "held", label: "Giữ cho chứng từ nháp", color: "#dc2626", qty: heldQty, value: heldValue, lots: heldLots.size, skus: heldSkus.size, href: null },
     ],
   };
+  // Số lô đang có hàng theo từng nhóm (một lô có thể nằm ở 2 vị trí thì
+  // tính vào cả hai nhóm vị trí; lô hết hàng không tính).
+  const lotCountOf = (filter: (r: AnyRow) => boolean) =>
+    new Set(
+      rows.filter((r) => filter(r) && Number(r.qty) > 0).map((r) => String(r.batch_id))
+    ).size;
+  const ownedLotCount = lotCountOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
+  const consignedLotCount = lotCountOf(consigned);
+  const atPartnersLotCount = lotCountOf((r) => owned(r) && r.location_kind === "PARTNER_VIRTUAL");
   // Doanh thu / lợi nhuận gộp / số đơn — mọi chứng từ đã xác nhận, không
   // giới hạn ngày (ngày chứng từ có thể ghi lùi so với ngày nhập máy).
   // Giá vốn của mỗi dòng lấy từ lô đã bán của dòng đó (luồng đối tác thì
@@ -862,6 +872,9 @@ export async function getDashboard() {
     bookAtPartnersOwnedValue: bookAtPartnersOwned.value,
     bookInventoryValue: bookOwnedOwn.value + bookAtPartnersOwned.value,
     bookConsignedCustodyValue: bookConsignedCustody.value,
+    ownedLotCount,
+    consignedLotCount,
+    atPartnersLotCount,
     warehouseTierValues,
     overduePayables: overdueOutstanding(payables.data as AnyRow[] | null),
     overdueReceivables: overdueOutstanding(receivables.data as AnyRow[] | null),

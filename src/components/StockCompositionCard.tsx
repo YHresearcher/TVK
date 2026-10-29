@@ -57,7 +57,7 @@ export default function StockCompositionCard({
         <MultiRingDonut
           rings={rings}
           canSeeMoney={canSeeMoney}
-          centerLabel={canSeeMoney ? formatCompactVND(ownedBookValue) : `${formatNumber(ownedQty)} cái`}
+          centerLabel={canSeeMoney ? formatCompactVND(ownedBookValue) : `${formatNumber(ownedQty)} đơn vị`}
           centerLines={
             canSeeMoney
               ? ["Tổng giá trị hàng TVK sở hữu", "theo giá vốn"]

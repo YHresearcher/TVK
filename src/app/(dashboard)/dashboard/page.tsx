@@ -74,6 +74,11 @@ export default async function DashboardPage() {
   // Gross Margin: lãi gộp trên doanh thu thuần. Markup on Cost: lãi gộp
   // trên giá vốn hàng đã bán. Chỉ đổi tên gọi, cách tính giữ nguyên.
   const roiAll = cogsAll > 0 ? Math.round((d.grossProfitAll / cogsAll) * 100) : 0;
+  // Tỷ trọng vốn theo vị trí trên tổng hàng TVK sở hữu (giá vốn).
+  const bookShare = (v: number) =>
+    d.bookInventoryValue > 0
+      ? `${((v / d.bookInventoryValue) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}% tổng hàng sở hữu`
+      : "—";
   if (!d.configured) {
     return (
       <>
@@ -112,9 +117,9 @@ export default async function DashboardPage() {
     <section className="mt-10">
       <LayerHeading n={2} title="Hàng hoá và quyền sở hữu" desc="Hàng của mình, hàng nhận ký gửi và hàng đang gửi ở đối tác — tách biệt theo từng lô." />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <StatCard label="Tồn kho (số lượng)" value={formatNumber(d.ownedQty)} sub={formatVND(d.ownedValue) + " giá trị theo giá bán"} tone="emerald" />
-        <StatCard label="Hàng nhận ký gửi (số lượng)" value={formatNumber(d.consignedQty)} sub={formatVND(d.consignedValue) + " đang giữ hộ nhà cung cấp"} tone="amber" />
-        <StatCard label="Hàng TVK tại đối tác" value={formatNumber(d.atPartnersQty)} sub={formatVND(d.atPartnersValue) + " theo giá chuyển giao"} tone="sky" />
+        <StatCard label="Tồn kho (số lượng)" value={`${formatNumber(d.ownedQty)} đơn vị`} sub={`${formatVND(d.ownedValue)} theo giá bán · ${formatNumber(d.ownedLotCount)} lô`} tone="emerald" />
+        <StatCard label="Hàng nhận ký gửi (số lượng)" value={`${formatNumber(d.consignedQty)} đơn vị`} sub={`${formatVND(d.consignedValue)} đang giữ hộ nhà cung cấp · ${formatNumber(d.consignedLotCount)} lô`} tone="amber" />
+        <StatCard label="Hàng TVK tại đối tác" value={`${formatNumber(d.atPartnersQty)} đơn vị`} sub={`${formatVND(d.atPartnersValue)} theo giá chuyển giao · ${formatNumber(d.atPartnersLotCount)} lô`} tone="sky" />
       </div>
       {canSeeCost && (
         <div className="mt-6">
@@ -124,8 +129,8 @@ export default async function DashboardPage() {
               tài sản của cửa hàng nên không gộp vào tổng hàng tồn kho của TVK.
             </p>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <StatCard label="Tổng tiền hàng trong kho (giá vốn)" value={formatVND(d.bookOwnedOwnValue)} />
-              <StatCard label="Hàng của TVK ký gởi" value={formatVND(d.bookAtPartnersOwnedValue)} />
+              <StatCard label="Tổng tiền hàng trong kho (giá vốn)" value={formatVND(d.bookOwnedOwnValue)} sub={bookShare(d.bookOwnedOwnValue)} />
+              <StatCard label="Hàng của TVK ký gởi" value={formatVND(d.bookAtPartnersOwnedValue)} sub={bookShare(d.bookAtPartnersOwnedValue)} />
               <StatCard label="Tổng hàng tồn kho của TVK (kho + ký gởi)" value={formatVND(d.bookInventoryValue)} />
               <StatCard label="Hàng giữ hộ (không phải tài sản)" value={formatVND(d.bookConsignedCustodyValue)} sub="Chỉ theo dõi, không ghi vào tài sản" />
             </div>
@@ -144,10 +149,10 @@ export default async function DashboardPage() {
         {canSeeMoney && (
           <Card title="Hàng đã bán và đã gửi ký gởi" tone="amber" className="lg:col-span-2">
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <StatCard label="Đã bán" value={`${formatNumber(d.flows.soldQty)} cái`} sub={`Doanh thu thuần ${formatVND(d.flows.soldRevenue)}`} />
-              <StatCard label="Đã gửi ký gởi" value={`${formatNumber(d.flows.sentQty)} cái`} sub={`Giá chuyển giao ${formatVND(d.flows.sentValue)}`} />
-              <StatCard label="Đối tác đã tiêu thụ" value={`${formatNumber(d.flows.consumedQty)} cái`} sub="Theo báo cáo tiêu thụ đã xác nhận" />
-              <StatCard label="Còn ở đối tác" value={`${formatNumber(d.flows.stillQty)} cái`} sub={`Giá chuyển giao ${formatVND(d.flows.stillValue)}`} />
+              <StatCard label="Đã bán" value={`${formatNumber(d.flows.soldQty)} đơn vị`} sub={`Doanh thu thuần ${formatVND(d.flows.soldRevenue)}`} />
+              <StatCard label="Đã gửi ký gởi" value={`${formatNumber(d.flows.sentQty)} đơn vị`} sub={`Giá chuyển giao ${formatVND(d.flows.sentValue)}`} />
+              <StatCard label="Đối tác đã tiêu thụ" value={`${formatNumber(d.flows.consumedQty)} đơn vị`} sub="Theo báo cáo tiêu thụ đã xác nhận" />
+              <StatCard label="Còn ở đối tác" value={`${formatNumber(d.flows.stillQty)} đơn vị`} sub={`Giá chuyển giao ${formatVND(d.flows.stillValue)}`} />
             </div>
             <p className="mt-3 text-xs leading-relaxed text-slate-500">
               Chỉ tính chứng từ bán hàng (BH) và phiếu gửi ký gởi (GK) đã xác nhận. Hàng còn ở đối tác
@@ -202,7 +207,7 @@ export default async function DashboardPage() {
               Doanh thu thuần <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
               {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
               {" · "}Lợi nhuận gộp <strong className="text-slate-900">{formatVND(d.grossProfitAll)}</strong>
-              {" "}(Gross Margin {grossMargin}% · Markup on Cost {roiAll}%).
+              {`(Gross Margin ${grossMargin}% · Markup on Cost ${roiAll}%)`}.
               Giá vốn tính theo lô thực tế đã xuất (nhập trước – xuất trước); giảm giá đã trừ vào doanh thu thuần.
               {" "}30 ngày gần nhất: doanh thu thuần {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn.
             </p>

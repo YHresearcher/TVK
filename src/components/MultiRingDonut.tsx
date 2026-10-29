@@ -53,7 +53,7 @@ export default function MultiRingDonut({
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const displayOf = (s: RingSegment) => (canSeeMoney ? s.value : s.qty);
-  const formatDisplay = (v: number) => (canSeeMoney ? formatVND(v) : `${formatNumber(v)} cái`);
+  const formatDisplay = (v: number) => (canSeeMoney ? formatVND(v) : `${formatNumber(v)} đơn vị`);
 
   const activeKey = hoverKey ?? selectedKey;
   let active: { ring: (typeof RING_DEFS)[number]; seg: RingSegment; total: number } | null = null;
@@ -69,10 +69,10 @@ export default function MultiRingDonut({
 
   return (
     <div>
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-5">
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className="mx-auto w-full max-w-[300px] shrink-0 sm:mx-0"
+          className="mx-auto w-full max-w-[300px] shrink-0"
           role="img"
           aria-label="Biểu đồ cơ cấu tồn kho 3 vòng"
         >
@@ -155,7 +155,7 @@ export default function MultiRingDonut({
                           }`}
                         >
                           <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
-                          <span className="min-w-0 flex-1 truncate">{s.label}</span>
+                          <span className="min-w-0 flex-1">{s.label}</span>
                           <span className="shrink-0 font-medium text-slate-900">{formatDisplay(displayOf(s))}</span>
                           <span className="w-11 shrink-0 text-right text-xs text-slate-500">{pct(displayOf(s), total)}</span>
                         </button>
@@ -176,7 +176,7 @@ export default function MultiRingDonut({
             {active.ring.title}: {active.seg.label}
           </p>
           <p className="mt-0.5 text-slate-700">
-            {formatDisplay(displayOf(active.seg))} · {pct(displayOf(active.seg), active.total)} · {active.seg.lots} lô · {active.seg.skus} SKU
+            {formatDisplay(displayOf(active.seg))} · {pct(displayOf(active.seg), active.total)} · {active.seg.lots} lô
           </p>
           {active.seg.href ? (
             <p className="mt-1.5">
@@ -194,7 +194,7 @@ export default function MultiRingDonut({
           )}
         </div>
       ) : (
-        <p className="mt-4 text-xs text-slate-500">Bấm vào một đoạn trên biểu đồ hoặc một dòng chú giải để xem giá trị, tỷ trọng, số lô và số SKU.</p>
+        <p className="mt-4 text-xs text-slate-500">Bấm vào một đoạn trên biểu đồ hoặc một dòng chú giải để xem giá trị, tỷ trọng và số lô.</p>
       )}
     </div>
   );

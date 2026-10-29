@@ -27,7 +27,7 @@ export default function PartnerStatsDialog({ partners }: { partners: PartnerStat
         { label: "Đã thanh toán", sub: "Tổng tiền đã thu", value: formatVND(selected.totalPaid) },
         { label: "Hoá đơn đã xuất", sub: "Hoá đơn đang hiệu lực", value: formatNumber(selected.invoiceCount) },
         { label: "Giá trị hoá đơn", sub: "Tổng tiền hoá đơn đang hiệu lực", value: formatVND(selected.invoiceTotal) },
-        { label: "Hàng còn ở đối tác", sub: "Số cái đang ở chỗ đối tác", value: formatNumber(selected.stillAtPartner) },
+        { label: "Hàng còn ở đối tác", sub: "Số đơn vị đang ở chỗ đối tác", value: formatNumber(selected.stillAtPartner) },
       ]
     : [];
 
