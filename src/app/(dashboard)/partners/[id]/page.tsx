@@ -70,6 +70,27 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
   const still = Number(consignment?.qty_still_at_partner ?? 0);
   const balanced = sent === consumed + returned + still;
 
+  // Mỗi phiếu/chứng từ chỉ hiện một lần ở dòng tóm tắt phía trên bảng —
+  // bảng phía dưới không lặp lại cột phiếu/chứng từ/hoá đơn theo từng dòng.
+  const distinctSlips: { id: string; code: string; date: string | null }[] = [];
+  for (const g of consignmentGoods) {
+    if (g.slip_id && g.slip_code && !distinctSlips.some((s) => s.id === g.slip_id)) {
+      distinctSlips.push({ id: g.slip_id, code: g.slip_code, date: g.slip_date });
+    }
+  }
+  const distinctDocs: { id: string; code: string; date: string | null }[] = [];
+  const distinctInvoices: { id: string; number: string; date: string }[] = [];
+  for (const r of receivables) {
+    const info = receivableDocs.get(String(r.id));
+    if (!info) continue;
+    if (info.docId && info.docCode && !distinctDocs.some((d) => d.id === info.docId)) {
+      distinctDocs.push({ id: info.docId, code: info.docCode, date: info.docDate });
+    }
+    for (const inv of info.invoices) {
+      if (!distinctInvoices.some((x) => x.id === inv.id)) distinctInvoices.push(inv);
+    }
+  }
+
   return (
     <>
       <PageHeader title={partner.name} description="Hồ sơ và thống kê của đối tác — bấm tên đối tác ở bất kỳ bảng nào để mở trang này." />
@@ -129,19 +150,24 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
                 ].join(" · ")}
                 .
               </p>
+              {distinctSlips.length > 0 && (
+                <p className="mb-3 text-sm text-slate-600">
+                  Phiếu gửi:{" "}
+                  {distinctSlips.map((s, i) => (
+                    <span key={s.id}>
+                      {i > 0 && " · "}
+                      <DocDetailDialog kind="SLIP" id={s.id} label={s.code} />
+                      {s.date && ` (${formatDate(s.date)})`}
+                    </span>
+                  ))}
+                </p>
+              )}
               <TableWrap>
-                <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Phiếu gửi</th><th className={thCls}>Mã hàng</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th><th className={thCls}>Trạng thái</th></tr></thead>
+                <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Mã hàng</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th><th className={thCls}>Trạng thái</th></tr></thead>
                 <tbody>
                   {consignmentGoods.map((g) => (
                     <tr key={g.batch_id} className="border-t border-slate-100">
                       <td className={tdCls}>{g.batch_code}</td>
-                      <td className={tdCls}>
-                        {g.slip_id && g.slip_code ? (
-                          <DocDetailDialog kind="SLIP" id={g.slip_id} label={g.slip_code} sub={g.slip_date ? formatDate(g.slip_date) : undefined} />
-                        ) : (
-                          "—"
-                        )}
-                      </td>
                       <td className={tdCls}>{g.sku}</td>
                       <td className={tdCls}>{g.product_name}</td>
                       <td className={tdCls}>{formatNumber(g.sent)}</td>
@@ -162,41 +188,52 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
 
         <Card title="Khoản phải thu">
           {receivables.length === 0 ? <EmptyState message="Chưa có khoản phải thu." /> : (
+            <>
+            {(distinctDocs.length > 0 || distinctInvoices.length > 0) && (
+              <p className="mb-3 text-sm text-slate-600">
+                {distinctDocs.length > 0 && (
+                  <>
+                    Chứng từ:{" "}
+                    {distinctDocs.map((d, i) => (
+                      <span key={d.id}>
+                        {i > 0 && " · "}
+                        <DocDetailDialog kind="DOC" id={d.id} label={d.code} />
+                        {d.date && ` (${formatDate(d.date)})`}
+                      </span>
+                    ))}
+                  </>
+                )}
+                {distinctInvoices.length > 0 ? (
+                  <>
+                    {" · "}Hoá đơn:{" "}
+                    {distinctInvoices.map((inv, i) => (
+                      <span key={inv.id}>
+                        {i > 0 && " · "}
+                        <DocDetailDialog kind="INV" id={inv.id} label={inv.number} />
+                        {` (${formatDate(inv.date)})`}
+                      </span>
+                    ))}
+                  </>
+                ) : (
+                  <>{" · "}Hoá đơn: chưa xuất</>
+                )}
+              </p>
+            )}
             <TableWrap>
-              <thead><tr><th className={thCls}>Số tiền</th><th className={thCls}>Đã thu</th><th className={thCls}>Còn phải thu</th><th className={thCls}>Chứng từ</th><th className={thCls}>Hoá đơn</th><th className={thCls}>Hạn thu</th><th className={thCls}>Trạng thái</th></tr></thead>
+              <thead><tr><th className={thCls}>Số tiền</th><th className={thCls}>Đã thu</th><th className={thCls}>Còn phải thu</th><th className={thCls}>Hạn thu</th><th className={thCls}>Trạng thái</th></tr></thead>
               <tbody>
-                {receivables.map((r) => {
-                  const info = receivableDocs.get(String(r.id));
-                  return (
+                {receivables.map((r) => (
                   <tr key={r.id} className="border-t border-slate-100">
                     <td className={tdCls}>{formatVND(r.amount)}</td>
                     <td className={tdCls}>{formatVND(r.amount_paid)}</td>
                     <td className={`${tdCls} font-medium`}>{formatVND(Number(r.amount) - Number(r.amount_paid))}</td>
-                    <td className={tdCls}>
-                      {info?.docId && info.docCode ? (
-                        <DocDetailDialog kind="DOC" id={info.docId} label={info.docCode} sub={info.docDate ? formatDate(info.docDate) : undefined} />
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className={tdCls}>
-                      {info && info.invoices.length > 0 ? (
-                        <span className="flex flex-col gap-1">
-                          {info.invoices.map((inv) => (
-                            <DocDetailDialog key={inv.id} kind="INV" id={inv.id} label={inv.number} sub={formatDate(inv.date)} />
-                          ))}
-                        </span>
-                      ) : (
-                        "Chưa xuất hoá đơn"
-                      )}
-                    </td>
                     <td className={tdCls}>{formatDate(r.due_date)}</td>
                     <td className={tdCls}><StatusBadge status={r.status} /></td>
                   </tr>
-                  );
-                })}
+                ))}
               </tbody>
             </TableWrap>
+            </>
           )}
         </Card>
 
