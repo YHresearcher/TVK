@@ -146,7 +146,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
         <Card title="Các lô của sản phẩm này">
           {detail.batches.length === 0 ? <EmptyState message="Chưa có hàng." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Quyền sở hữu</th><th className={thCls}>Nhập từ</th><th className={thCls}>Vị trí</th><th className={thCls}>Số lượng</th><th className={thCls}>Ngày nhập</th><th className={thCls}>Hạn dùng</th><th className={thCls}>Hạn trả</th></tr></thead>
+              <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sở hữu</th><th className={thCls}>Nhập từ</th><th className={thCls}>Vị trí</th><th className={thCls}>Số lượng</th><th className={thCls}>Ngày nhập</th><th className={thCls}>Hạn dùng</th><th className={thCls}>Hạn trả</th></tr></thead>
               <tbody>
                 {detail.batches.map((b, i) => (
                   <tr key={i} className="border-t border-slate-100">

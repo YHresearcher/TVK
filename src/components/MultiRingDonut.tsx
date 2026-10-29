@@ -16,7 +16,7 @@ const STROKE = 20;
 const GAP_DEG = 10;
 
 const RING_DEFS = [
-  { key: "ownership", title: "Quyền sở hữu", radius: 156 },
+  { key: "ownership", title: "Sở hữu", radius: 156 },
   { key: "location", title: "Vị trí", radius: 128 },
   { key: "status", title: "Trạng thái", radius: 100 },
 ] as const;

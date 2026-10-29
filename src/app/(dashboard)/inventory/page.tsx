@@ -36,9 +36,9 @@ export default async function InventoryPage({
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <form method="get" className="mb-4 flex flex-wrap gap-2">
         <select name="ownership" defaultValue={searchParams.ownership ?? ""} className={`${inputCls} w-auto`}>
-          <option value="">Tất cả quyền sở hữu</option>
-          <option value="OWNED">Tồn kho (OWN)</option>
-          <option value="CONSIGNED">Hàng ký gửi (CONS)</option>
+          <option value="">Tất cả sở hữu</option>
+          <option value="OWNED">Hàng hoá của TVK (OWN)</option>
+          <option value="CONSIGNED">Hàng được ký gửi (CONS)</option>
         </select>
         <select name="location_kind" defaultValue={searchParams.location_kind ?? ""} className={`${inputCls} w-auto`}>
           <option value="">Tất cả vị trí</option>
@@ -55,7 +55,7 @@ export default async function InventoryPage({
 
       {rows.length === 0 ? <EmptyState message="Không có dòng tồn kho nào khớp." /> : (
         <TableWrap>
-          <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Quyền sở hữu</th><th className={thCls}>Nhập từ</th><th className={thCls}>Vị trí</th><th className={thCls}>Số lượng</th>{!isSales && (<th className={thCls}>Giá vốn</th>)}<th className={thCls}>Ngày nhập</th><th className={thCls}>Hạn dùng</th><th className={thCls}>Trạng thái</th></tr></thead>
+          <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Sở hữu</th><th className={thCls}>Nhập từ</th><th className={thCls}>Vị trí</th><th className={thCls}>Số lượng</th>{!isSales && (<th className={thCls}>Giá vốn</th>)}<th className={thCls}>Ngày nhập</th><th className={thCls}>Hạn dùng</th><th className={thCls}>Trạng thái</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-100">

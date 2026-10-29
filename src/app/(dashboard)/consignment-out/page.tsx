@@ -103,7 +103,7 @@ export default async function ConsignmentOutPage({
     <>
       <PageHeader
         title="Gửi ký gửi (GK)"
-        description="Gửi hàng cho đối tác chỉ thay đổi nơi giữ hàng — quyền sở hữu vẫn của mình, chưa ghi doanh thu và chưa ghi phải thu cho tới khi đối tác báo tiêu thụ. Gửi tiếp lô của nhà cung cấp (ô D) bị chặn trừ khi nhà cung cấp đó cho phép."
+        description="Gửi hàng cho đối tác chỉ thay đổi nơi giữ hàng — hàng vẫn là của TVK, chưa ghi doanh thu và chưa ghi phải thu cho tới khi đối tác báo tiêu thụ. Gửi tiếp lô hàng được ký gửi (ô D) bị chặn trừ khi nhà cung cấp đó cho phép."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}

@@ -687,8 +687,8 @@ export async function getDashboard() {
   }
   const rings: StockRings = {
     ownership: [
-      segOf("owned", "Hàng thuộc TVK", "#f43f5e", rows.filter(owned), "/inventory?ownership=OWNED"),
-      segOf("consigned", "Hàng nhận ký gửi", "#d97706", rows.filter(consigned), "/inventory?ownership=CONSIGNED"),
+      segOf("owned", "Hàng hoá của TVK", "#f43f5e", rows.filter(owned), "/inventory?ownership=OWNED"),
+      segOf("consigned", "Hàng được ký gửi", "#d97706", rows.filter(consigned), "/inventory?ownership=CONSIGNED"),
     ],
     location: [
       segOf("own", "Hàng tại kho TVK", "#059669", rows.filter((r) => r.location_kind === "OWN_WAREHOUSE"), "/inventory?location_kind=OWN_WAREHOUSE"),
