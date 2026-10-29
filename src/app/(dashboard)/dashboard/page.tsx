@@ -96,10 +96,10 @@ export default async function DashboardPage() {
 
   const role = profile.data?.role ?? "";
 
-  // Tầng 1 — Tổng quan điều hành: 5 giây nắm tình hình. Lợi nhuận gộp chỉ
-  // Chủ cửa hàng và Kế toán thấy; CEO thấy doanh thu, công nợ và giá trị
-  // hàng sở hữu theo giá trị thật.
-  const layer1 = (
+  // Tầng 1 — Tổng quan điều hành: 5 giây nắm tình hình. Tiền tổng chỉ
+  // Chủ cửa hàng, Kế toán và CEO thấy (canSeeMoney); Bán hàng và Thủ kho
+  // không thấy tầng này. Lợi nhuận gộp chặn thêm một lớp (canSeeCost).
+  const layer1 = !canSeeMoney ? null : (
     <section>
       <LayerHeading n={1} title="Tổng quan điều hành" desc="Doanh thu, lợi nhuận, công nợ và giá trị hàng sở hữu." />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
