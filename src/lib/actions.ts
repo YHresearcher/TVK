@@ -405,6 +405,35 @@ export async function createWarehouseAction(formData: FormData) {
   revalidatePath("/stock-in");
 }
 
+export async function updateWarehouseAction(formData: FormData) {
+  const supabase = await db();
+  const uid = await userId();
+  if (!uid) throw new Error("Chưa đăng nhập.");
+  const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+  if (!prof || !["OWNER", "WAREHOUSE"].includes(prof.role))
+    throw new Error("Vai trò của bạn không được sửa kho.");
+  const id = str(formData, "id");
+  const name = str(formData, "name");
+  if (!id || !name) throw new Error("Thiếu mã hoặc tên kho.");
+  const { data: loc } = await supabase
+    .from("locations")
+    .select("id")
+    .eq("id", id)
+    .eq("location_kind", "OWN_WAREHOUSE")
+    .maybeSingle();
+  if (!loc) throw new Error("Không tìm thấy kho của TVK.");
+  done(
+    await supabase.from("locations").update({
+      name,
+      detail: optStr(formData, "detail"),
+    }).eq("id", id),
+    "Cập nhật kho"
+  );
+  revalidatePath("/settings");
+  revalidatePath("/stock-in");
+  redirect("/settings");
+}
+
 // -------------------------------------------------------------- stock in
 export async function createPurchaseReceiptAction(formData: FormData) {
   const supabase = await db();

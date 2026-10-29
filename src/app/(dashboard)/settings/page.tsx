@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import UserAdminPanel from "@/components/UserAdminPanel";
 import UsernameForm from "@/components/UsernameForm";
-import { createWarehouseAction, updateVatModeAction } from "@/lib/actions";
+import { createWarehouseAction, updateWarehouseAction, updateVatModeAction } from "@/lib/actions";
 import { getCurrentProfile, listLocations } from "@/lib/queries";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -10,7 +11,11 @@ import { ROLE_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: { ok?: string; edit?: string };
+}) {
   const locations = await listLocations();
   const me = (await getCurrentProfile()).data;
   const supabase = await createClient();
@@ -28,6 +33,11 @@ export default async function SettingsPage() {
   }
   const warehouses = locations.data.filter((l) => l.location_kind === "OWN_WAREHOUSE");
   const partnerWarehouses = locations.data.filter((l) => l.location_kind === "PARTNER_VIRTUAL");
+  // Sửa kho theo đúng quyền ghi của RLS bảng locations: Chủ cửa hàng + Thủ kho.
+  const canEditWarehouse = ["OWNER", "WAREHOUSE"].includes(me?.role ?? "");
+  const editingWarehouse = canEditWarehouse
+    ? warehouses.find((l) => l.id === searchParams.edit)
+    : undefined;
 
   return (
     <>
@@ -68,17 +78,41 @@ export default async function SettingsPage() {
           {warehouses.length === 0 ? <EmptyState message="Chưa có kho — hãy tạo kho đầu tiên." /> : (
             <ul className="space-y-1 text-sm">
               {warehouses.map((l) => (
-                <li key={l.id} className="flex justify-between"><span>{l.name}</span><span className="text-slate-500">{l.detail ?? ""}</span></li>
+                <li key={l.id} className="flex items-baseline justify-between gap-2">
+                  <span>{l.name}</span>
+                  <span className="flex shrink-0 items-baseline gap-2">
+                    <span className="text-slate-500">{l.detail ?? ""}</span>
+                    {canEditWarehouse && (
+                      <Link href={`/settings?edit=${l.id}`} className="font-medium text-blue-700 hover:underline">
+                        Sửa
+                      </Link>
+                    )}
+                  </span>
+                </li>
               ))}
             </ul>
           )}
-          <form action={createWarehouseAction} className="mt-4 space-y-2 border-t border-slate-100 pt-3">
-            <div className="flex gap-2">
-              <input name="name" required placeholder="Tên kho (Kho chính)" className={inputCls} />
-              <input name="detail" placeholder="Chi tiết (địa chỉ / khu vực kệ)" className={inputCls} />
-            </div>
-            <SubmitButton className={`${btnCls} w-full`}>Thêm kho</SubmitButton>
-          </form>
+          {canEditWarehouse && (
+            <form
+              key={editingWarehouse?.id ?? "new"}
+              action={editingWarehouse ? updateWarehouseAction : createWarehouseAction}
+              className="mt-4 space-y-2 border-t border-slate-100 pt-3"
+            >
+              {editingWarehouse && <input type="hidden" name="id" value={editingWarehouse.id} />}
+              <div className="flex gap-2">
+                <input name="name" required placeholder="Tên kho (Kho chính)" defaultValue={editingWarehouse?.name ?? ""} className={inputCls} />
+                <input name="detail" placeholder="Chi tiết (địa chỉ / khu vực kệ)" defaultValue={editingWarehouse?.detail ?? ""} className={inputCls} />
+              </div>
+              <div className="flex items-center gap-3">
+                <SubmitButton className={btnCls}>{editingWarehouse ? "Lưu thay đổi" : "Thêm kho"}</SubmitButton>
+                {editingWarehouse && (
+                  <Link href="/settings" className="text-sm text-slate-500 hover:underline">
+                    Huỷ
+                  </Link>
+                )}
+              </div>
+            </form>
+          )}
           {partnerWarehouses.length > 0 && (
             <p className="mt-4 text-xs text-slate-500">
               Kho ảo của đối tác ({partnerWarehouses.length}) được tạo tự động khi phiếu gửi ký gửi đầu tiên cho một đối tác được xác nhận.

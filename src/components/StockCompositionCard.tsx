@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { DonutChart, formatCompactVND } from "@/components/Charts";
+import { DonutChart, formatCompactVND, formatCompactVND2 } from "@/components/Charts";
 import { formatNumber, formatVND } from "@/lib/format";
 
 export interface CompositionSegmentInput {
@@ -117,18 +117,18 @@ export default function StockCompositionCard({
           <div className="grid grid-cols-3 gap-3">
             <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Giá vốn</p>
-              <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatCompactVND(cost)}</p>
+              <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatCompactVND2(cost)}</p>
               <p className="mt-0.5 text-xs text-slate-500">Giá trị vốn tồn kho</p>
             </div>
             <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Giá sỉ</p>
-              <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatCompactVND(wholesale)}</p>
-              <p className="mt-0.5 text-xs text-slate-500">+{formatCompactVND(wholesale - cost)} ({cost > 0 ? pct(((wholesale - cost) / cost) * 100) : "—"})</p>
+              <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatCompactVND2(wholesale)}</p>
+              <p className="mt-0.5 text-xs text-slate-500">+{formatCompactVND2(wholesale - cost)} ({cost > 0 ? pct(((wholesale - cost) / cost) * 100) : "—"})</p>
             </div>
             <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Giá lẻ</p>
-              <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatCompactVND(retail)}</p>
-              <p className="mt-0.5 text-xs text-slate-500">+{formatCompactVND(retail - cost)} ({cost > 0 ? pct(((retail - cost) / cost) * 100) : "—"})</p>
+              <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatCompactVND2(retail)}</p>
+              <p className="mt-0.5 text-xs text-slate-500">+{formatCompactVND2(retail - cost)} ({cost > 0 ? pct(((retail - cost) / cost) * 100) : "—"})</p>
             </div>
           </div>
           <p className="mt-2 text-xs leading-relaxed text-slate-500">

@@ -19,6 +19,18 @@ export function formatCompactVND(v: number): string {
   return `${Math.round(v)}`;
 }
 
+// Rút gọn như formatCompactVND nhưng giữ 2 chữ số thập phân — dùng cho
+// các thẻ KPI cần khớp con số trên bản thiết kế (3,62 tỷ thay vì 3,6 tỷ).
+export function formatCompactVND2(v: number): string {
+  const abs = Math.abs(v);
+  const two = (n: number) =>
+    n.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (abs >= 1e9) return `${two(v / 1e9)} tỷ`;
+  if (abs >= 1e6) return `${two(v / 1e6)}tr`;
+  if (abs >= 1e3) return `${Math.round(v / 1e3)}k`;
+  return `${Math.round(v)}`;
+}
+
 export function BarChart({
   data,
   format = formatCompactVND,
