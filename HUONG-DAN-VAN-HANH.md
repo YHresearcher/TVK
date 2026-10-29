@@ -138,6 +138,7 @@ Trang **Nhập kho** có 3 nút: **Phiếu nhập mua (PN)** · **Phiếu nhận
 | **Sản phẩm** | Chọn từ danh mục (hiển thị dạng "Mã SKU — Tên hàng"). Có ô **quét mã vạch**: quét/nhập bất kỳ mã nào đã đăng ký của sản phẩm (mã OEM hoặc mã tương đương) rồi Enter, hệ thống tự chọn đúng sản phẩm; quét lại cùng mã sẽ cộng thêm 1 số lượng. |
 | **Số lượng** | Số lượng thực nhập của dòng này. |
 | **Đơn giá vốn (₫)** | Giá mình mua vào của 1 đơn vị — là cơ sở tính giá trị tồn kho và lãi gộp sau này. Nhập đúng giá theo hoá đơn mua (đã gồm các chi phí theo chính sách của cửa hàng). |
+| **Hạn dùng (chỉ nhớt)** | Hạn dùng của lô hàng — chỉ nhập cho nhớt, để trống với linh kiện. Hạn dùng ghi vào lô khi xác nhận phiếu; nhớt xuất theo hạn gần nhất trước (FEFO). |
 
 Kết quả khi xác nhận PN: tạo **lô OWN (nhãn trắng)** cho từng dòng, giá vốn của lô = đơn giá vốn đã nhập.
 
@@ -149,6 +150,7 @@ Các ô **Nhà cung cấp \***, **Kho \***, **Ngày nhập** giống PN. Khác b
 |---|---|
 | **Hạn trả** | Hạn cuối được giữ hàng ký gửi chưa bán được (quá hạn thì trả lại nhà cung cấp hoặc xử lý theo thoả thuận). **Để trống = dùng hạn mặc định đã khai trong hồ sơ nhà cung cấp.** Hệ thống dùng hạn này để cảnh báo hàng ký gửi sắp hết hạn giữ. |
 | **Giá ký gửi (₫)** *(cột trong bảng dòng hàng)* | Giá thoả thuận sẽ **trả cho nhà cung cấp cho mỗi đơn vị khi hàng bán được**. Đây là con số quyết định khoản phải trả sau này — nhập đúng theo thoả thuận/bảng giá ký gửi của từng nhà cung cấp, từng lô có thể khác nhau. |
+| **Hạn dùng (chỉ nhớt)** *(cột trong bảng dòng hàng)* | Hạn dùng của lô hàng — chỉ nhập cho nhớt, để trống với linh kiện. Hạn dùng ghi vào lô khi xác nhận phiếu; nhớt xuất theo hạn gần nhất trước (FEFO). |
 | *(không có)* Số hoá đơn NCC | Nhận ký gửi chưa phải mua hàng nên chưa có hoá đơn mua vào — ô này không xuất hiện ở NK. |
 
 Kết quả khi xác nhận NK: tạo **lô CONS (nhãn vàng)**. **Chưa phát sinh khoản phải trả nào** — tiền chỉ phát sinh khi hàng bán được (xem A4).
@@ -179,7 +181,7 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **Tự tạo sản phẩm mới nếu mã chưa có** | Bật: mã hàng chưa có trong danh mục sẽ được **tự tạo sản phẩm mới** (kèm mã thay thế + dòng xe trong file). Tắt: dòng nào mã chưa có sẽ báo lỗi và chặn import. |
 | **Xác nhận nhập kho ngay sau khi tạo phiếu** | Bật: phiếu tạo xong được xác nhận luôn (hàng vào kho ngay). Tắt: phiếu ở trạng thái Nháp để kiểm tra lại rồi xác nhận sau ở danh sách phiếu. |
 
-**8 cột trong file Excel — chỉ nhập 8 cột này theo đúng thứ tự** (Tỷ giá, VAT, % lợi nhuận nhập trên form, áp chung cho cả file; tên cột viết bằng tiếng Việt tương ứng — Dòng xe, Tên phụ tùng, Tên tiếng anh, Mã số, Thương hiệu, ĐVT, Số lượng, Đơn giá USD — cũng được nhận):
+**8 cột bắt buộc + 1 cột tùy chọn trong file Excel — nhập theo đúng thứ tự** (Tỷ giá, VAT, % lợi nhuận nhập trên form, áp chung cho cả file; tên cột viết bằng tiếng Việt tương ứng — Dòng xe, Tên phụ tùng, Tên tiếng anh, Mã số, Thương hiệu, ĐVT, Số lượng, Đơn giá USD, Hạn dùng — cũng được nhận):
 
 | Cột | Bắt buộc | Ý nghĩa |
 |---|---|---|
@@ -191,6 +193,7 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **DonViTinh** (ĐVT) | | Đơn vị tính (cái, bộ, chiếc…). |
 | **SoLuong** (Số lượng) | ✔ | Số lượng nhập, phải lớn hơn 0. |
 | **GiaUSD** (Đơn giá USD) | ✔ | Đơn giá bằng USD của một đơn vị — đầu vào duy nhất để tính giá nhập. |
+| **HanDung** (Hạn dùng) | | Hạn dùng của lô (chỉ nhớt) — ghi dạng ngày 01/05/2027 hoặc 2027-05-01; để trống nếu không có. Hạn dùng ghi vào từng lô khi xác nhận phiếu; nhớt xuất theo hạn gần nhất trước (FEFO), linh kiện xuất theo nhập trước (FIFO). |
 
 **Bảng xem trước (preview) — đọc trạng thái từng dòng trước khi nhập:**
 

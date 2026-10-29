@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { todayISO } from "@/lib/format";
-import { matchByNameVehicle, tierPriceOf } from "@/lib/product-match";
+import { compareLotOrder, isOilGroup, matchByNameVehicle, tierPriceOf } from "@/lib/product-match";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AnyRow } from "@/lib/types";
@@ -452,13 +452,14 @@ export async function createPurchaseReceiptAction(formData: FormData) {
       .single(),
     "Tạo phiếu nhập mua"
   );
-  const items = zipItems(formData, ["product_id", "qty", "unit_cost"])
+  const items = zipItems(formData, ["product_id", "qty", "unit_cost", "expiry_date"])
     .filter((r) => r.product_id && Number(r.qty) > 0)
     .map((r) => ({
       receipt_id: receipt.id,
       product_id: r.product_id,
       qty: Math.trunc(Number(r.qty)),
       unit_cost: Number(r.unit_cost),
+      expiry_date: validDate(String(r.expiry_date ?? "")),
     }));
   if (!items.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
   done(await supabase.from("purchase_receipt_items").insert(items), "Thêm dòng phiếu nhập");
@@ -526,13 +527,14 @@ export async function createConsignmentReceiptAction(formData: FormData) {
       .single(),
     "Tạo phiếu nhận ký gửi"
   );
-  const items = zipItems(formData, ["product_id", "qty", "consignment_price"])
+  const items = zipItems(formData, ["product_id", "qty", "consignment_price", "expiry_date"])
     .filter((r) => r.product_id && Number(r.qty) > 0)
     .map((r) => ({
       receipt_id: receipt.id,
       product_id: r.product_id,
       qty: Math.trunc(Number(r.qty)),
       consignment_price: Number(r.consignment_price),
+      expiry_date: validDate(String(r.expiry_date ?? "")),
     }));
   if (!items.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
   done(await supabase.from("consignment_receipt_items").insert(items), "Thêm dòng phiếu nhập");
@@ -569,6 +571,7 @@ interface ImportPayloadRow {
   unit?: unknown;
   qty?: unknown;
   usd?: unknown;
+  expiry?: unknown;
 }
 
 /**
@@ -622,7 +625,7 @@ export async function importStockAction(formData: FormData) {
     )
   );
 
-  const items: { product_id: string; qty: number; unit_cost: number }[] = [];
+  const items: { product_id: string; qty: number; unit_cost: number; expiry_date: string | null }[] = [];
   // Công thức phía máy chủ (không tin bản xem trước ở client), áp chung
   // cho toàn bộ file: Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%),
   // giữ chính xác tới 4 số lẻ, KHÔNG làm tròn (migration 0014). Giá bán
@@ -649,6 +652,13 @@ export async function importStockAction(formData: FormData) {
     const { unitCost } = rowPrices(r);
     if (!code || qty <= 0 || unitCost <= 0) {
       invalid.push(code || "(dòng thiếu mã)");
+      continue;
+    }
+    // Hạn dùng: máy chủ không tin bản xem trước ở client — ô có ghi mà
+    // không phải ngày YYYY-MM-DD hợp lệ thì từ chối cả file.
+    const expRaw = String(r.expiry ?? "").trim();
+    if (expRaw && !validDate(expRaw)) {
+      invalid.push(code);
       continue;
     }
     const altCodes = (Array.isArray(r.altCodes) ? r.altCodes : [])
@@ -686,7 +696,7 @@ export async function importStockAction(formData: FormData) {
   }[] = [];
   const codeRows: { productRef: string; code: string; code_kind: string }[] = [];
   const fitmentReqs: { productRef: string; fitment: string }[] = [];
-  const pendingItems: { productRef: string; qty: number; unit_cost: number }[] = [];
+  const pendingItems: { productRef: string; qty: number; unit_cost: number; expiry_date: string | null }[] = [];
   const pendingRef = (sku: string) => `pending:${normKey(sku)}`;
 
   for (const r of rawRows) {
@@ -755,7 +765,12 @@ export async function importStockAction(formData: FormData) {
       codeRows.push({ productRef, code, code_kind: "OEM" });
     }
 
-    pendingItems.push({ productRef, qty, unit_cost: unitCost });
+    pendingItems.push({
+      productRef,
+      qty,
+      unit_cost: unitCost,
+      expiry_date: String(r.expiry ?? "").trim() ? validDate(String(r.expiry ?? "").trim()) : null,
+    });
   }
 
   // Chèn hàng loạt: sản phẩm mới trước (lấy id thật), rồi mã và dòng xe.
@@ -835,7 +850,7 @@ export async function importStockAction(formData: FormData) {
   }
 
   for (const pi of pendingItems)
-    items.push({ product_id: resolveRef(pi.productRef), qty: pi.qty, unit_cost: pi.unit_cost });
+    items.push({ product_id: resolveRef(pi.productRef), qty: pi.qty, unit_cost: pi.unit_cost, expiry_date: pi.expiry_date });
 
   if (!items.length)
     throw new Error(
@@ -870,6 +885,7 @@ export async function importStockAction(formData: FormData) {
           product_id: i.product_id,
           qty: i.qty,
           unit_cost: i.unit_cost,
+          expiry_date: i.expiry_date,
         }))
       ),
       "Thêm dòng phiếu nhập"
@@ -906,6 +922,7 @@ export async function importStockAction(formData: FormData) {
         product_id: i.product_id,
         qty: i.qty,
         consignment_price: i.unit_cost,
+        expiry_date: i.expiry_date,
       }))
     ),
     "Thêm dòng phiếu nhập"
@@ -1340,21 +1357,29 @@ export async function importDealerSaleAction(formData: FormData) {
   const productIds = Array.from(new Set(resolved.map((r) => r.productId)));
 
   // Hàng đợi FIFO theo sản phẩm: lô cũ nhất (received_date, rồi mã lô)
-  // trước; tồn khả dụng của mỗi lô = tồn tại vị trí kho mình giữ nhiều
-  // nhất — đúng vị trí phiếu sẽ trừ.
+  // trước; nhớt thì FEFO — hạn dùng gần nhất trước, lô không hạn xếp
+  // sau cùng rồi mới theo FIFO. Tồn khả dụng của mỗi lô = tồn tại vị
+  // trí kho mình giữ nhiều nhất — đúng vị trí phiếu sẽ trừ.
   const { data: batches } = productIds.length
     ? await supabase
         .from("stock_batches")
-        .select("id, batch_code, product_id, ownership, received_date")
+        .select("id, batch_code, product_id, ownership, received_date, expiry_date")
         .in("product_id", productIds)
     : { data: [] as AnyRow[] };
+  const { data: groupRows } = productIds.length
+    ? await supabase
+        .from("products")
+        .select("id, product_group")
+        .in("id", productIds)
+    : { data: [] as AnyRow[] };
+  const oilByProduct = new Map<string, boolean>(
+    ((groupRows ?? []) as AnyRow[]).map((p) => [p.id as string, isOilGroup(p.product_group)])
+  );
   const batchIds = ((batches ?? []) as AnyRow[]).map((b) => b.id as string);
   const ownLocs = await mainOwnLocations(supabase, batchIds);
   const fifoByProduct = new Map<string, { id: string; qty: number }[]>();
-  for (const b of ((batches ?? []) as AnyRow[]).sort(
-    (x, y) =>
-      String(x.received_date).localeCompare(String(y.received_date)) ||
-      String(x.batch_code).localeCompare(String(y.batch_code))
+  for (const b of ((batches ?? []) as AnyRow[]).sort((x, y) =>
+    compareLotOrder(x, y, oilByProduct.get(x.product_id as string) ?? false)
   )) {
     const q = ownLocs.get(b.id as string)?.qty ?? 0;
     if (q <= 0) continue;

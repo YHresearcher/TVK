@@ -11,6 +11,40 @@ export function normCode(v: unknown): string {
     .replace(/\s+/g, "");
 }
 
+/** Nhóm hàng có phải là nhớt? So khớp không dấu, chứa "nhot" (Nhớt,
+ * Dầu nhớt...). Nhớt quản lý hạn dùng theo lô và xuất FEFO; linh kiện
+ * và mọi nhóm khác xuất FIFO, không xét hạn dùng. */
+export function isOilGroup(group: unknown): boolean {
+  const n = normalizeHeader(group);
+  return n.includes("nhot");
+}
+
+export interface LotOrder {
+  expiry_date?: string | null;
+  received_date?: string | null;
+  batch_code?: string | null;
+}
+
+/** Thứ tự xuất kho của các lô cùng một sản phẩm: nhớt thì FEFO — hạn
+ * dùng gần nhất trước, lô không có hạn xếp sau cùng rồi mới theo FIFO;
+ * còn lại FIFO thuần (ngày nhập rồi mã lô). */
+export function compareLotOrder(a: LotOrder, b: LotOrder, oil: boolean): number {
+  if (oil) {
+    const ea = a.expiry_date || "";
+    const eb = b.expiry_date || "";
+    if (ea !== eb) {
+      if (!ea) return 1;
+      if (!eb) return -1;
+      const c = ea.localeCompare(eb);
+      if (c) return c;
+    }
+  }
+  return (
+    String(a.received_date ?? "").localeCompare(String(b.received_date ?? "")) ||
+    String(a.batch_code ?? "").localeCompare(String(b.batch_code ?? ""))
+  );
+}
+
 /** Tên hàng chuẩn hoá để so khớp: bỏ dấu, hoa/thường và khoảng trắng đều như nhau. */
 export function normProductName(v: unknown): string {
   return normalizeHeader(v);

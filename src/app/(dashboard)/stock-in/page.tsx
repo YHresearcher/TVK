@@ -127,6 +127,7 @@ export default async function StockInPage({
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty", label: "Số lượng", type: "number" },
                 { name: "unit_cost", label: "Đơn giá vốn (₫)", type: "number", step: "1000" },
+                { name: "expiry_date", label: "Hạn dùng (chỉ nhớt)", type: "date" },
               ]} />
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                 <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -171,6 +172,7 @@ export default async function StockInPage({
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty", label: "Số lượng", type: "number" },
                 { name: "consignment_price", label: "Giá ký gửi (₫)", type: "number", step: "1000" },
+                { name: "expiry_date", label: "Hạn dùng (chỉ nhớt)", type: "date" },
               ]} />
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                 <label className="flex items-center gap-2 text-sm text-slate-700">

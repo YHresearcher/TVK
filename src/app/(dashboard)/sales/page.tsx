@@ -5,6 +5,7 @@ import ExportExcelButton from "@/components/ExportExcelButton";
 import { createCounterSaleAction, importDealerSaleAction } from "@/lib/actions";
 import { buildProductCodeMap, getCurrentProfile, getSalesDocumentCosts, listBatchStock, listPartners, listProductCodes, listProductFitments, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
+import { compareLotOrder, isOilGroup } from "@/lib/product-match";
 import { OWNERSHIP_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
 import type { AnyRow } from "@/lib/types";
 
@@ -93,7 +94,8 @@ export default async function SalesPage({
       };
     }
   }
-  // Hàng đợi FIFO: theo từng sản phẩm, lô cũ nhất trước; mỗi lô mang tồn
+  // Hàng đợi xuất kho: theo từng sản phẩm, lô cũ nhất trước; nhớt thì
+  // FEFO (hạn gần nhất trước, lô không hạn xếp sau cùng). Mỗi lô mang tồn
   // tại vị trí kho mình giữ nhiều nhất (đúng vị trí phiếu sẽ trừ — cùng
   // logic mainOwnLocations phía server). Dùng chung cho import bán đại lý
   // và quầy POS (POS giữ thêm ownership thô để tách BH/KG khi tính tổng).
@@ -105,10 +107,9 @@ export default async function SalesPage({
   }
   const dealerFifoBatches: Record<string, { batch_id: string; batch_code: string; ownership: string; mainOwnQty: number }[]> = {};
   const posFifoBatches: Record<string, PosBatch[]> = {};
-  for (const r of [...ownBatches].sort(
-    (a, b) =>
-      String(a.received_date).localeCompare(String(b.received_date)) ||
-      String(a.batch_code).localeCompare(String(b.batch_code))
+  const groupByProduct = new Map(products.data.map((p) => [p.id, p.product_group]));
+  for (const r of [...ownBatches].sort((a, b) =>
+    compareLotOrder(a, b, isOilGroup(groupByProduct.get(a.product_id)))
   )) {
     const q = mainOwnQtyByBatch.get(r.batch_id) ?? 0;
     if (q <= 0) continue;

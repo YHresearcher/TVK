@@ -27,6 +27,51 @@ export function toNum(v: unknown): number {
 }
 
 /**
+ * Parse an Excel date cell into ISO YYYY-MM-DD, or "" when the cell is
+ * empty. Returns "" for unparseable non-empty values too — callers that
+ * must reject bad dates check the raw cell themselves. Accepted forms:
+ * a JS Date, an Excel serial day number, ISO text (2027-05-01), or a
+ * Vietnamese date (01/05/2027, 1-5-2027, 01.05.2027).
+ */
+export function toDateISO(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (v instanceof Date) {
+    if (Number.isNaN(v.getTime())) return "";
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
+  }
+  if (typeof v === "number") {
+    if (!Number.isFinite(v)) return "";
+    // Excel serial: day 1 = 1900-01-01 (with the Lotus leap-year quirk
+    // folded into the 1899-12-30 epoch). Plausible range ~2000-2100.
+    if (v < 30000 || v > 80000) return "";
+    const ms = Math.round((v - 25569) * 86400 * 1000);
+    const d = new Date(ms);
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+  }
+  const s = String(v).trim();
+  if (!s) return "";
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    const out = `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+    return validISODate(out) ? out : "";
+  }
+  const vn = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  if (vn) {
+    const out = `${vn[3]}-${vn[2].padStart(2, "0")}-${vn[1].padStart(2, "0")}`;
+    return validISODate(out) ? out : "";
+  }
+  return "";
+}
+
+function validISODate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+/**
  * Read the first sheet of a workbook as an array of rows (header row first).
  * The xlsx library is loaded on demand (only when a file is picked) so the
  * import pages stay light on first load.

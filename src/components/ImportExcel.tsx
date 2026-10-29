@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
+import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toDateISO, toNum, toStr } from "@/lib/excel-parse";
 import { normCode } from "@/lib/product-match";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
-import { formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
+import { formatDate, formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
 
 /** Cột tiền: căn phải để dễ dò số. */
 const thNumCls = `${thCls} text-right`;
@@ -33,6 +33,10 @@ interface RawRow {
   qty: number;
   usd: number;
   note: string;
+  /** Hạn dùng ISO (YYYY-MM-DD), "" = không có. Chỉ dùng cho nhớt. */
+  expiry: string;
+  /** Ô Hạn dùng có ghi nhưng không đọc được thành ngày. */
+  expiryBad: boolean;
 }
 
 interface PreviewRow extends RawRow {
@@ -60,6 +64,7 @@ const FIELD_ALIASES: Record<string, string[]> = {
   qty: ["soluong", "sl", "qty", "quantity"],
   usd: ["giausd", "dongiausd", "usd", "priceusd"],
   note: ["ghichu", "note"],
+  expiry: ["handung", "hansudung", "ngayhethan", "expiry", "expdate", "hantt", "hsd"],
 };
 
 export default function ImportExcel({
@@ -144,6 +149,8 @@ export default function ImportExcel({
       const rows: RawRow[] = [];
       for (const cells of aoa.slice(1) as unknown[][]) {
         if (cells.every((c) => toStr(c) === "")) continue;
+        const expiryRaw = toStr(val(cells, "expiry"));
+        const expiry = toDateISO(val(cells, "expiry"));
         rows.push({
           code: toStr(val(cells, "code")),
           altCodes: toStr(val(cells, "altCodes"))
@@ -158,6 +165,8 @@ export default function ImportExcel({
           qty: toNum(val(cells, "qty")),
           usd: toNum(val(cells, "usd")),
           note: toStr(val(cells, "note")),
+          expiry,
+          expiryBad: expiryRaw !== "" && expiry === "",
         });
       }
       if (rows.length === 0)
@@ -209,6 +218,7 @@ export default function ImportExcel({
       if (!r.code) error = "Thiếu mã hàng";
       else if (!(r.qty > 0)) error = "Số lượng phải lớn hơn 0";
       else if (unitCost <= 0) error = "Chưa có giá USD (cần cột GiaUSD)";
+      else if (r.expiryBad) error = "Hạn dùng không đúng định dạng ngày (dùng 01/05/2027 hoặc 2027-05-01)";
       else if (!matched && !r.name) error = "Thiếu tên hàng cho sản phẩm mới";
       else if (!matched && !autoCreate)
         error = "Mã chưa có trong hệ thống (đã tắt tự tạo sản phẩm)";
@@ -286,6 +296,7 @@ export default function ImportExcel({
       qty: r.qty,
       usd: r.usd,
       note: r.note,
+      expiry: r.expiry || null,
     })),
   };
 
@@ -479,14 +490,16 @@ export default function ImportExcel({
             <p className="font-semibold">Định dạng chuẩn của file nhập hàng:</p>
             <p className="mt-1 font-mono text-[11px]">
               DongXe · TenHang* · TenTiengAnh · MaHang* · ThuongHieu · DonViTinh ·
-              SoLuong* · GiaUSD*
+              SoLuong* · GiaUSD* · HanDung
             </p>
             <p className="mt-1">
               Hàng 1 phải là hàng tiêu đề với đúng các tên cột trên (cột * là bắt
-              buộc). File chỉ cần 8 cột này — Tỷ giá, VAT và % lợi nhuận nhập
+              buộc; HanDung tùy chọn, chỉ dùng cho nhớt — để trống nếu không có
+              hạn dùng, ghi dạng ngày 01/05/2027 hoặc 2027-05-01). File chỉ cần
+              các cột này — Tỷ giá, VAT và % lợi nhuận nhập
               trên form, áp dụng chung cho toàn bộ file. Đặt tên cột bằng tên
               tiếng Việt tương ứng (Dòng xe, Tên phụ tùng, Tên tiếng anh, Mã
-              số, Thương hiệu, ĐVT, Số lượng, Đơn giá USD) cũng được nhận.
+              số, Thương hiệu, ĐVT, Số lượng, Đơn giá USD, Hạn dùng) cũng được nhận.
               Hệ thống tự tính:
               Đơn giá nhập VNĐ = GiaUSD × Tỷ giá × (1 + VAT%); Thành tiền =
               Số lượng × Đơn giá nhập; Giá bán = Đơn giá nhập × (1 + %
@@ -534,6 +547,7 @@ export default function ImportExcel({
               <th className={thNumCls}>Thành tiền</th>
               <th className={thNumCls}>Giá đại lý</th>
               <th className={thNumCls}>Giá lẻ</th>
+              <th className={thCls}>Hạn dùng</th>
               <th className={thCls}>Trạng thái</th>
             </tr>
           </thead>
@@ -561,6 +575,7 @@ export default function ImportExcel({
                 <td className={tdNumCls}>
                   {r.retailPriceEff > 0 ? formatVND(r.retailPriceEff) : "—"}
                 </td>
+                <td className={tdCls}>{r.expiry ? formatDate(r.expiry) : "—"}</td>
                 <td className={tdCls}>
                   {r.status === "existing" && (
                     <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
@@ -596,6 +611,7 @@ export default function ImportExcel({
               <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdNumCls}>{formatVND(exactTotal)}</td>
+              <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>
               <td className={tdCls}></td>

@@ -6,6 +6,7 @@ import { confirmConsignmentOutAction, createConsignmentOutAction, importConsignm
 import { buildProductCodeMap, getCurrentProfile, listBatchStock, listConsignmentOutSlips, listPartners, listProductCodes, listProductFitments, listProducts, listSuppliers } from "@/lib/queries";
 import type { PosProduct } from "@/components/PosSaleForm";
 import { formatDate } from "@/lib/format";
+import { compareLotOrder, isOilGroup } from "@/lib/product-match";
 import { OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -43,10 +44,11 @@ export default async function ConsignmentOutPage({
     label: `${r.batch_code} — ${r.product_name} (${OWNERSHIP_LABELS[r.ownership] ?? r.ownership}${r.supplier_name ? " / " + r.supplier_name : ""})`,
   }));
   // Danh mục cho import Excel (giống form bán hàng): khớp tên + dòng xe,
-  // tra mã, rồi phân bổ FIFO. Hàng đợi FIFO: lô cũ nhất trước, mỗi lô
-  // mang tồn tại vị trí kho mình giữ nhiều nhất (đúng vị trí phiếu sẽ
-  // trừ — cùng logic mainOwnLocations phía server). Lô ký gửi của nhà
-  // cung cấp chưa cho ký gửi tiếp (ô D khoá) thì loại khỏi hàng đợi.
+  // tra mã, rồi phân bổ theo thứ tự xuất kho (FIFO; nhớt FEFO theo hạn
+  // dùng). Hàng đợi: mỗi lô mang tồn tại vị trí kho mình giữ nhiều nhất
+  // (đúng vị trí phiếu sẽ trừ — cùng logic mainOwnLocations phía server).
+  // Lô ký gửi của nhà cung cấp chưa cho ký gửi tiếp (ô D khoá) thì loại
+  // khỏi hàng đợi.
   const fitmentsByProduct = new Map<string, string[]>();
   for (const f of fitments.data) {
     const v = f.vehicles as AnyRow | AnyRow[] | null;
@@ -82,10 +84,9 @@ export default async function ConsignmentOutPage({
     if (Number(r.qty) > prev) mainOwnQtyByBatch.set(r.batch_id, Number(r.qty));
   }
   const gkFifoBatches: Record<string, { batch_id: string; batch_code: string; ownership: string; mainOwnQty: number }[]> = {};
-  for (const r of [...ownBatches].sort(
-    (a, b) =>
-      String(a.received_date).localeCompare(String(b.received_date)) ||
-      String(a.batch_code).localeCompare(String(b.batch_code))
+  const groupByProduct = new Map(products.data.map((p) => [p.id, p.product_group]));
+  for (const r of [...ownBatches].sort((a, b) =>
+    compareLotOrder(a, b, isOilGroup(groupByProduct.get(a.product_id)))
   )) {
     const q = mainOwnQtyByBatch.get(r.batch_id) ?? 0;
     if (q <= 0) continue;
