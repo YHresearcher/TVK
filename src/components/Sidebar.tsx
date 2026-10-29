@@ -113,21 +113,22 @@ export default function Sidebar({
   // trang; lựa chọn mở/thu của người dùng được nhớ trong localStorage.
   const [openId, setOpenId] = useState<string | null>(currentGroup);
 
+  // Thứ tự ưu tiên: trang hiện tại thuộc nhóm nào thì mở nhóm đó; trang
+  // không thuộc nhóm nào (Tổng quan, Cài đặt) thì khôi phục nhóm đã nhớ,
+  // kể cả khi vừa điều hướng từ một trang có nhóm về. Lựa chọn mở/thu
+  // thủ công của người dùng chỉ thay đổi khi họ bấm, vì effect này chỉ
+  // chạy khi chuyển trang.
   useEffect(() => {
-    if (currentGroup) return;
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) setOpenId(saved);
-    } catch {
-      // Không đọc được localStorage: dùng trạng thái mặc định.
+    if (currentGroup) {
+      setOpenId(currentGroup);
+      return;
     }
-    // Chỉ chạy một lần khi nạp thanh điều hướng.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (currentGroup) setOpenId(currentGroup);
-  }, [currentGroup]);
+    try {
+      setOpenId(window.localStorage.getItem(STORAGE_KEY) || null);
+    } catch {
+      setOpenId(null);
+    }
+  }, [pathname, currentGroup]);
 
   // Ngăn kéo điều hướng trên màn hình nhỏ (< lg): mặc định đóng, mở bằng
   // nút hamburger trên thanh trên cùng (layout render). Chuyển trang thì
@@ -266,18 +267,23 @@ export default function Sidebar({
         </div>
       </nav>
       <div className="border-t border-white/10 px-5 py-4">
-        <p className="truncate text-sm font-medium text-white">{userName}</p>
-        <p className="text-xs text-slate-400">{role}</p>
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className="text-base leading-none">👤</span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-white">{userName}</p>
+            <p className="text-xs text-slate-400">{role}</p>
+          </div>
+        </div>
         <form action={signOutAction} className="mt-3">
           <SubmitButton
-            className="w-full rounded-md border border-white/20 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10"
+            className="w-full rounded-md px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10"
           >
-            Đăng xuất
+            ↪ Đăng xuất
           </SubmitButton>
         </form>
         <div className="mt-4 border-t border-white/10 pt-3 text-center">
-          <p className="text-[11px] text-slate-500">TVK management system by Thanh Phan</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">version 1.0</p>
+          <p className="text-[11px] text-slate-500">TVK Management System</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">v1.0</p>
         </div>
       </div>
       </aside>

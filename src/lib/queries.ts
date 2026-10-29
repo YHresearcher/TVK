@@ -1022,3 +1022,125 @@ export async function getSlowMoving(days = 90): Promise<{ rows: SlowMovingRow[];
   rows.sort((a, b) => b.idleDays - a.idleDays);
   return { rows: rows.slice(0, 10), total: rows.length };
 }
+
+export type ConsignmentGoodStatus = "UNSOLD" | "PARTIAL" | "SOLD_OUT" | "RETURNED";
+
+export interface PartnerConsignmentGood {
+  batch_id: string;
+  batch_code: string;
+  sku: string;
+  product_name: string;
+  sent: number;
+  consumed: number;
+  returned: number;
+  still: number;
+  status: ConsignmentGoodStatus;
+}
+
+export const CONSIGNMENT_GOOD_STATUS_LABELS: Record<ConsignmentGoodStatus, string> = {
+  UNSOLD: "Chưa bán",
+  PARTIAL: "Đã bán một phần",
+  SOLD_OUT: "Đã bán hết",
+  RETURNED: "Đã trả lại",
+};
+
+/**
+ * Hàng hoá ký gửi của một đối tác, theo từng lô: đã gửi, đã bán (tiêu thụ),
+ * đã trả, còn giữ — kèm trạng thái bán. Lô đã bán hết / đã trả hết vẫn hiện
+ * để đối tác nào cũng đối chiếu được toàn bộ lịch sử ký gửi.
+ */
+export async function getPartnerConsignmentGoods(partnerId: string): Promise<PartnerConsignmentGood[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+  const { data: locs } = await supabase
+    .from("locations")
+    .select("id")
+    .eq("partner_id", partnerId)
+    .eq("location_kind", "PARTNER_VIRTUAL")
+    .limit(50);
+  const locIds = ((locs ?? []) as AnyRow[]).map((l) => String(l.id));
+  if (locIds.length === 0) return [];
+  const [atPartner, inbound, outbound] = await Promise.all([
+    supabase.from("batch_locations").select("batch_id, qty").in("location_id", locIds).limit(2000),
+    supabase
+      .from("stock_movements")
+      .select("batch_id, qty")
+      .in("to_location_id", locIds)
+      .eq("movement_kind", "OUT_CONSIGNMENT")
+      .limit(5000),
+    supabase
+      .from("stock_movements")
+      .select("batch_id, qty, movement_kind, to_location_id")
+      .in("from_location_id", locIds)
+      .in("movement_kind", ["OUT_SALE", "TRANSFER", "IN_RETURN"])
+      .limit(5000),
+  ]);
+  if (atPartner.error || inbound.error || outbound.error) return [];
+  const sentByBatch = new Map<string, number>();
+  for (const m of (inbound.data ?? []) as AnyRow[]) {
+    const id = String(m.batch_id);
+    sentByBatch.set(id, (sentByBatch.get(id) ?? 0) + Number(m.qty));
+  }
+  const consumedByBatch = new Map<string, number>();
+  const returnedByBatch = new Map<string, number>();
+  const locSet = new Set(locIds);
+  for (const m of (outbound.data ?? []) as AnyRow[]) {
+    const id = String(m.batch_id);
+    const qty = Number(m.qty);
+    if (m.movement_kind === "OUT_SALE") {
+      consumedByBatch.set(id, (consumedByBatch.get(id) ?? 0) + qty);
+    } else if (!locSet.has(String(m.to_location_id))) {
+      // Chuyển/trả ra khỏi kho đối tác về kho TVK mới là trả lại; chuyển
+      // nội bộ giữa các kho của cùng đối tác thì không.
+      returnedByBatch.set(id, (returnedByBatch.get(id) ?? 0) + qty);
+    }
+  }
+  const stillByBatch = new Map<string, number>();
+  for (const bl of (atPartner.data ?? []) as AnyRow[]) {
+    const id = String(bl.batch_id);
+    stillByBatch.set(id, (stillByBatch.get(id) ?? 0) + Number(bl.qty));
+  }
+  const batchIds = Array.from(
+    new Set([
+      ...Array.from(sentByBatch.keys()),
+      ...Array.from(consumedByBatch.keys()),
+      ...Array.from(returnedByBatch.keys()),
+      ...Array.from(stillByBatch.keys()),
+    ])
+  );
+  if (batchIds.length === 0) return [];
+  const { data: batches } = await supabase
+    .from("stock_batches")
+    .select("id, batch_code, product_id")
+    .in("id", batchIds)
+    .limit(2000);
+  const batchRows = (batches ?? []) as AnyRow[];
+  const productIds = Array.from(new Set(batchRows.map((b) => String(b.product_id))));
+  const { data: products } = await supabase.from("products").select("id, sku, name").in("id", productIds).limit(2000);
+  const productOf = new Map(((products ?? []) as AnyRow[]).map((p) => [String(p.id), p]));
+  const rows: PartnerConsignmentGood[] = [];
+  for (const b of batchRows) {
+    const id = String(b.id);
+    const p = productOf.get(String(b.product_id));
+    if (!p) continue;
+    const sent = sentByBatch.get(id) ?? 0;
+    const consumed = consumedByBatch.get(id) ?? 0;
+    const returned = returnedByBatch.get(id) ?? 0;
+    const still = stillByBatch.get(id) ?? 0;
+    const status: ConsignmentGoodStatus =
+      still > 0 ? (consumed > 0 ? "PARTIAL" : "UNSOLD") : consumed > 0 ? "SOLD_OUT" : returned > 0 ? "RETURNED" : "UNSOLD";
+    rows.push({
+      batch_id: id,
+      batch_code: String(b.batch_code),
+      sku: String(p.sku),
+      product_name: String(p.name),
+      sent,
+      consumed,
+      returned,
+      still,
+      status,
+    });
+  }
+  rows.sort((a, b) => b.still - a.still || b.sent - a.sent || a.batch_code.localeCompare(b.batch_code));
+  return rows;
+}

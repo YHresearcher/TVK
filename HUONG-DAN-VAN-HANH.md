@@ -110,7 +110,7 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 | | Phải thu đối tác | Khoản đối tác/khách còn nợ; ghi thu tiền; bảng **Tuổi nợ phải thu** gom theo đối tác, 3 nhóm quá hạn 1–6 tháng |
 | | Báo cáo | Đối soát nhà cung cấp/đối tác, xuất CSV |
 | **Danh mục** | Nhà cung cấp | Hồ sơ NCC, hạn trả mặc định, cho phép ký gửi tiếp (ô D) hay không |
-| | Đối tác | Hồ sơ đối tác (gara/cửa hàng/công ty), hạn mức ký gửi; bấm tên đối tác để mở trang chi tiết: số dư phải thu, đã thanh toán, số hoá đơn đã xuất + giá trị, hàng còn ở đối tác, đối soát ký gửi, các khoản phải thu và hoá đơn |
+| | Đối tác | Hồ sơ đối tác (gara/cửa hàng/công ty), hạn mức ký gửi; bấm tên đối tác để mở trang chi tiết: số dư phải thu, đã thanh toán, số hoá đơn đã xuất + giá trị, hàng còn ở đối tác, đối soát ký gửi, bảng hàng hoá đang ký gửi theo lô kèm trạng thái bán (chưa bán / đã bán một phần / đã bán hết / đã trả lại), các khoản phải thu và hoá đơn |
 | | Sửa hồ sơ | Ở bảng mỗi trang bấm **Sửa** — form bên phải chuyển sang chế độ sửa, điền lại rồi **Lưu thay đổi** (Chủ + Kế toán sửa được NCC; Chủ + Kế toán + Bán hàng sửa được đối tác; CEO chỉ xem) |
 | — | **Cài đặt** | Chế độ hoá đơn GTGT mặc định, kho, quản lý tài khoản & vai trò |
 

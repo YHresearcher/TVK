@@ -1,10 +1,30 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
-import { getPartnerDetail } from "@/lib/queries";
+import {
+  CONSIGNMENT_GOOD_STATUS_LABELS,
+  getPartnerConsignmentGoods,
+  getPartnerDetail,
+  type ConsignmentGoodStatus,
+} from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { PARTNER_KIND_LABELS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+const CONSIGNMENT_STATUS_COLORS: Record<ConsignmentGoodStatus, string> = {
+  UNSOLD: "bg-amber-100 text-amber-700",
+  PARTIAL: "bg-sky-100 text-sky-700",
+  SOLD_OUT: "bg-green-100 text-green-700",
+  RETURNED: "bg-slate-100 text-slate-600",
+};
+
+function ConsignmentStatusBadge({ status }: { status: ConsignmentGoodStatus }) {
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${CONSIGNMENT_STATUS_COLORS[status]}`}>
+      {CONSIGNMENT_GOOD_STATUS_LABELS[status]}
+    </span>
+  );
+}
 
 function StatBox({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
@@ -17,7 +37,10 @@ function StatBox({ label, value, sub }: { label: string; value: string; sub: str
 }
 
 export default async function PartnerDetailPage({ params }: { params: { id: string } }) {
-  const detail = await getPartnerDetail(params.id);
+  const [detail, consignmentGoods] = await Promise.all([
+    getPartnerDetail(params.id),
+    getPartnerConsignmentGoods(params.id),
+  ]);
   const { partner, consignment, receivables, invoices, stats } = detail.data;
 
   if (!detail.configured) {
@@ -86,6 +109,45 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
               </tr>
             </tbody>
           </TableWrap>
+        </Card>
+
+        <Card title="Hàng hóa đang ký gửi theo lô">
+          {consignmentGoods.length === 0 ? <EmptyState message="Chưa có hàng hóa nào được gửi ký gửi cho đối tác này." /> : (
+            <>
+              <p className="mb-3 text-sm text-slate-600">
+                {[
+                  `Tổng ${consignmentGoods.length} lô`,
+                  ...(["UNSOLD", "PARTIAL", "SOLD_OUT", "RETURNED"] as ConsignmentGoodStatus[])
+                    .map((s) => {
+                      const n = consignmentGoods.filter((g) => g.status === s).length;
+                      return n > 0 ? `${n} lô ${CONSIGNMENT_GOOD_STATUS_LABELS[s].toLowerCase()}` : null;
+                    })
+                    .filter((x): x is string => x !== null),
+                ].join(" · ")}
+                .
+              </p>
+              <TableWrap>
+                <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Mã hàng</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th><th className={thCls}>Trạng thái</th></tr></thead>
+                <tbody>
+                  {consignmentGoods.map((g) => (
+                    <tr key={g.batch_id} className="border-t border-slate-100">
+                      <td className={tdCls}>{g.batch_code}</td>
+                      <td className={tdCls}>{g.sku}</td>
+                      <td className={tdCls}>{g.product_name}</td>
+                      <td className={tdCls}>{formatNumber(g.sent)}</td>
+                      <td className={tdCls}>{formatNumber(g.consumed)}</td>
+                      <td className={tdCls}>{formatNumber(g.returned)}</td>
+                      <td className={`${tdCls} font-medium`}>{formatNumber(g.still)}</td>
+                      <td className={tdCls}><ConsignmentStatusBadge status={g.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </TableWrap>
+              <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                Đã bán là số lượng đối tác đã tiêu thụ theo báo cáo đã xác nhận. Lô đã bán hết hoặc đã trả hết vẫn hiện để đối chiếu đủ lịch sử ký gửi.
+              </p>
+            </>
+          )}
         </Card>
 
         <Card title="Khoản phải thu">
