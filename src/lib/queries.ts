@@ -1164,6 +1164,9 @@ export interface PartnerConsignmentGood {
   returned: number;
   still: number;
   status: ConsignmentGoodStatus;
+  slip_id: string | null;
+  slip_code: string | null;
+  slip_date: string | null;
 }
 
 export const CONSIGNMENT_GOOD_STATUS_LABELS: Record<ConsignmentGoodStatus, string> = {
@@ -1193,7 +1196,7 @@ export async function getPartnerConsignmentGoods(partnerId: string): Promise<Par
     supabase.from("batch_locations").select("batch_id, qty").in("location_id", locIds).limit(2000),
     supabase
       .from("stock_movements")
-      .select("batch_id, qty")
+      .select("batch_id, qty, ref_doc_id, created_at")
       .in("to_location_id", locIds)
       .eq("movement_kind", "OUT_CONSIGNMENT")
       .limit(5000),
@@ -1206,9 +1209,16 @@ export async function getPartnerConsignmentGoods(partnerId: string): Promise<Par
   ]);
   if (atPartner.error || inbound.error || outbound.error) return [];
   const sentByBatch = new Map<string, number>();
+  const slipByBatch = new Map<string, { id: string; at: string }>();
   for (const m of (inbound.data ?? []) as AnyRow[]) {
     const id = String(m.batch_id);
     sentByBatch.set(id, (sentByBatch.get(id) ?? 0) + Number(m.qty));
+    const refId = String(m.ref_doc_id ?? "");
+    if (refId) {
+      const at = String(m.created_at ?? "");
+      const cur = slipByBatch.get(id);
+      if (!cur || at > cur.at) slipByBatch.set(id, { id: refId, at });
+    }
   }
   const consumedByBatch = new Map<string, number>();
   const returnedByBatch = new Map<string, number>();
@@ -1252,6 +1262,18 @@ export async function getPartnerConsignmentGoods(partnerId: string): Promise<Par
   const productIds = Array.from(new Set(batchRows.map((b) => String(b.product_id))));
   const { data: products } = await supabase.from("products").select("id, sku, name").in("id", productIds).limit(2000);
   const productOf = new Map(((products ?? []) as AnyRow[]).map((p) => [String(p.id), p]));
+  // Phiếu gửi gần nhất của từng lô (bút toán OUT_CONSIGNMENT mang ref_doc_id
+  // là id phiếu GK) — để bảng lô bấm mở được chi tiết phiếu.
+  const slipIds = Array.from(new Set(Array.from(slipByBatch.values()).map((s) => s.id)));
+  const slipOf = new Map<string, AnyRow>();
+  if (slipIds.length) {
+    const { data: slips } = await supabase
+      .from("consignment_out_slips")
+      .select("id, doc_code, slip_date")
+      .in("id", slipIds)
+      .limit(500);
+    for (const s of (slips ?? []) as AnyRow[]) slipOf.set(String(s.id), s);
+  }
   const rows: PartnerConsignmentGood[] = [];
   for (const b of batchRows) {
     const id = String(b.id);
@@ -1263,6 +1285,8 @@ export async function getPartnerConsignmentGoods(partnerId: string): Promise<Par
     const still = stillByBatch.get(id) ?? 0;
     const status: ConsignmentGoodStatus =
       still > 0 ? (consumed > 0 ? "PARTIAL" : "UNSOLD") : consumed > 0 ? "SOLD_OUT" : returned > 0 ? "RETURNED" : "UNSOLD";
+    const slipRef = slipByBatch.get(id);
+    const slip = slipRef ? slipOf.get(slipRef.id) : undefined;
     rows.push({
       batch_id: id,
       batch_code: String(b.batch_code),
@@ -1273,6 +1297,9 @@ export async function getPartnerConsignmentGoods(partnerId: string): Promise<Par
       returned,
       still,
       status,
+      slip_id: slip ? String(slip.id) : null,
+      slip_code: slip ? String(slip.doc_code) : null,
+      slip_date: slip ? String(slip.slip_date) : null,
     });
   }
   rows.sort((a, b) => b.still - a.still || b.sent - a.sent || a.batch_code.localeCompare(b.batch_code));
@@ -1544,4 +1571,405 @@ export async function getReceivableAgingBars(): Promise<
     { label: "5–6 tháng", value: total("band3"), color: "#ef4444" },
     { label: "Trên 6 tháng", value: total("over6"), color: "#7f1d1d" },
   ];
+}
+
+/** Chứng từ + hoá đơn gắn với từng khoản phải thu của một đối tác. */
+export interface ReceivableDocInfo {
+  docId: string | null;
+  docCode: string | null;
+  docKind: string | null;
+  docDate: string | null;
+  invoices: { id: string; number: string; symbol: string; date: string }[];
+}
+
+export async function getPartnerReceivableDocs(partnerId: string): Promise<Map<string, ReceivableDocInfo>> {
+  const out = new Map<string, ReceivableDocInfo>();
+  const supabase = await client();
+  if (!supabase) return out;
+  const { data: recs } = await supabase
+    .from("partner_receivables")
+    .select("id, source_document_id")
+    .eq("partner_id", partnerId)
+    .limit(500);
+  const recRows = (recs ?? []) as AnyRow[];
+  if (recRows.length === 0) return out;
+  const docIds = Array.from(new Set(recRows.map((r) => String(r.source_document_id ?? "")).filter(Boolean)));
+  const docOf = new Map<string, AnyRow>();
+  if (docIds.length) {
+    const { data: docs } = await supabase
+      .from("sales_documents")
+      .select("id, doc_code, doc_kind, doc_date")
+      .in("id", docIds)
+      .limit(500);
+    for (const d of (docs ?? []) as AnyRow[]) docOf.set(String(d.id), d);
+  }
+  const lineDoc = new Map<string, string>();
+  if (docIds.length) {
+    const { data: lines } = await supabase
+      .from("sales_document_lines")
+      .select("id, document_id")
+      .in("document_id", docIds)
+      .limit(20000);
+    for (const l of (lines ?? []) as AnyRow[]) lineDoc.set(String(l.id), String(l.document_id));
+  }
+  const invByDoc = new Map<string, { id: string; number: string; symbol: string; date: string }[]>();
+  if (lineDoc.size) {
+    const { data: invLines } = await supabase
+      .from("vat_invoice_lines")
+      .select("vat_invoice_id, sales_document_line_id")
+      .eq("is_active", true)
+      .in("sales_document_line_id", Array.from(lineDoc.keys()))
+      .limit(20000);
+    const invIds = Array.from(new Set(((invLines ?? []) as AnyRow[]).map((l) => String(l.vat_invoice_id))));
+    const invOf = new Map<string, AnyRow>();
+    if (invIds.length) {
+      const { data: invs } = await supabase
+        .from("vat_invoices")
+        .select("id, invoice_no, symbol, invoice_date")
+        .in("id", invIds)
+        .limit(500);
+      for (const v of (invs ?? []) as AnyRow[]) invOf.set(String(v.id), v);
+    }
+    for (const l of (invLines ?? []) as AnyRow[]) {
+      const docId = lineDoc.get(String(l.sales_document_line_id));
+      const inv = invOf.get(String(l.vat_invoice_id));
+      if (!docId || !inv) continue;
+      const list = invByDoc.get(docId) ?? [];
+      if (!list.some((x) => x.id === String(inv.id))) {
+        list.push({ id: String(inv.id), number: String(inv.invoice_no), symbol: String(inv.symbol), date: String(inv.invoice_date) });
+      }
+      invByDoc.set(docId, list);
+    }
+  }
+  for (const r of recRows) {
+    const doc = docOf.get(String(r.source_document_id ?? ""));
+    out.set(String(r.id), {
+      docId: doc ? String(doc.id) : null,
+      docCode: doc ? String(doc.doc_code) : null,
+      docKind: doc ? String(doc.doc_kind) : null,
+      docDate: doc ? String(doc.doc_date) : null,
+      invoices: doc ? invByDoc.get(String(doc.id)) ?? [] : [],
+    });
+  }
+  return out;
+}
+
+/** Một dòng hàng trong chi tiết chứng từ / hoá đơn / phiếu gửi. */
+export interface DetailLine {
+  sourceId?: string;
+  productName: string;
+  sku: string;
+  batchCode: string;
+  docCode?: string;
+  docDate?: string;
+  qty: number;
+  unitPrice: number;
+  amount: number;
+  unitCost: number;
+  profit: number;
+  consumedQty?: number;
+  remainingQty?: number;
+  consumedAmount?: number;
+  remainingEstimate?: number;
+  consumedProfit?: number;
+  remainingProfitEstimate?: number;
+}
+
+export interface DocumentDetail {
+  kind: "DOC" | "SLIP" | "INV";
+  kindLabel: string;
+  code: string;
+  date: string;
+  lines: DetailLine[];
+  totalAmount: number;
+  totalCost: number;
+  totalProfit: number;
+  /** Riêng phiếu gửi: tách phần đã bán (thật) và phần còn giữ (ước tính). */
+  consumedAmount?: number;
+  remainingEstimate?: number;
+  consumedProfit?: number;
+  remainingProfitEstimate?: number;
+  note?: string;
+}
+
+async function resolveLineCosts(
+  supabase: NonNullable<Awaited<ReturnType<typeof client>>>,
+  lineRows: AnyRow[]
+): Promise<Map<string, { batchCode: string; unitCost: number }>> {
+  const allocIds = Array.from(new Set(lineRows.map((l) => String(l.allocation_line_id ?? "")).filter(Boolean)));
+  const allocBatch = new Map<string, string>();
+  if (allocIds.length) {
+    const { data: allocs } = await supabase.from("allocation_lines").select("id, batch_id").in("id", allocIds).limit(5000);
+    for (const a of (allocs ?? []) as AnyRow[]) allocBatch.set(String(a.id), String(a.batch_id));
+  }
+  const batchIds = Array.from(
+    new Set(
+      lineRows
+        .map((l) => (l.batch_id ? String(l.batch_id) : allocBatch.get(String(l.allocation_line_id ?? ""))))
+        .filter((v): v is string => Boolean(v))
+    )
+  );
+  const out = new Map<string, { batchCode: string; unitCost: number }>();
+  if (batchIds.length) {
+    const { data: batches } = await supabase.from("stock_batches").select("id, batch_code, unit_cost").in("id", batchIds).limit(5000);
+    for (const b of (batches ?? []) as AnyRow[]) {
+      out.set(String(b.id), { batchCode: String(b.batch_code ?? ""), unitCost: Number(b.unit_cost ?? 0) });
+    }
+  }
+  return out;
+}
+
+function buildDocLines(
+  lineRows: AnyRow[],
+  productOf: Map<string, AnyRow>,
+  costOf: Map<string, { batchCode: string; unitCost: number }>,
+  allocBatchOf: (line: AnyRow) => string | undefined,
+  docOf?: Map<string, AnyRow>
+): DetailLine[] {
+  return lineRows.map((l) => {
+    const p = productOf.get(String(l.product_id));
+    const batchId = l.batch_id ? String(l.batch_id) : allocBatchOf(l);
+    const cost = batchId ? costOf.get(batchId) : undefined;
+    const qty = Number(l.qty ?? 0);
+    const unitPrice = Number(l.unit_price ?? 0);
+    const amount = Number(l.line_total ?? qty * unitPrice);
+    const unitCost = cost?.unitCost ?? 0;
+    const doc = docOf?.get(String(l.document_id));
+    return {
+      sourceId: String(l.id),
+      productName: p ? String(p.name) : "—",
+      sku: p ? String(p.sku) : "",
+      batchCode: cost?.batchCode ?? "",
+      docCode: doc ? String(doc.doc_code) : undefined,
+      docDate: doc ? String(doc.doc_date) : undefined,
+      qty,
+      unitPrice,
+      amount,
+      unitCost,
+      profit: amount - qty * unitCost,
+    };
+  });
+}
+
+/** Chi tiết một chứng từ quản lý (BH/KG): danh sách hàng, tiền, giá vốn, lãi. */
+export async function getSalesDocumentDetail(docId: string): Promise<DocumentDetail | null> {
+  const supabase = await client();
+  if (!supabase) return null;
+  const { data: doc } = await supabase
+    .from("sales_documents")
+    .select("id, doc_code, doc_kind, doc_date, partner_id")
+    .eq("id", docId)
+    .maybeSingle();
+  if (!doc) return null;
+  const d = doc as AnyRow;
+  const { data: lines } = await supabase
+    .from("sales_document_lines")
+    .select("id, document_id, product_id, batch_id, allocation_line_id, qty, unit_price, line_total")
+    .eq("document_id", docId)
+    .order("id")
+    .limit(2000);
+  const lineRows = (lines ?? []) as AnyRow[];
+  const allocIds = Array.from(new Set(lineRows.map((l) => String(l.allocation_line_id ?? "")).filter(Boolean)));
+  const allocBatch = new Map<string, string>();
+  if (allocIds.length) {
+    const { data: allocs } = await supabase.from("allocation_lines").select("id, batch_id").in("id", allocIds).limit(5000);
+    for (const a of (allocs ?? []) as AnyRow[]) allocBatch.set(String(a.id), String(a.batch_id));
+  }
+  const productIds = Array.from(new Set(lineRows.map((l) => String(l.product_id))));
+  const { data: products } = await supabase.from("products").select("id, sku, name").in("id", productIds).limit(2000);
+  const productOf = new Map(((products ?? []) as AnyRow[]).map((p) => [String(p.id), p]));
+  const costOf = await resolveLineCosts(supabase, lineRows);
+  const detailLines = buildDocLines(lineRows, productOf, costOf, (l) => allocBatch.get(String(l.allocation_line_id ?? "")));
+  const totalAmount = detailLines.reduce((a, l) => a + l.amount, 0);
+  const totalCost = detailLines.reduce((a, l) => a + l.qty * l.unitCost, 0);
+  return {
+    kind: "DOC",
+    kindLabel: String(d.doc_kind) === "KG" ? "Chứng từ tiêu thụ ký gửi" : "Chứng từ bán hàng",
+    code: String(d.doc_code),
+    date: String(d.doc_date),
+    lines: detailLines,
+    totalAmount,
+    totalCost,
+    totalProfit: totalAmount - totalCost,
+  };
+}
+
+/** Chi tiết một hoá đơn GTGT: các dòng hàng đã xuất hoá đơn, gom theo chứng từ gốc. */
+export async function getInvoiceDetail(invoiceId: string): Promise<DocumentDetail | null> {
+  const supabase = await client();
+  if (!supabase) return null;
+  const { data: inv } = await supabase
+    .from("vat_invoices")
+    .select("id, invoice_no, symbol, invoice_date, total_amount")
+    .eq("id", invoiceId)
+    .maybeSingle();
+  if (!inv) return null;
+  const v = inv as AnyRow;
+  const { data: invLines } = await supabase
+    .from("vat_invoice_lines")
+    .select("sales_document_line_id, amount")
+    .eq("vat_invoice_id", invoiceId)
+    .eq("is_active", true)
+    .order("line_no")
+    .limit(2000);
+  const invLineRows = (invLines ?? []) as AnyRow[];
+  if (invLineRows.length === 0) {
+    return {
+      kind: "INV",
+      kindLabel: "Hoá đơn GTGT",
+      code: `${String(v.invoice_no)} (${String(v.symbol)})`,
+      date: String(v.invoice_date),
+      lines: [],
+      totalAmount: Number(v.total_amount ?? 0),
+      totalCost: 0,
+      totalProfit: 0,
+    };
+  }
+  const lineIds = invLineRows.map((l) => String(l.sales_document_line_id));
+  const { data: lines } = await supabase
+    .from("sales_document_lines")
+    .select("id, document_id, product_id, batch_id, allocation_line_id, qty, unit_price, line_total")
+    .in("id", lineIds)
+    .limit(2000);
+  const lineRows = (lines ?? []) as AnyRow[];
+  const docIds = Array.from(new Set(lineRows.map((l) => String(l.document_id))));
+  const { data: docs } = await supabase.from("sales_documents").select("id, doc_code, doc_date").in("id", docIds).limit(500);
+  const docOf = new Map(((docs ?? []) as AnyRow[]).map((dd) => [String(dd.id), dd]));
+  const allocIds = Array.from(new Set(lineRows.map((l) => String(l.allocation_line_id ?? "")).filter(Boolean)));
+  const allocBatch = new Map<string, string>();
+  if (allocIds.length) {
+    const { data: allocs } = await supabase.from("allocation_lines").select("id, batch_id").in("id", allocIds).limit(5000);
+    for (const a of (allocs ?? []) as AnyRow[]) allocBatch.set(String(a.id), String(a.batch_id));
+  }
+  const productIds = Array.from(new Set(lineRows.map((l) => String(l.product_id))));
+  const { data: products } = await supabase.from("products").select("id, sku, name").in("id", productIds).limit(2000);
+  const productOf = new Map(((products ?? []) as AnyRow[]).map((p) => [String(p.id), p]));
+  const costOf = await resolveLineCosts(supabase, lineRows);
+  const detailLines = buildDocLines(lineRows, productOf, costOf, (l) => allocBatch.get(String(l.allocation_line_id ?? "")), docOf);
+  // Giữ đúng thứ tự dòng hoá đơn: sắp theo line_no của hoá đơn.
+  const order = new Map(lineIds.map((id, i) => [id, i]));
+  detailLines.sort((a, b) => (order.get(a.sourceId ?? "") ?? 0) - (order.get(b.sourceId ?? "") ?? 0));
+  const totalAmount = detailLines.reduce((a, l) => a + l.amount, 0);
+  const totalCost = detailLines.reduce((a, l) => a + l.qty * l.unitCost, 0);
+  return {
+    kind: "INV",
+    kindLabel: "Hoá đơn GTGT",
+    code: `${String(v.invoice_no)} (${String(v.symbol)})`,
+    date: String(v.invoice_date),
+    lines: detailLines,
+    totalAmount,
+    totalCost,
+    totalProfit: totalAmount - totalCost,
+  };
+}
+
+/** Chi tiết một phiếu gửi ký gửi (GK): từng lô đã gửi, đã tiêu thụ (thật)
+ *  và còn giữ (ước tính theo giá chuyển giao), tách lãi thật / lãi ước tính.
+ *  Đã tiêu thụ / còn giữ tính theo lô tại đối tác này — một lô có thể đi
+ *  trên nhiều phiếu thì các phiếu cùng thấy con số theo lô đó. */
+export async function getConsignmentSlipDetail(slipId: string): Promise<DocumentDetail | null> {
+  const supabase = await client();
+  if (!supabase) return null;
+  const { data: slip } = await supabase
+    .from("consignment_out_slips")
+    .select("id, doc_code, slip_date, partner_id")
+    .eq("id", slipId)
+    .maybeSingle();
+  if (!slip) return null;
+  const s = slip as AnyRow;
+  const { data: items } = await supabase
+    .from("consignment_out_items")
+    .select("id, batch_id, qty, transfer_price")
+    .eq("slip_id", slipId)
+    .order("id")
+    .limit(2000);
+  const itemRows = (items ?? []) as AnyRow[];
+  const batchIds = Array.from(new Set(itemRows.map((i) => String(i.batch_id))));
+  const { data: batches } = await supabase
+    .from("stock_batches")
+    .select("id, batch_code, product_id, unit_cost")
+    .in("id", batchIds)
+    .limit(2000);
+  const batchOf = new Map(((batches ?? []) as AnyRow[]).map((b) => [String(b.id), b]));
+  const productIds = Array.from(new Set(((batches ?? []) as AnyRow[]).map((b) => String(b.product_id))));
+  const { data: products } = await supabase.from("products").select("id, sku, name").in("id", productIds).limit(2000);
+  const productOf = new Map(((products ?? []) as AnyRow[]).map((p) => [String(p.id), p]));
+  // Tổng theo lô tại đối tác này (cùng cách tính với bảng lô ký gửi).
+  const { data: locs } = await supabase
+    .from("locations")
+    .select("id")
+    .eq("partner_id", String(s.partner_id))
+    .eq("location_kind", "PARTNER_VIRTUAL")
+    .limit(50);
+  const locIds = ((locs ?? []) as AnyRow[]).map((l) => String(l.id));
+  const consumedByBatch = new Map<string, number>();
+  const stillByBatch = new Map<string, number>();
+  if (locIds.length) {
+    const [outbound, atPartner] = await Promise.all([
+      supabase
+        .from("stock_movements")
+        .select("batch_id, qty")
+        .in("from_location_id", locIds)
+        .eq("movement_kind", "OUT_SALE")
+        .in("batch_id", batchIds)
+        .limit(5000),
+      supabase.from("batch_locations").select("batch_id, qty").in("location_id", locIds).in("batch_id", batchIds).limit(2000),
+    ]);
+    for (const m of (outbound.data ?? []) as AnyRow[]) {
+      const id = String(m.batch_id);
+      consumedByBatch.set(id, (consumedByBatch.get(id) ?? 0) + Number(m.qty));
+    }
+    for (const bl of (atPartner.data ?? []) as AnyRow[]) {
+      const id = String(bl.batch_id);
+      stillByBatch.set(id, (stillByBatch.get(id) ?? 0) + Number(bl.qty));
+    }
+  }
+  const lines: DetailLine[] = itemRows.map((it) => {
+    const b = batchOf.get(String(it.batch_id));
+    const p = b ? productOf.get(String(b.product_id)) : undefined;
+    const qty = Number(it.qty ?? 0);
+    const unitPrice = Number(it.transfer_price ?? 0);
+    const unitCost = b ? Number(b.unit_cost ?? 0) : 0;
+    const consumedQty = consumedByBatch.get(String(it.batch_id)) ?? 0;
+    const remainingQty = stillByBatch.get(String(it.batch_id)) ?? 0;
+    const consumedAmount = consumedQty * unitPrice;
+    const remainingEstimate = remainingQty * unitPrice;
+    return {
+      productName: p ? String(p.name) : "—",
+      sku: p ? String(p.sku) : "",
+      batchCode: b ? String(b.batch_code) : "",
+      qty,
+      unitPrice,
+      amount: qty * unitPrice,
+      unitCost,
+      profit: qty * (unitPrice - unitCost),
+      consumedQty,
+      remainingQty,
+      consumedAmount,
+      remainingEstimate,
+      consumedProfit: consumedQty * (unitPrice - unitCost),
+      remainingProfitEstimate: remainingQty * (unitPrice - unitCost),
+    };
+  });
+  const totalAmount = lines.reduce((a, l) => a + l.amount, 0);
+  const totalCost = lines.reduce((a, l) => a + l.qty * l.unitCost, 0);
+  const consumedAmount = lines.reduce((a, l) => a + (l.consumedAmount ?? 0), 0);
+  const remainingEstimate = lines.reduce((a, l) => a + (l.remainingEstimate ?? 0), 0);
+  const consumedProfit = lines.reduce((a, l) => a + (l.consumedProfit ?? 0), 0);
+  const remainingProfitEstimate = lines.reduce((a, l) => a + (l.remainingProfitEstimate ?? 0), 0);
+  return {
+    kind: "SLIP",
+    kindLabel: "Phiếu gửi ký gửi",
+    code: String(s.doc_code),
+    date: String(s.slip_date),
+    lines,
+    totalAmount,
+    totalCost,
+    totalProfit: totalAmount - totalCost,
+    consumedAmount,
+    remainingEstimate,
+    consumedProfit,
+    remainingProfitEstimate,
+    note: "Đã tiêu thụ / còn giữ tính theo lô tại đối tác này; một lô có thể đi trên nhiều phiếu.",
+  };
 }

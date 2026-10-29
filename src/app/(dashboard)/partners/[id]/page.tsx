@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
+import DocDetailDialog from "@/components/DocDetailDialog";
 import {
   CONSIGNMENT_GOOD_STATUS_LABELS,
   getPartnerConsignmentGoods,
   getPartnerDetail,
+  getPartnerReceivableDocs,
   type ConsignmentGoodStatus,
 } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
@@ -37,9 +39,10 @@ function StatBox({ label, value, sub }: { label: string; value: string; sub: str
 }
 
 export default async function PartnerDetailPage({ params }: { params: { id: string } }) {
-  const [detail, consignmentGoods] = await Promise.all([
+  const [detail, consignmentGoods, receivableDocs] = await Promise.all([
     getPartnerDetail(params.id),
     getPartnerConsignmentGoods(params.id),
+    getPartnerReceivableDocs(params.id),
   ]);
   const { partner, consignment, receivables, invoices, stats } = detail.data;
 
@@ -127,11 +130,18 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
                 .
               </p>
               <TableWrap>
-                <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Mã hàng</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th><th className={thCls}>Trạng thái</th></tr></thead>
+                <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Phiếu gửi</th><th className={thCls}>Mã hàng</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th><th className={thCls}>Trạng thái</th></tr></thead>
                 <tbody>
                   {consignmentGoods.map((g) => (
                     <tr key={g.batch_id} className="border-t border-slate-100">
                       <td className={tdCls}>{g.batch_code}</td>
+                      <td className={tdCls}>
+                        {g.slip_id && g.slip_code ? (
+                          <DocDetailDialog kind="SLIP" id={g.slip_id} label={g.slip_code} sub={g.slip_date ? formatDate(g.slip_date) : undefined} />
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className={tdCls}>{g.sku}</td>
                       <td className={tdCls}>{g.product_name}</td>
                       <td className={tdCls}>{formatNumber(g.sent)}</td>
@@ -153,17 +163,38 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
         <Card title="Khoản phải thu">
           {receivables.length === 0 ? <EmptyState message="Chưa có khoản phải thu." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Số tiền</th><th className={thCls}>Đã thu</th><th className={thCls}>Còn phải thu</th><th className={thCls}>Hạn thu</th><th className={thCls}>Trạng thái</th></tr></thead>
+              <thead><tr><th className={thCls}>Số tiền</th><th className={thCls}>Đã thu</th><th className={thCls}>Còn phải thu</th><th className={thCls}>Chứng từ</th><th className={thCls}>Hoá đơn</th><th className={thCls}>Hạn thu</th><th className={thCls}>Trạng thái</th></tr></thead>
               <tbody>
-                {receivables.map((r) => (
+                {receivables.map((r) => {
+                  const info = receivableDocs.get(String(r.id));
+                  return (
                   <tr key={r.id} className="border-t border-slate-100">
                     <td className={tdCls}>{formatVND(r.amount)}</td>
                     <td className={tdCls}>{formatVND(r.amount_paid)}</td>
                     <td className={`${tdCls} font-medium`}>{formatVND(Number(r.amount) - Number(r.amount_paid))}</td>
+                    <td className={tdCls}>
+                      {info?.docId && info.docCode ? (
+                        <DocDetailDialog kind="DOC" id={info.docId} label={info.docCode} sub={info.docDate ? formatDate(info.docDate) : undefined} />
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className={tdCls}>
+                      {info && info.invoices.length > 0 ? (
+                        <span className="flex flex-col gap-1">
+                          {info.invoices.map((inv) => (
+                            <DocDetailDialog key={inv.id} kind="INV" id={inv.id} label={inv.number} sub={formatDate(inv.date)} />
+                          ))}
+                        </span>
+                      ) : (
+                        "Chưa xuất hoá đơn"
+                      )}
+                    </td>
                     <td className={tdCls}>{formatDate(r.due_date)}</td>
                     <td className={tdCls}><StatusBadge status={r.status} /></td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </TableWrap>
           )}
@@ -177,7 +208,9 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
                 <tbody>
                   {invoices.map((inv) => (
                     <tr key={inv.id} className="border-t border-slate-100">
-                      <td className={tdCls}>{inv.invoice_no}</td>
+                      <td className={tdCls}>
+                        <DocDetailDialog kind="INV" id={inv.id} label={inv.invoice_no} />
+                      </td>
                       <td className={tdCls}>{inv.symbol}</td>
                       <td className={tdCls}>{formatDate(inv.invoice_date)}</td>
                       <td className={tdCls}>{formatVND(inv.total_amount)}</td>
