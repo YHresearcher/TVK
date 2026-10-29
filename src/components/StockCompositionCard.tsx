@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Card } from "@/components/ui";
-import { formatCompactVND, formatCompactVND2 } from "@/components/Charts";
+import { formatCompactVND2 } from "@/components/Charts";
 import MultiRingDonut from "@/components/MultiRingDonut";
 import { formatNumber, formatVND } from "@/lib/format";
 import type { StockRings } from "@/lib/types";
@@ -64,7 +64,7 @@ export default function StockCompositionCard({
         <MultiRingDonut
           rings={rings}
           canSeeMoney={canSeeMoney}
-          centerLabel={canSeeMoney ? formatCompactVND(managedBookValue) : `${formatNumber(ownedQty + custodyQty)} đơn vị`}
+          centerLabel={canSeeMoney ? formatCompactVND2(managedBookValue) : `${formatNumber(ownedQty + custodyQty)} đơn vị`}
           centerLines={
             canSeeMoney
               ? ["Tổng giá trị hàng đang quản lý", "theo giá vốn"]

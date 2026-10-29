@@ -56,12 +56,15 @@ export default function MultiRingDonut({
   const formatDisplay = (v: number) => (canSeeMoney ? formatVND(v) : `${formatNumber(v)} đơn vị`);
 
   const activeKey = hoverKey ?? selectedKey;
+  // Hộp chi tiết chỉ theo LỰA CHỌN (bấm), không theo hover: rê chuột chỉ
+  // làm mờ các đoạn khác, bấm lần nữa thì hộp đóng ngay cả khi chuột vẫn
+  // đang đặt trên chip.
   let active: { ring: (typeof RING_DEFS)[number]; seg: RingSegment; total: number } | null = null;
   for (const def of RING_DEFS) {
     const segs = rings[def.key];
     const total = segs.reduce((a, s) => a + Math.max(displayOf(s), 0), 0);
     for (const s of segs) {
-      if (`${def.key}:${s.key}` === activeKey) active = { ring: def, seg: s, total };
+      if (`${def.key}:${s.key}` === selectedKey) active = { ring: def, seg: s, total };
     }
   }
 
