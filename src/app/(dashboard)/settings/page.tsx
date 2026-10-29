@@ -1,13 +1,12 @@
 import Link from "next/link";
-import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import { Card, EmptyState, NotConfigured, PageHeader, btnCls, inputCls, labelCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import UserAdminPanel from "@/components/UserAdminPanel";
-import UsernameForm from "@/components/UsernameForm";
 import { createWarehouseAction, updateWarehouseAction, updateVatModeAction } from "@/lib/actions";
 import { getCurrentProfile, listLocations } from "@/lib/queries";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { ROLE_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
+import { isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -118,41 +117,6 @@ export default async function SettingsPage({
               Kho ảo của đối tác ({partnerWarehouses.length}) được tạo tự động khi phiếu gửi ký gửi đầu tiên cho một đối tác được xác nhận.
             </p>
           )}
-        </Card>
-
-        <Card title="Người dùng & vai trò" className="lg:col-span-2">
-          {profiles.length === 0 ? (
-            <EmptyState message="Chưa có hồ sơ người dùng. Tạo hồ sơ OWNER đầu tiên theo hướng dẫn trong supabase/README.md." />
-          ) : (
-            <TableWrap>
-              <thead><tr><th className={thCls}>Tên</th><th className={thCls}>Email</th><th className={thCls}>Tên đăng nhập</th><th className={thCls}>Vai trò</th><th className={thCls}>Đang hoạt động</th></tr></thead>
-              <tbody>
-                {profiles.map((p) => (
-                  <tr key={p.id} className="border-t border-slate-100">
-                    <td className={tdCls}>{p.full_name}</td>
-                    <td className={tdCls}>{p.email ?? "—"}</td>
-                    <td className={tdCls}>
-                      <UsernameForm
-                        profileId={p.id}
-                        username={p.username ?? null}
-                        canEdit={!!me && (me.role === "OWNER" || me.id === p.id)}
-                      />
-                    </td>
-                    <td className={tdCls}>{ROLE_LABELS[p.role as keyof typeof ROLE_LABELS] ?? p.role}</td>
-                    <td className={tdCls}>{p.is_active ? "Có" : "Không"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </TableWrap>
-          )}
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-slate-500">
-            <li>Tên đăng nhập — tên đăng nhập ngắn tuỳ chọn (3–32 ký tự). Người dùng đăng nhập bằng tên đăng nhập hoặc email; OWNER đặt được tên đăng nhập cho mọi người, người dùng tự đặt cho mình.</li>
-            <li>Chủ cửa hàng (OWNER) — toàn quyền, xem được giá ký gửi và lợi nhuận.</li>
-            <li>Bán hàng (SALES) — bán hàng và xuất hoá đơn; không xem được giá ký gửi, giá vốn hay lợi nhuận (bảng tài chính bị chặn bởi RLS; giao diện bán hàng dùng khung nhìn lô không có giá vốn).</li>
-            <li>Kho (WAREHOUSE) — nhập/xuất kho, kiểm kê, trả hàng; không có dữ liệu tiền.</li>
-            <li>Kế toán (ACCOUNTING) — phải trả, phải thu, đối soát, hoá đơn và báo cáo; không sửa kho trực tiếp.</li>
-            <li>CEO (chỉ xem) — xem được toàn bộ số liệu kho và tài chính (tổng quan, công nợ, báo cáo) nhưng không tạo/sửa/xoá được dữ liệu; phù hợp cho giám đốc điều hành theo dõi.</li>
-          </ul>
         </Card>
 
         {me?.role === "OWNER" && (
