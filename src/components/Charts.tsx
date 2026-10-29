@@ -339,7 +339,7 @@ export function HBarList({
   data,
   format = formatCompactVND,
 }: {
-  data: (ChartDatum & { color?: string })[];
+  data: (ChartDatum & { color?: string; href?: string })[];
   format?: (v: number) => string;
 }) {
   const max = Math.max(0, ...data.map((d) => d.value));
@@ -348,24 +348,161 @@ export function HBarList({
   }
   return (
     <ul className="space-y-3">
-      {data.map((d, i) => (
-        <li key={i} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-          <span className="min-w-0 text-xs text-slate-600 sm:w-44 sm:shrink-0 sm:truncate" title={d.label}>
-            {d.label}
+      {data.map((d, i) => {
+        const row = (
+          <>
+            <span className="min-w-0 text-xs text-slate-600 sm:w-44 sm:shrink-0 sm:truncate" title={d.label}>
+              {d.label}
+            </span>
+            <span className="flex flex-1 items-center gap-3">
+              <span className="h-4 flex-1 overflow-hidden rounded bg-slate-100">
+                <span
+                  className="block h-full rounded"
+                  style={{
+                    width: `${max > 0 ? Math.max((d.value / max) * 100, d.value > 0 ? 2 : 0) : 0}%`,
+                    backgroundColor: d.color ?? "#2563eb",
+                  }}
+                />
+              </span>
+              <span className="w-24 shrink-0 text-right text-sm font-medium text-slate-900">
+                {format(d.value)}
+              </span>
+            </span>
+          </>
+        );
+        return (
+          <li key={i} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+            {d.href ? (
+              <a href={d.href} className="flex flex-1 flex-col gap-1 hover:opacity-80 sm:flex-row sm:items-center sm:gap-3">
+                {row}
+              </a>
+            ) : (
+              row
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Biểu đồ kết hợp: cột doanh thu thuần + cột giá vốn (trục trái, tiền)
+ *  và đường biên lợi nhuận % (trục phải). Đường chỉ nối các kỳ có doanh
+ *  thu; kỳ bằng 0 vẫn hiện cột để thấy được khoảng trống. */
+export function ComposedChart({
+  data,
+  format = formatCompactVND,
+}: {
+  data: { label: string; revenue: number; cogs: number; margin: number | null }[];
+  format?: (v: number) => string;
+}) {
+  const W = 680;
+  const H = 280;
+  const padTop = 24;
+  const padBottom = 26;
+  const padLeft = 52;
+  const padRight = 44;
+  const chartW = W - padLeft - padRight;
+  const chartH = H - padTop - padBottom;
+  const maxMoney = Math.max(0, ...data.map((d) => Math.max(d.revenue, d.cogs)));
+  const maxPct = 100;
+  const slot = data.length ? chartW / data.length : chartW;
+  const barW = Math.min(slot * 0.3, 26);
+  const yMoney = (v: number) => padTop + chartH * (1 - (maxMoney > 0 ? v / maxMoney : 0));
+  const yPct = (v: number) => padTop + chartH * (1 - v / maxPct);
+  const gridFracs = [0.25, 0.5, 0.75, 1];
+  const labelEvery = Math.max(1, Math.ceil(data.length / 10));
+  const points = data
+    .map((d, i) => ({ d, i }))
+    .filter(({ d }) => d.margin !== null)
+    .map(({ d, i }) => ({ x: padLeft + slot * i + slot / 2, y: yPct(d.margin as number), d }));
+  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img">
+      {gridFracs.map((f) => (
+        <g key={f}>
+          <line x1={padLeft} x2={W - padRight} y1={padTop + chartH * (1 - f)} y2={padTop + chartH * (1 - f)} stroke="#e2e8f0" strokeWidth="1" />
+          <text x={padLeft - 6} y={padTop + chartH * (1 - f) + 4} textAnchor="end" fontSize="11" fill="#64748b">
+            {format(maxMoney * f)}
+          </text>
+          <text x={W - padRight + 6} y={padTop + chartH * (1 - f) + 4} textAnchor="start" fontSize="11" fill="#64748b">
+            {`${Math.round(maxPct * f)}%`}
+          </text>
+        </g>
+      ))}
+      <line x1={padLeft} x2={W - padRight} y1={padTop + chartH} y2={padTop + chartH} stroke="#cbd5e1" strokeWidth="1" />
+      {data.map((d, i) => {
+        const cx = padLeft + slot * i + slot / 2;
+        return (
+          <g key={i}>
+            <rect x={cx - barW - 2} y={yMoney(d.revenue)} width={barW} height={Math.max(padTop + chartH - yMoney(d.revenue), 0)} rx="2" fill="#2563eb">
+              <title>{`${d.label}: doanh thu ${format(d.revenue)}`}</title>
+            </rect>
+            <rect x={cx + 2} y={yMoney(d.cogs)} width={barW} height={Math.max(padTop + chartH - yMoney(d.cogs), 0)} rx="2" fill="#f59e0b">
+              <title>{`${d.label}: giá vốn ${format(d.cogs)}`}</title>
+            </rect>
+            {i % labelEvery === 0 && (
+              <text x={cx} y={H - 8} textAnchor="middle" fontSize="11" fill="#64748b">
+                {d.label}
+              </text>
+            )}
+          </g>
+        );
+      })}
+      {points.length > 1 && <polyline points={linePath} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" />}
+      {points.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5">
+          <title>{`${p.d.label}: biên lợi nhuận ${(p.d.margin as number).toFixed(1)}%`}</title>
+        </circle>
+      ))}
+    </svg>
+  );
+}
+
+/** Thanh xếp chồng theo từng đối tác: đã tiêu thụ / còn tại đối tác /
+ *  chờ đối soát. Độ dài thanh theo tổng đã gửi + chờ đối soát. */
+export function StackedBarList({
+  rows,
+}: {
+  rows: {
+    name: string;
+    href: string;
+    consumed: number;
+    remaining: number;
+    pending: number;
+    transferValue: number;
+    formatQty: (v: number) => string;
+    formatMoney: (v: number) => string;
+  }[];
+}) {
+  if (rows.length === 0) {
+    return <p className="py-4 text-center text-sm text-slate-400">Chưa có hàng ký gửi ở đối tác</p>;
+  }
+  const max = Math.max(0, ...rows.map((r) => r.consumed + r.remaining + r.pending));
+  const seg = (value: number, color: string, title: string) =>
+    value > 0 ? (
+      <span className="block h-full" style={{ width: `${(value / max) * 100}%`, backgroundColor: color }} title={title} />
+    ) : null;
+  return (
+    <ul className="space-y-4">
+      {rows.map((r) => (
+        <li key={r.name} className="flex flex-col gap-1">
+          <span className="flex flex-wrap items-baseline justify-between gap-2">
+            <a href={r.href} className="min-w-0 text-sm font-medium text-slate-900 hover:text-blue-700">
+              {r.name}
+            </a>
+            <span className="text-xs text-slate-500">
+              Giá trị chuyển giao còn giữ (ước tính): {r.formatMoney(r.transferValue)}
+            </span>
           </span>
-          <span className="flex flex-1 items-center gap-3">
-            <span className="h-4 flex-1 overflow-hidden rounded bg-slate-100">
-              <span
-                className="block h-full rounded"
-                style={{
-                  width: `${max > 0 ? Math.max((d.value / max) * 100, d.value > 0 ? 2 : 0) : 0}%`,
-                  backgroundColor: d.color ?? "#2563eb",
-                }}
-              />
-            </span>
-            <span className="w-24 shrink-0 text-right text-sm font-medium text-slate-900">
-              {format(d.value)}
-            </span>
+          <span className="flex h-5 w-full overflow-hidden rounded bg-slate-100">
+            {seg(r.consumed, "#10b981", `Đã tiêu thụ ${r.formatQty(r.consumed)}`)}
+            {seg(r.remaining, "#2563eb", `Còn tại đối tác ${r.formatQty(r.remaining)}`)}
+            {seg(r.pending, "#f59e0b", `Chờ đối soát ${r.formatQty(r.pending)}`)}
+          </span>
+          <span className="text-xs text-slate-500">
+            Đã tiêu thụ {r.formatQty(r.consumed)} · Còn tại đối tác {r.formatQty(r.remaining)} · Chờ đối soát{" "}
+            {r.formatQty(r.pending)}
           </span>
         </li>
       ))}

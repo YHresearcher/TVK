@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { buildAging } from "@/lib/aging";
 import type { AnyRow, Profile, RingSegment, StockRings } from "@/lib/types";
 
 export interface QueryResult<T> {
@@ -1276,4 +1277,271 @@ export async function getPartnerConsignmentGoods(partnerId: string): Promise<Par
   }
   rows.sort((a, b) => b.still - a.still || b.sent - a.sent || a.batch_code.localeCompare(b.batch_code));
   return rows;
+}
+
+/** Một điểm trên biểu đồ doanh thu – giá vốn – biên lợi nhuận. margin là
+ *  % lãi gộp trên doanh thu thuần, null khi kỳ đó không có doanh thu. */
+export interface PerformancePoint {
+  label: string;
+  revenue: number;
+  cogs: number;
+  margin: number | null;
+}
+
+function dayParts(iso: string): { y: number; m: number; d: number; dayNum: number } {
+  const [y, m, d] = iso.split("-").map(Number);
+  return { y, m, d, dayNum: Math.floor(Date.UTC(y, m - 1, d) / 86400000) };
+}
+
+/** Gom chứng từ đã xác nhận trong khoảng [fromISO, toISO] thành từng
+ *  khoảng (ngày khi kỳ ≤ 31 ngày, 7 ngày khi ≤ 120 ngày, tháng khi dài
+ *  hơn). Giá vốn theo lô thực tế đã xuất, cùng cách tính với Phân tích
+ *  đơn hàng. Luôn trả đủ các khoảng trong kỳ, kể cả khoảng bằng 0. */
+export async function getPerformanceSeries(
+  fromISO: string,
+  toISO: string
+): Promise<PerformancePoint[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+  const from = dayParts(fromISO);
+  const to = dayParts(toISO);
+  const spanDays = Math.max(1, to.dayNum - from.dayNum + 1);
+  const mode: "day" | "week" | "month" = spanDays <= 31 ? "day" : spanDays <= 120 ? "week" : "month";
+  type Bucket = { label: string; revenue: number; cogs: number; order: number };
+  const buckets: Bucket[] = [];
+  const bucketIndex = new Map<string, number>();
+  if (mode === "month") {
+    let y = from.y;
+    let m = from.m;
+    while (y < to.y || (y === to.y && m <= to.m)) {
+      const key = `${y}-${m}`;
+      bucketIndex.set(key, buckets.length);
+      buckets.push({ label: `T${m}/${y}`, revenue: 0, cogs: 0, order: buckets.length });
+      m += 1;
+      if (m > 12) {
+        m = 1;
+        y += 1;
+      }
+    }
+  } else {
+    const step = mode === "day" ? 1 : 7;
+    for (let dayNum = from.dayNum; dayNum <= to.dayNum; dayNum += step) {
+      const dt = new Date(dayNum * 86400000);
+      const key = String(dayNum);
+      bucketIndex.set(key, buckets.length);
+      buckets.push({
+        label: `${dt.getUTCDate()}/${dt.getUTCMonth() + 1}`,
+        revenue: 0,
+        cogs: 0,
+        order: buckets.length,
+      });
+    }
+  }
+  const keyOf = (iso: string): string => {
+    const p = dayParts(iso);
+    if (mode === "month") return `${p.y}-${p.m}`;
+    if (mode === "day") return String(p.dayNum);
+    return String(from.dayNum + Math.floor((p.dayNum - from.dayNum) / 7) * 7);
+  };
+  const { data: docs } = await supabase
+    .from("sales_documents")
+    .select("id, doc_date, total_amount, discount_amount")
+    .eq("status", "CONFIRMED")
+    .gte("doc_date", fromISO)
+    .lte("doc_date", toISO)
+    .limit(2000);
+  const docRows = (docs ?? []) as AnyRow[];
+  if (docRows.length === 0) return buckets.map((b) => ({ label: b.label, revenue: 0, cogs: 0, margin: null }));
+  const docIds = docRows.map((d) => String(d.id));
+  const { data: lines } = await supabase
+    .from("sales_document_lines")
+    .select("document_id, qty, batch_id, allocation_line_id")
+    .in("document_id", docIds)
+    .limit(20000);
+  const lineRows = (lines ?? []) as AnyRow[];
+  const allocIds = Array.from(new Set(lineRows.map((l) => String(l.allocation_line_id ?? "")).filter(Boolean)));
+  const batchIds = Array.from(new Set(lineRows.map((l) => String(l.batch_id ?? "")).filter(Boolean)));
+  const allocBatch = new Map<string, string>();
+  if (allocIds.length) {
+    const { data: allocs } = await supabase
+      .from("allocation_lines")
+      .select("id, batch_id")
+      .in("id", allocIds)
+      .limit(5000);
+    for (const a of (allocs ?? []) as AnyRow[]) allocBatch.set(String(a.id), String(a.batch_id));
+  }
+  if (allocBatch.size) for (const b of Array.from(allocBatch.values())) batchIds.push(b);
+  const batchCost = new Map<string, number>();
+  if (batchIds.length) {
+    const { data: batches } = await supabase
+      .from("stock_batches")
+      .select("id, unit_cost")
+      .in("id", Array.from(new Set(batchIds)))
+      .limit(5000);
+    for (const b of (batches ?? []) as AnyRow[]) batchCost.set(String(b.id), Number(b.unit_cost ?? 0));
+  }
+  const byDoc = new Map<string, { revenue: number; cogs: number; date: string }>();
+  for (const d of docRows) {
+    byDoc.set(String(d.id), {
+      revenue: Math.max(Number(d.total_amount ?? 0) - Number(d.discount_amount ?? 0), 0),
+      cogs: 0,
+      date: String(d.doc_date),
+    });
+  }
+  for (const l of lineRows) {
+    const b = byDoc.get(String(l.document_id));
+    if (!b) continue;
+    const batchId = l.batch_id ? String(l.batch_id) : allocBatch.get(String(l.allocation_line_id ?? ""));
+    b.cogs += Number(l.qty ?? 0) * (batchCost.get(batchId ?? "") ?? 0);
+  }
+  for (const b of Array.from(byDoc.values())) {
+    const i = bucketIndex.get(keyOf(b.date));
+    if (i === undefined) continue;
+    buckets[i].revenue += b.revenue;
+    buckets[i].cogs += b.cogs;
+  }
+  return buckets.map((b) => ({
+    label: b.label,
+    revenue: b.revenue,
+    cogs: b.cogs,
+    margin: b.revenue > 0 ? ((b.revenue - b.cogs) / b.revenue) * 100 : null,
+  }));
+}
+
+/** Giá trị tồn kho theo nhóm hàng, chỉ hàng TVK sở hữu, theo giá vốn lô. */
+export interface GroupValueRow {
+  group: string;
+  value: number;
+  lots: number;
+}
+
+export async function getInventoryValueByGroup(): Promise<GroupValueRow[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+  const [locs, batches, products] = await Promise.all([
+    supabase.from("batch_locations").select("batch_id, qty").gt("qty", 0).limit(5000),
+    supabase.from("stock_batches").select("id, product_id, ownership, unit_cost").eq("ownership", "OWNED").limit(5000),
+    supabase.from("products").select("id, product_group").limit(5000),
+  ]);
+  if (locs.error || batches.error || products.error) return [];
+  const batchMap = new Map<string, { product_id: string; unit_cost: number }>(
+    ((batches.data ?? []) as AnyRow[]).map((b) => [
+      String(b.id),
+      { product_id: String(b.product_id), unit_cost: Number(b.unit_cost ?? 0) },
+    ])
+  );
+  const groupOf = new Map<string, string>(
+    ((products.data ?? []) as AnyRow[]).map((p) => [String(p.id), String(p.product_group ?? "").trim()])
+  );
+  const byGroup = new Map<string, { value: number; lots: Set<string> }>();
+  for (const bl of (locs.data ?? []) as AnyRow[]) {
+    const b = batchMap.get(String(bl.batch_id));
+    if (!b) continue;
+    const label = groupOf.get(b.product_id) || "Chưa xếp nhóm";
+    const cur = byGroup.get(label) ?? { value: 0, lots: new Set<string>() };
+    cur.value += Number(bl.qty ?? 0) * b.unit_cost;
+    cur.lots.add(String(bl.batch_id));
+    byGroup.set(label, cur);
+  }
+  return Array.from(byGroup.entries())
+    .map(([group, v]) => ({ group, value: v.value, lots: v.lots.size }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/** Hiệu suất tiêu thụ ký gửi theo từng đối tác: đã gửi / đã tiêu thụ /
+ *  còn tại đối tác / chờ đối soát (phiếu phân bổ nháp chưa xác nhận). */
+export interface PartnerConsignmentBar {
+  partnerId: string;
+  partnerName: string;
+  sent: number;
+  consumed: number;
+  remaining: number;
+  pending: number;
+  transferValue: number;
+}
+
+export async function getPartnerConsignmentBars(): Promise<PartnerConsignmentBar[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+  const [view, partners, drafts, estimates] = await Promise.all([
+    supabase
+      .from("v_partner_consignment")
+      .select("partner_id, qty_sent, qty_consumed, qty_still_at_partner")
+      .limit(500),
+    supabase.from("partners").select("id, name").limit(500),
+    supabase.from("allocation_slips").select("id, partner_id").eq("status", "DRAFT").limit(500),
+    getPartnerRemainingEstimates(),
+  ]);
+  const nameMap = new Map<string, string>(
+    ((partners.data ?? []) as AnyRow[]).map((p) => [String(p.id), String(p.name)])
+  );
+  const pendingByPartner = new Map<string, number>();
+  const draftRows = (drafts.data ?? []) as AnyRow[];
+  if (draftRows.length) {
+    const slipPartner = new Map<string, string>(
+      draftRows.map((s) => [String(s.id), String(s.partner_id)])
+    );
+    const { data: draftLines } = await supabase
+      .from("allocation_lines")
+      .select("allocation_id, qty")
+      .in("allocation_id", Array.from(slipPartner.keys()))
+      .limit(5000);
+    for (const l of (draftLines ?? []) as AnyRow[]) {
+      const pid = slipPartner.get(String(l.allocation_id));
+      if (!pid) continue;
+      pendingByPartner.set(pid, (pendingByPartner.get(pid) ?? 0) + Number(l.qty ?? 0));
+    }
+  }
+  const rows: PartnerConsignmentBar[] = [];
+  for (const v of (view.data ?? []) as AnyRow[]) {
+    const pid = String(v.partner_id);
+    const sent = Number(v.qty_sent ?? 0);
+    const pending = pendingByPartner.get(pid) ?? 0;
+    if (sent === 0 && pending === 0) continue;
+    rows.push({
+      partnerId: pid,
+      partnerName: nameMap.get(pid) ?? "—",
+      sent,
+      consumed: Number(v.qty_consumed ?? 0),
+      remaining: Number(v.qty_still_at_partner ?? 0),
+      pending,
+      transferValue: estimates.get(pid) ?? 0,
+    });
+  }
+  rows.sort((a, b) => b.sent - a.sent || a.partnerName.localeCompare(b.partnerName));
+  return rows;
+}
+
+/** Tổng tuổi nợ phải thu theo từng nhóm tuổi (nhóm của kế toán), để vẽ
+ *  biểu đồ thanh ngang ở tầng cảnh báo. */
+export async function getReceivableAgingBars(): Promise<
+  { label: string; value: number; color: string }[]
+> {
+  const supabase = await client();
+  if (!supabase) return [];
+  const [rows, partners] = await Promise.all([
+    supabase.from("partner_receivables").select("partner_id, amount, amount_paid, due_date").limit(2000),
+    supabase.from("partners").select("id, name").limit(500),
+  ]);
+  const nameMap = new Map<string, string>(
+    ((partners.data ?? []) as AnyRow[]).map((p) => [String(p.id), String(p.name)])
+  );
+  const aged = buildAging(
+    ((rows.data ?? []) as AnyRow[]).map((r) => ({
+      partyId: String(r.partner_id),
+      due_date: r.due_date,
+      amount: Number(r.amount ?? 0),
+      amount_paid: Number(r.amount_paid ?? 0),
+    })),
+    nameMap
+  );
+  const total = (f: "notDue" | "band1" | "band2" | "band3" | "over6") =>
+    aged.reduce((a, r) => a + r[f], 0);
+  return [
+    { label: "Chưa đến hạn", value: total("notDue"), color: "#10b981" },
+    { label: "1–2 tháng", value: total("band1"), color: "#f59e0b" },
+    { label: "3–4 tháng", value: total("band2"), color: "#f97316" },
+    { label: "5–6 tháng", value: total("band3"), color: "#ef4444" },
+    { label: "Trên 6 tháng", value: total("over6"), color: "#7f1d1d" },
+  ];
 }
