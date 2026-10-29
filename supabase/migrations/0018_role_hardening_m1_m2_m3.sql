@@ -4,7 +4,8 @@
 --     bi chan), than ham giu nguyen ban dang chay live (0002 + 0014 + 0017).
 --     Thu hoi EXECUTE khoi public, chi cap cho authenticated (anon khong goi duoc).
 -- M2: stock_batches chi OWNER/WAREHOUSE/ACCOUNTING/CEO duoc SELECT truc tiep;
---     SALES dung view an toan v_batches_for_sales (them return_by_date, expiry_date).
+--     SALES dung view an toan v_batches_for_sales (them supplier_id,
+--     return_by_date, expiry_date o CUOI danh sach cot).
 --     v_batch_stock dat security_invoker=true de RLS cua bang goc ap dung.
 -- M3: v_supplier_consignment + v_partner_consignment dat security_invoker=true
 --     de RLS cua bang cong no ap dung (SALES khong thay phai tra NCC;
@@ -460,12 +461,14 @@ drop policy if exists pol_stock_batches_sel on stock_batches;
 create policy pol_stock_batches_sel on stock_batches for select to authenticated
   using (current_app_role() = any (array['OWNER','WAREHOUSE','ACCOUNTING','CEO']::app_role[]));
 
--- View an toan cho SALES: them return_by_date + expiry_date (cuoi danh sach cot).
+-- View an toan cho SALES: 3 cot moi (supplier_id, return_by_date,
+-- expiry_date) PHAI nam o CUOI danh sach — CREATE OR REPLACE VIEW so cot
+-- theo vi tri, chen giua se doi ten cot cu va loi 42P16.
 create or replace view v_batches_for_sales as
 select b.id as batch_id, b.batch_code, b.product_id, p.sku, p.name as product_name,
-       b.ownership, b.supplier_id, s.name as supplier_name,
+       b.ownership, s.name as supplier_name,
        bl.location_id, l.name as location_name, l.location_kind, l.partner_id,
-       bl.qty, b.received_date, b.status, b.return_by_date, b.expiry_date
+       bl.qty, b.received_date, b.status, b.supplier_id, b.return_by_date, b.expiry_date
 from stock_batches b
 join products p on p.id = b.product_id
 left join suppliers s on s.id = b.supplier_id
