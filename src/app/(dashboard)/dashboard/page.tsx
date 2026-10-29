@@ -111,9 +111,7 @@ export default async function DashboardPage() {
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" tone="rose" />
         <StatCard label="Giá trị hàng sở hữu" value={formatVND(ownedRealValue)} sub="Theo giá bán / giá chuyển giao" tone="sky" />
       </div>
-      <p className="mt-2 text-xs text-slate-500">
-        Doanh thu thuần tính theo tổng chứng từ đã xác nhận, chưa tách thuế GTGT.
-      </p>
+      <p className="mt-2 text-xs text-slate-500">Chưa tách thuế GTGT.</p>
     </section>
   );
 
@@ -130,8 +128,7 @@ export default async function DashboardPage() {
         <div className="mt-6">
           <Card title="Theo sổ kế toán (giá vốn)" tone="slate">
             <p className="mb-3 text-sm leading-relaxed text-slate-600">
-              Tồn kho trên sổ ghi theo giá vốn, không theo giá bán. Hàng giữ hộ của nhà cung cấp không phải
-              tài sản của cửa hàng nên không gộp vào tổng hàng tồn kho của TVK.
+              Theo giá vốn; hàng giữ hộ không phải tài sản, không gộp vào tổng.
             </p>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <StatCard label="Tổng tiền hàng trong kho (giá vốn)" value={formatVND(d.bookOwnedOwnValue)} sub={bookShare(d.bookOwnedOwnValue)} />
@@ -184,14 +181,13 @@ export default async function DashboardPage() {
               </div>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-slate-500">
-              Chỉ tính phiếu gửi ký gởi (GK) và báo cáo tiêu thụ (BT) đã xác nhận. Hàng còn tại đối tác tính theo giá chuyển giao mới nhất của từng lô.
+              Chỉ tính GK/BT đã xác nhận; giá chuyển giao mới nhất theo lô.
             </p>
           </Card>
         )}
       </div>
       <div className="mt-6">
         <Card title="Thống kê đối tác" tone="sky">
-          <p className="mb-4 text-sm text-slate-500">Chọn một đối tác để xem nhanh số dư, tiền đã trả, hoá đơn và hàng còn ở đối tác đó trong cửa sổ bật lên.</p>
           <PartnerStatsDialog partners={partnerStats} />
         </Card>
       </div>
@@ -221,9 +217,6 @@ export default async function DashboardPage() {
               <HBarList
                 data={groupPerf.map((g) => ({ label: g.group, value: g.revenue, color: "#2563eb" }))}
               />
-              <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                Gồm cả bán thẳng (BH) và tiêu thụ ký gửi (KG) đã xác nhận.
-              </p>
             </>
           )}
         </Card>
@@ -236,11 +229,9 @@ export default async function DashboardPage() {
               {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
               {" · "}Lợi nhuận gộp <strong className="text-slate-900">{formatVND(d.grossProfitAll)}</strong>
               {` (Gross Margin ${grossMargin}% · Markup on Cost ${roiAll}%)`}.
-              Giá vốn tính theo lô thực tế đã xuất (nhập trước – xuất trước); giảm giá đã trừ vào doanh thu thuần.
+              Giá vốn tính theo lô thực tế đã xuất; giảm giá đã trừ vào doanh thu thuần.
               {" "}30 ngày gần nhất: doanh thu thuần {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn. Tổng số lượng đã bán (lũy kế): {formatNumber(d.flows.soldQty)} đơn vị.
             </p>
-            <p className="text-xs leading-relaxed text-slate-500">Gross Margin là lãi gộp chia cho doanh thu thuần.</p>
-            <p className="mb-3 text-xs leading-relaxed text-slate-500">Markup on Cost là lãi gộp chia cho giá vốn hàng đã bán.</p>
             {d.orderAnalysis.length === 0 ? (
               <EmptyState message="Chưa có đơn hàng nào được xác nhận." />
             ) : (
@@ -314,7 +305,7 @@ export default async function DashboardPage() {
             <p className="mt-2 text-xs text-slate-500">Đang hiện {slow.rows.length} trong tổng số {slow.total} sản phẩm chậm.</p>
           )}
           <p className="mt-2 text-xs leading-relaxed text-slate-500">
-            Sản phẩm còn tồn kho mà 90 ngày không có bút toán xuất, bán hay trả nào; hàng mới nhập trong 90 ngày không tính là chậm.
+            Tồn kho 90 ngày không xuất/bán/trả; hàng mới nhập không tính.
           </p>
         </Card>
       </div>

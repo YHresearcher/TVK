@@ -44,18 +44,14 @@ export default function StockCompositionCard({
 
   return (
     <Card title="Cơ cấu tồn kho" tone="violet">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs leading-relaxed text-slate-500">
-          Ba vòng độc lập, cùng phạm vi hàng đang quản lý, cùng tính theo giá vốn.
-        </p>
+      <div className="flex justify-end">
         <details className="relative shrink-0">
           <summary className="flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-full border border-slate-300 text-sm text-slate-500 hover:bg-slate-50" title="Cách tính">
             ⓘ
           </summary>
           <div className="absolute right-0 top-8 z-10 w-72 rounded-lg border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg">
-            <p>Ba vòng thể hiện ba chiều độc lập của cùng một lượng hàng đang quản lý, đều tính theo giá vốn lô: quyền sở hữu (của TVK / nhận ký gửi), vị trí (kho TVK / kho đối tác), trạng thái (bán được / giữ cho chứng từ nháp).</p>
-            <p className="mt-2">Hàng nhận ký gửi là hàng giữ hộ, không phải tài sản của cửa hàng. &ldquo;Giữ cho chứng từ nháp&rdquo; là số lượng các dòng chứng từ nháp (bán hàng, gửi ký gửi, phân bổ) đang trỏ vào lô, tối đa bằng tồn thực tế của lô.</p>
-            <p className="mt-2">Ba mức giá dưới đây chỉ tính hàng của TVK trong kho, chưa gồm hàng ở đối tác.</p>
+            <p>Ba vòng là ba chiều của cùng một lượng hàng, đều theo giá vốn lô. Hàng giữ hộ không phải tài sản.</p>
+            <p className="mt-2">&ldquo;Giữ cho chứng từ nháp&rdquo; là lượng hàng trên chứng từ nháp, tối đa bằng tồn thực tế. Ba mức giá dưới chỉ tính hàng trong kho.</p>
           </div>
         </details>
       </div>
@@ -99,8 +95,7 @@ export default function StockCompositionCard({
             </div>
           </div>
           <p className="mt-2 text-xs leading-relaxed text-slate-500">
-            Biên lợi nhuận gộp tiềm năng theo giá lẻ: {pct(marginPct)} — lý thuyết nếu bán toàn bộ hàng ở giá lẻ,
-            chưa trừ chiết khấu, chi phí và hao hụt; không phải lợi nhuận đã thực hiện.
+            Biên tiềm năng theo giá lẻ: {pct(marginPct)} (lý thuyết, chưa trừ chi phí).
           </p>
         </div>
       )}

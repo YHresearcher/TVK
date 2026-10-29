@@ -198,7 +198,7 @@ export default function MultiRingDonut({
           )}
         </div>
       ) : (
-        <p className="mt-4 text-xs text-slate-500">Bấm vào một đoạn trên biểu đồ hoặc một chip chú giải để xem giá trị, tỷ trọng và số lô.</p>
+        <p className="mt-4 text-xs text-slate-500">Bấm một đoạn hoặc chip để xem chi tiết.</p>
       )}
     </div>
   );
