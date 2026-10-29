@@ -29,7 +29,7 @@ export default async function SalesPage({
   const configured = orders.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   // Giá vốn / lãi gộp chỉ Chủ cửa hàng và Kế toán được coi.
-  const canSeeCost = ["OWNER", "ACCOUNTING"].includes(profile.data?.role ?? "");
+  const canSeeCost = ["OWNER", "ACCOUNTING", "CEO"].includes(profile.data?.role ?? "");
   const docCosts = canSeeCost
     ? await getSalesDocumentCosts(documents.data.slice(0, 20).map((d) => String(d.id)))
     : new Map<string, { qty: number; total: number; cost: number }>();

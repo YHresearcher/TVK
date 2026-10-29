@@ -67,7 +67,7 @@ export default async function DashboardPage() {
   const canSeeMoney = ["OWNER", "ACCOUNTING", "CEO"].includes(profile.data?.role ?? "");
   // Giá vốn / lợi nhuận chỉ Chủ cửa hàng và Kế toán được coi — CEO chỉ coi
   // giá trị thật, nhân viên bán hàng/kho không thấy giá vốn và lợi nhuận.
-  const canSeeCost = ["OWNER", "ACCOUNTING"].includes(profile.data?.role ?? "");
+  const canSeeCost = ["OWNER", "ACCOUNTING", "CEO"].includes(profile.data?.role ?? "");
   const grossMargin = d.revenueAll > 0 ? Math.round((d.grossProfitAll / d.revenueAll) * 100) : 0;
   const revenue14Total = d.revenue14.reduce((a, r) => a + r.value, 0);
   const cogsAll = d.revenueAll - d.grossProfitAll;
