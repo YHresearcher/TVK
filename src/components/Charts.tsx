@@ -223,13 +223,14 @@ export function DonutChart({
   centerLabel,
   centerSub,
   format = formatCompactVND,
+  size = 176,
 }: {
   segments: DonutSegment[];
   centerLabel?: string;
   centerSub?: string;
   format?: (v: number) => string;
+  size?: number;
 }) {
-  const size = 176;
   const stroke = 26;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -240,7 +241,8 @@ export function DonutChart({
     <div className="flex flex-wrap items-center gap-5">
       <svg
         viewBox={`0 0 ${size} ${size}`}
-        className="h-44 w-44 shrink-0"
+        style={{ width: size, height: size }}
+        className="shrink-0"
         role="img"
       >
         <circle

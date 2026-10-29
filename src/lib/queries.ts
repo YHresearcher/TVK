@@ -397,9 +397,9 @@ export async function getDashboard() {
       revenue14: [] as { label: string; value: number }[],
       topProducts: [] as AnyRow[],
       stockComposition: {
-        ownedOwn: { qty: 0, value: 0 },
-        consignedOwn: { qty: 0, value: 0 },
-        atPartners: { qty: 0, value: 0 },
+        ownedOwn: { qty: 0, real: 0, cost: 0, wholesale: 0, retail: 0 },
+        ownedAtPartners: { qty: 0, real: 0, cost: 0, wholesale: 0, retail: 0 },
+        consignedAll: { qty: 0, real: 0, cost: 0, wholesale: 0, retail: 0 },
       },
       balances: { payablesUnpaid: 0, payablesPartial: 0, receivablesUnpaid: 0, receivablesPartial: 0 },
     };
@@ -521,14 +521,45 @@ export async function getDashboard() {
     const sp = sellPrice.get(r.product_id) ?? 0;
     return qty * (sp > 0 ? sp : Number(r.unit_cost));
   };
-  const realCompositionOf = (filter: (r: AnyRow) => boolean) => ({
-    qty: sum(filter, (r) => Number(r.qty)),
-    value: rows.filter(filter).reduce((acc, r) => acc + realValueOf(r), 0),
-  });
-  const ownedOwn = realCompositionOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
-  const consignedOwn = realCompositionOf((r) => consigned(r) && r.location_kind === "OWN_WAREHOUSE");
-  const atPartners = realCompositionOf((r) => r.location_kind === "PARTNER_VIRTUAL");
-  const consignedReal = rows.filter(consigned).reduce((acc, r) => acc + realValueOf(r), 0);
+  // Giá trị một dòng tồn theo từng cơ sở định giá. Hàng ở kho đối tác tính
+  // theo giá chuyển giao mới nhất, trừ cơ sở giá vốn thì tính theo giá vốn
+  // lô — vì hàng đó không có giá sỉ/giá lẻ.
+  const transferValueOf = (r: AnyRow) => {
+    const tp = latestTransfer.get(String(r.batch_id));
+    return tp !== undefined ? Number(r.qty) * tp : null;
+  };
+  const costValueOf = (r: AnyRow) => Number(r.qty) * Number(r.unit_cost);
+  const wholesaleValueOf = (r: AnyRow) => {
+    if (r.location_kind === "PARTNER_VIRTUAL") {
+      const tv = transferValueOf(r);
+      if (tv !== null) return tv;
+    }
+    const wp = wholesalePrice.get(r.product_id) ?? 0;
+    return Number(r.qty) * (wp > 0 ? wp : Number(r.unit_cost));
+  };
+  const retailValueOf = (r: AnyRow) => {
+    if (r.location_kind === "PARTNER_VIRTUAL") {
+      const tv = transferValueOf(r);
+      if (tv !== null) return tv;
+    }
+    const rp = sellPrice.get(r.product_id) ?? 0; // lẻ trước, sỉ sau
+    return Number(r.qty) * (rp > 0 ? rp : Number(r.unit_cost));
+  };
+  const compOf = (filter: (r: AnyRow) => boolean) => {
+    const rs = rows.filter(filter);
+    return {
+      qty: rs.reduce((a, r) => a + Number(r.qty), 0),
+      real: rs.reduce((a, r) => a + realValueOf(r), 0),
+      cost: rs.reduce((a, r) => a + costValueOf(r), 0),
+      wholesale: rs.reduce((a, r) => a + wholesaleValueOf(r), 0),
+      retail: rs.reduce((a, r) => a + retailValueOf(r), 0),
+    };
+  };
+  // Ba nhóm không trùng nhau, phủ hết hàng đang quản lý: hàng TVK tại kho,
+  // hàng TVK tại đối tác, và hàng nhận ký gửi (mọi vị trí, của nhà cung cấp).
+  const ownedOwn = compOf((r) => owned(r) && r.location_kind === "OWN_WAREHOUSE");
+  const ownedAtPartners = compOf((r) => owned(r) && r.location_kind === "PARTNER_VIRTUAL");
+  const consignedAll = compOf(consigned);
   // Sổ kế toán: tồn kho ghi theo GIÁ VỐN, không theo giá bán. Hàng giữ hộ
   // của nhà cung cấp không phải tài sản — chỉ theo dõi riêng, không gộp
   // vào tồn kho thuộc sở hữu.
@@ -551,7 +582,7 @@ export async function getDashboard() {
         return Number(r.qty) * (wp > 0 ? wp : Number(r.unit_cost));
       }
     ),
-    retail: ownedOwn.value,
+    retail: ownedOwn.real,
   };
   // Doanh thu / lợi nhuận gộp / số đơn — mọi chứng từ đã xác nhận, không
   // giới hạn ngày (ngày chứng từ có thể ghi lùi so với ngày nhập máy).
@@ -697,12 +728,12 @@ export async function getDashboard() {
     // gửi tới đối tác nằm ở ô riêng, không gộp chung (trước đây gộp
     // chung nên nhìn lệch với biểu đồ cơ cấu).
     ownedQty: ownedOwn.qty,
-    ownedValue: ownedOwn.value,
-    consignedQty: sum(consigned, (r) => Number(r.qty)),
-    consignedValue: consignedReal,
-    atPartnersQty: sum((r) => r.location_kind === "PARTNER_VIRTUAL", (r) => Number(r.qty)),
-    atPartnersValue: atPartners.value,
-    flows: { soldQty, soldRevenue, sentQty, sentValue, consumedQty, stillQty, stillValue: atPartners.value },
+    ownedValue: ownedOwn.real,
+    consignedQty: consignedAll.qty,
+    consignedValue: consignedAll.real,
+    atPartnersQty: ownedAtPartners.qty,
+    atPartnersValue: ownedAtPartners.real,
+    flows: { soldQty, soldRevenue, sentQty, sentValue, consumedQty, stillQty, stillValue: ownedAtPartners.real },
     payablesOutstanding: (payables.data ?? []).reduce(
       (a: number, r: AnyRow) => a + Number(r.amount) - Number(r.amount_paid), 0),
     receivablesOutstanding: (receivables.data ?? []).reduce(
@@ -725,8 +756,8 @@ export async function getDashboard() {
     topProducts,
     stockComposition: {
       ownedOwn,
-      consignedOwn,
-      atPartners,
+      ownedAtPartners,
+      consignedAll,
     },
     balances: {
       payablesUnpaid: remainingByStatus(payables.data as AnyRow[] | null, "UNPAID"),
@@ -896,4 +927,98 @@ export async function listLedgerMovements(limit = 200): Promise<QueryResult<Ledg
       };
     }),
   };
+}
+
+export interface GroupPerformanceRow {
+  group: string;
+  revenue: number;
+  qty: number;
+}
+
+/** Doanh thu + số lượng theo nhóm hàng, từ dòng chứng từ BH/KG đã xác nhận. */
+export async function getGroupPerformance(): Promise<GroupPerformanceRow[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+  const [lines, docs, products] = await Promise.all([
+    supabase.from("sales_document_lines").select("document_id, product_id, qty, line_total").limit(2000),
+    supabase.from("sales_documents").select("id, status").eq("status", "CONFIRMED").limit(2000),
+    supabase.from("products").select("id, product_group").limit(5000),
+  ]);
+  if (lines.error || docs.error || products.error) return [];
+  const confirmed = new Set(((docs.data ?? []) as AnyRow[]).map((d) => d.id as string));
+  const groupOf = new Map(((products.data ?? []) as AnyRow[]).map((p) => [p.id as string, (p.product_group as string) ?? ""]));
+  const byGroup = new Map<string, GroupPerformanceRow>();
+  for (const l of (lines.data ?? []) as AnyRow[]) {
+    if (!confirmed.has(l.document_id as string)) continue;
+    const label = groupOf.get(l.product_id as string)?.trim() || "Chưa xếp nhóm";
+    const row = byGroup.get(label) ?? { group: label, revenue: 0, qty: 0 };
+    row.revenue += Number(l.line_total);
+    row.qty += Number(l.qty);
+    byGroup.set(label, row);
+  }
+  return Array.from(byGroup.values()).sort((a, b) => b.revenue - a.revenue);
+}
+
+export interface SlowMovingRow {
+  product_id: string;
+  sku: string;
+  name: string;
+  qty: number;
+  lastOutAt: string | null;
+  idleDays: number;
+}
+
+const OUT_KINDS = new Set(["OUT_SALE", "OUT_CONSIGNMENT", "OUT_RETURN_SUPPLIER"]);
+
+/**
+ * Hàng chậm luân chuyển: còn tồn kho mà `days` ngày không có bút toán xuất,
+ * bán hay trả nào; sản phẩm mới nhập trong `days` ngày thì không tính là chậm.
+ */
+export async function getSlowMoving(days = 90): Promise<{ rows: SlowMovingRow[]; total: number }> {
+  const supabase = await client();
+  if (!supabase) return { rows: [], total: 0 };
+  const [stock, movements, batches, products] = await Promise.all([
+    supabase.from("v_product_stock").select("product_id, total_qty").limit(5000),
+    supabase.from("stock_movements").select("batch_id, movement_kind, created_at").limit(5000),
+    supabase.from("stock_batches").select("id, product_id").limit(5000),
+    supabase.from("products").select("id, sku, name").limit(5000),
+  ]);
+  if (stock.error || movements.error || batches.error || products.error) return { rows: [], total: 0 };
+  const cutoff = Date.now() - days * 86400000;
+  const productOfBatch = new Map(((batches.data ?? []) as AnyRow[]).map((b) => [b.id as string, b.product_id as string]));
+  const lastOut = new Map<string, number>();
+  const firstIn = new Map<string, number>();
+  for (const m of (movements.data ?? []) as AnyRow[]) {
+    const pid = productOfBatch.get(m.batch_id as string);
+    if (!pid) continue;
+    const t = new Date(m.created_at as string).getTime();
+    if (OUT_KINDS.has(m.movement_kind as string)) {
+      if (t > (lastOut.get(pid) ?? 0)) lastOut.set(pid, t);
+    }
+    if (t < (firstIn.get(pid) ?? Infinity)) firstIn.set(pid, t);
+  }
+  const info = new Map(((products.data ?? []) as AnyRow[]).map((p) => [p.id as string, p]));
+  const rows: SlowMovingRow[] = [];
+  for (const s of (stock.data ?? []) as AnyRow[]) {
+    const qty = Number(s.total_qty);
+    if (qty <= 0) continue;
+    const pid = s.product_id as string;
+    const last = lastOut.get(pid);
+    const first = firstIn.get(pid) ?? Date.now();
+    if (last == null && first >= cutoff) continue; // mới nhập, chưa tính là chậm
+    if (last != null && last >= cutoff) continue;
+    const p = info.get(pid);
+    if (!p) continue;
+    const idleDays = Math.floor((Date.now() - (last ?? first)) / 86400000);
+    rows.push({
+      product_id: pid,
+      sku: (p.sku as string) ?? "—",
+      name: (p.name as string) ?? "—",
+      qty,
+      lastOutAt: last != null ? new Date(last).toISOString() : null,
+      idleDays,
+    });
+  }
+  rows.sort((a, b) => b.idleDays - a.idleDays);
+  return { rows: rows.slice(0, 10), total: rows.length };
 }
