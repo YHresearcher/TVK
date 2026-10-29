@@ -104,7 +104,7 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 | **Ký gửi** | Gửi ký gửi | Lập phiếu GK gửi hàng cho đối tác (có nhập từ Excel) |
 | | Tiêu thụ của đối tác | Nhập báo cáo tiêu thụ BT, xem phân bổ PB → BH/KG (BT và PB đều có nhập từ Excel) |
 | **Bán hàng & Hoá đơn** | Bán hàng | Bán tại quầy, chọn theo lô; bảng đơn hàng và chứng từ BH/KG có nút Xuất Excel; bảng chứng từ BH/KG có thêm cột Giá vốn và Lãi gộp, chỉ Chủ cửa hàng và Kế toán xem được (giá vốn theo lô thực tế đã xuất, chứng từ nháp chưa có giá vốn) |
-| | Hoá đơn GTGT | Phát hành/huỷ hoá đơn từ các dòng BH/KG đã xác nhận; bảng hoá đơn có nút Xuất Excel |
+| | Hoá đơn GTGT (theo dõi nội bộ) | Ghi nhận/huỷ ghi nhận hoá đơn đã xuất từ hệ thống hoá đơn chính thức, theo các dòng BH/KG đã xác nhận; bảng hoá đơn có nút Xuất Excel |
 | | Trả hàng & bảo hành | Lập phiếu trả hàng TH; bảng phiếu trả có nút Xuất Excel |
 | **Công nợ & Báo cáo** | Phải trả nhà cung cấp | Khoản phải trả phát sinh từ hàng ký gửi bán được; ghi thanh toán; bảng **Tuổi nợ phải trả** gom theo nhà cung cấp, 3 nhóm quá hạn 1–6 tháng |
 | | Phải thu đối tác | Khoản đối tác/khách còn nợ; ghi thu tiền; bảng **Tuổi nợ phải thu** gom theo đối tác, 3 nhóm quá hạn 1–6 tháng |
@@ -233,8 +233,9 @@ Khi đối tác báo đã bán được hàng họ đang giữ: vào **Ký gửi
 
 **Nhập BT/PB từ Excel:** mỗi mục đều có **Nhập từ Excel** với nút **Tải file mẫu (.xlsx)**. BT: một file là một báo cáo cho một đối tác trong một kỳ, cột `MaHang*` · `SoLuongTieuThu*` (báo cáo chỉ ghi số lượng, không có giá). PB: một file là một phiếu phân bổ cho một đối tác, cột `MaHang*` · `MaLo*` (lô đang ở kho đối tác đó, phải thuộc đúng sản phẩm) · `NguonHang` (“Mua đứt”/“Ký gửi”, để trống = Ký gửi) · `SoLuong*` · `DonGiaVND` (VNĐ, để trống = 0). PB kiểm tra trước cả 3 chốt xác nhận (lượng đã báo, hạn mức theo tính chất, tồn tại kho đối tác). Cả hai đều có tick “Xác nhận ngay”; dòng lỗi nào cũng chặn cả file.
 
-### D4. Hoá đơn GTGT
-Vào **Bán hàng & Hoá đơn → Hoá đơn GTGT**: tick các dòng chứng từ BH/KG đã xác nhận chưa xuất hoá đơn, chọn đối tác, nhập số hoá đơn/ký hiệu/ngày. **Ngay trên form có ô chọn "Gộp thành 1 hoá đơn GTGT"**: tick = xuất **1 hoá đơn** chứa cả hai phần; bỏ tick = **tách 2 hoá đơn** (hoá đơn BH dùng số/ký hiệu chính; hoá đơn KG phải nhập thêm số/ký hiệu ở hai ô "phần ký gửi"). Ô chọn được đặt sẵn theo mặc định ở Cài đặt (mục dưới), đổi tại form chỉ áp dụng cho lần xuất đó. Huỷ hoá đơn chỉ mở lại đúng các dòng thuộc hoá đơn đó.
+### D4. Hoá đơn GTGT (theo dõi nội bộ)
+
+Hoá đơn GTGT chính thức được xuất từ hệ thống hoá đơn riêng; TVK chỉ ghi nhận lại để theo dõi nội bộ, không phát hành hoá đơn pháp lý tại đây. Vào **Bán hàng & Hoá đơn → Hoá đơn GTGT (theo dõi nội bộ)**: tick các dòng chứng từ BH/KG đã xác nhận chưa ghi nhận hoá đơn, chọn đối tác, nhập số hoá đơn/ký hiệu/ngày theo đúng hoá đơn đã xuất. **Ngay trên form có ô chọn "Gộp thành 1 hoá đơn GTGT"**: tick = ghi nhận **1 hoá đơn** chứa cả hai phần; bỏ tick = **tách 2 ghi nhận** (hoá đơn BH dùng số/ký hiệu chính; hoá đơn KG phải nhập thêm số/ký hiệu ở hai ô "phần ký gửi"). Ô chọn được đặt sẵn theo mặc định ở Cài đặt (mục dưới), đổi tại form chỉ áp dụng cho lần ghi nhận đó. Huỷ ghi nhận chỉ mở lại đúng các dòng thuộc hoá đơn đó.
 
 ### D5. Công nợ
 - **Phải trả nhà cung cấp**: tự sinh từ chứng từ KG khi hàng ký gửi bán được, theo đúng giá ký gửi của lô. Ghi thanh toán từng phần/toàn bộ; trạng thái Chưa trả / Trả một phần / Đã trả theo số còn lại.
@@ -274,7 +275,7 @@ Quyền được thực thi ở tầng dữ liệu (không chỉ ẩn nút): vai
 - **Chuẩn mật khẩu mạnh** cho mật khẩu tự đặt: tối thiểu **8 ký tự**, có chữ thường, chữ HOA, chữ số và ký tự đặc biệt. Trang đặt/đổi mật khẩu có checklist đánh dấu từng yêu cầu khi gõ.
 
 ### Cài đặt hệ thống (Cài đặt)
-- **Chế độ hoá đơn GTGT**: COMBINED (gộp) / SEPARATE (tách) — là **mặc định** cho ô chọn khi phát hành hoá đơn (xem D4); nên chốt cùng kế toán theo mô hình hợp đồng ký gửi.
+- **Chế độ hoá đơn GTGT (theo dõi nội bộ)**: COMBINED (gộp) / SEPARATE (tách) — là **mặc định** cho ô chọn khi ghi nhận hoá đơn (xem D4); nên chốt cùng kế toán theo mô hình hợp đồng ký gửi.
 - Quản lý danh sách **kho** và **người dùng & vai trò** (đặt tên đăng nhập cho từng tài khoản).
 
 ---

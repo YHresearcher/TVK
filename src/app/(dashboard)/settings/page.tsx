@@ -55,19 +55,19 @@ export default async function SettingsPage({
         </Card>
       ) : (
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Chế độ hoá đơn GTGT">
+        <Card title="Chế độ hoá đơn GTGT (theo dõi nội bộ)">
           <form action={updateVatModeAction} className="space-y-3">
             <div>
-              <label className={labelCls}>Cách phát hành hoá đơn gộp</label>
+              <label className={labelCls}>Cách gộp hoá đơn khi ghi nhận</label>
               <select name="vat_invoice_mode" defaultValue={vatMode} className={inputCls}>
                 <option value="COMBINED">COMBINED — một hoá đơn GTGT, mỗi tính chất một dòng</option>
                 <option value="SEPARATE">SEPARATE — hai hoá đơn GTGT, mỗi tính chất một hoá đơn</option>
               </select>
             </div>
             <p className="text-xs text-slate-500">
-              Đây là chế độ MẶC ĐỊNH khi mở form Phát hành hoá đơn — người xuất vẫn chọn lại Gộp/Tách ngay trên form cho từng lần xuất, nên đối tác nào cần cách riêng vẫn xử lý được. Dù chọn cách nào, các chứng từ quản lý nội bộ (BH / KG) luôn tách riêng và mỗi
+              Đây là chế độ MẶC ĐỊNH khi mở form ghi nhận hoá đơn — người ghi vẫn chọn lại Gộp/Tách ngay trên form cho từng lần ghi nhận, nên đối tác nào cần cách riêng vẫn xử lý được. Dù chọn cách nào, các chứng từ quản lý nội bộ (BH / KG) luôn tách riêng và mỗi
               dòng hoá đơn luôn liên kết với đúng một chứng từ. Cài đặt này chỉ quyết định cách
-              nhóm các dòng khi phát hành hoá đơn pháp lý.
+              nhóm các dòng khi ghi nhận hoá đơn.
             </p>
             <SubmitButton className={btnCls}>Lưu</SubmitButton>
           </form>

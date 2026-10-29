@@ -51,7 +51,7 @@ const GROUPS: NavGroup[] = [
     dot: "bg-emerald-500",
     items: [
       { href: "/sales", label: "Bán hàng" },
-      { href: "/invoices", label: "Hoá đơn GTGT" },
+      { href: "/invoices", label: "Hoá đơn GTGT (theo dõi nội bộ)" },
       { href: "/returns", label: "Trả hàng & bảo hành" },
     ],
   },

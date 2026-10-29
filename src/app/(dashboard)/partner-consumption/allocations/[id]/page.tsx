@@ -67,9 +67,9 @@ export default async function AllocationDetailPage({
             </form>
           )}
           {slip.status === "CONFIRMED" && pendingCount === 0 && (
-            <p className="text-sm text-slate-500">Mọi dòng đều đã có chứng từ BH/KG. Sang Hoá đơn GTGT để phát hành hoá đơn pháp lý.</p>
+            <p className="text-sm text-slate-500">Mọi dòng đều đã có chứng từ BH/KG. Sang Hoá đơn GTGT (theo dõi nội bộ) để ghi nhận hoá đơn đã xuất.</p>
           )}
-          <a href="/invoices" className={btnGhostCls}>Đi tới Hoá đơn GTGT</a>
+          <a href="/invoices" className={btnGhostCls}>Đi tới Hoá đơn GTGT (theo dõi nội bộ)</a>
         </div>
       </Card>
     </>

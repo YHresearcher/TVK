@@ -18,7 +18,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     roles: ["ALL"],
     points: [
       "Đăng nhập bằng tên đăng nhập hoặc email và mật khẩu. Quên mật khẩu: nhờ Chủ cửa hàng (OWNER) bấm “Đặt lại mật khẩu” cho bạn trong Cài đặt → Quản lý tài khoản — email đặt lại mật khẩu sẽ gửi về hộp thư của bạn.",
-      "Menu bên trái được gộp theo nhóm công việc: Hàng hoá & Kho (Sản phẩm, Tồn kho theo lô, Nhập kho) · Ký gửi (Gửi ký gửi, Tiêu thụ của đối tác) · Bán hàng & Hoá đơn (Bán hàng, Hoá đơn GTGT, Trả hàng & bảo hành) · Công nợ & Báo cáo (Phải trả, Phải thu, Báo cáo) · Danh mục (Nhà cung cấp, Đối tác). Bấm vào tên nhóm để mở — mở nhóm khác thì nhóm đang mở tự thu lại (mỗi lúc chỉ một nhóm mở); nhóm chứa trang bạn đang xem sẽ tự mở, và hệ thống nhớ lựa chọn của riêng bạn. Nhập hàng từ Excel nằm ngay trong trang Nhập kho (nút “Nhập từ Excel”).",
+      "Menu bên trái được gộp theo nhóm công việc: Hàng hoá & Kho (Sản phẩm, Tồn kho theo lô, Nhập kho) · Ký gửi (Gửi ký gửi, Tiêu thụ của đối tác) · Bán hàng & Hoá đơn (Bán hàng, Hoá đơn GTGT (theo dõi nội bộ), Trả hàng & bảo hành) · Công nợ & Báo cáo (Phải trả, Phải thu, Báo cáo) · Danh mục (Nhà cung cấp, Đối tác). Bấm vào tên nhóm để mở — mở nhóm khác thì nhóm đang mở tự thu lại (mỗi lúc chỉ một nhóm mở); nhóm chứa trang bạn đang xem sẽ tự mở, và hệ thống nhớ lựa chọn của riêng bạn. Nhập hàng từ Excel nằm ngay trong trang Nhập kho (nút “Nhập từ Excel”).",
       "Nguyên tắc cốt lõi: mọi hàng hoá thuộc một trong hai loại — Tồn kho (mua đứt, lô OWN) và Hàng ký gửi (giữ hộ nhà cung cấp, lô CONS). Cùng một sản phẩm có thể có cả hai loại lô, nên hãy luôn chọn đúng lô khi bán, gửi đi hoặc trả hàng.",
       "Quét mã vạch: các form có ô “Quét mã vạch / nhập mã hàng” (Nhập kho, Tiêu thụ của đối tác) nhận mã từ máy quét mã vạch hoặc gõ tay rồi Enter — hệ thống khớp theo SKU hoặc bất kỳ mã tra cứu nào đã đăng ký cho sản phẩm; quét lại cùng một mã sẽ cộng thêm 1 số lượng.",
       "Tồn kho không bao giờ sửa trực tiếp: mọi thay đổi đều đi qua chứng từ (PN, NK, GK, BT, PB, BH, KG, TH) và được ghi vào sổ cái biến động không thể sửa/xoá, nên số liệu luôn truy vết được.",
@@ -46,8 +46,8 @@ export const HELP_SECTIONS: HelpSection[] = [
     roles: ["OWNER"],
     points: [
       "Chứng từ quản lý nội bộ BH (bán trực tiếp) và KG (ký gửi) LUÔN tách riêng, bất kể cài đặt này — để tiền bán trực tiếp và tiền ký gửi không bao giờ trộn lẫn, và khoản phải trả cho nhà cung cấp luôn tính đúng theo từng chứng từ KG.",
-      "Cài đặt ở Cài đặt → Chế độ hoá đơn GTGT là MẶC ĐỊNH cho cách phát hành HOÁ ĐƠN PHÁP LÝ: COMBINED = một hoá đơn GTGT cho cả hai tính chất (mỗi tính chất một dòng); SEPARATE = hai hoá đơn GTGT riêng, mỗi hoá đơn một tính chất. Khi phát hành, người xuất chọn lại Gộp/Tách ngay trên form Hoá đơn GTGT cho từng lần xuất.",
-      "Hãy chốt lựa chọn này cùng kế toán và mô hình hợp đồng ký gửi trước khi vận hành thật. Đổi cài đặt chỉ ảnh hưởng các hoá đơn phát hành sau đó, không thay đổi hoá đơn đã phát hành.",
+      "Cài đặt ở Cài đặt → Chế độ hoá đơn GTGT (theo dõi nội bộ) là MẶC ĐỊNH cho cách ghi nhận hoá đơn: COMBINED = một hoá đơn GTGT cho cả hai tính chất (mỗi tính chất một dòng); SEPARATE = hai hoá đơn GTGT riêng, mỗi hoá đơn một tính chất. Khi ghi nhận, người ghi chọn lại Gộp/Tách ngay trên form Hoá đơn GTGT cho từng lần ghi nhận.",
+      "Hãy chốt lựa chọn này cùng kế toán và mô hình hợp đồng ký gửi trước khi vận hành thật. Đổi cài đặt chỉ ảnh hưởng các hoá đơn ghi nhận sau đó, không thay đổi hoá đơn đã ghi nhận.",
     ],
   },
   {
@@ -87,10 +87,10 @@ export const HELP_SECTIONS: HelpSection[] = [
   },
   {
     id: "sales-hoa-don-va-gioi-han",
-    title: "Hoá đơn GTGT & giới hạn của vai trò Bán hàng",
+    title: "Hoá đơn GTGT (theo dõi nội bộ) & giới hạn của vai trò Bán hàng",
     roles: ["SALES"],
     points: [
-      "Menu Hoá đơn GTGT với vai trò Bán hàng là CHỈ XEM danh sách hoá đơn đã phát hành: việc phát hành và huỷ hoá đơn do Kế toán (hoặc Chủ cửa hàng) thực hiện từ các dòng chứng từ BH/KG đã xác nhận.",
+      "Menu Hoá đơn GTGT (theo dõi nội bộ) với vai trò Bán hàng là CHỈ XEM danh sách hoá đơn đã ghi nhận: việc ghi nhận và huỷ ghi nhận do Kế toán (hoặc Chủ cửa hàng) thực hiện từ các dòng chứng từ BH/KG đã xác nhận.",
       "Vai trò của bạn không xem được giá vốn, giá ký gửi, lợi nhuận, phải trả / phải thu và đối soát — các bảng tài chính bị chặn ở cơ sở dữ liệu, không phải chỉ ẩn trên giao diện.",
       "Cần số liệu tài chính, hoặc cần sửa chứng từ đã xác nhận: liên hệ Kế toán hoặc Chủ cửa hàng để xử lý.",
     ],
@@ -147,9 +147,9 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Xuất & huỷ hoá đơn GTGT",
     roles: ["ACCOUNTING"],
     points: [
-      "Vào Hoá đơn GTGT: chọn đối tác, nhập Số hoá đơn, Ký hiệu, Ngày hoá đơn và nhà cung cấp hoá đơn điện tử, tick các dòng chứng từ BH/KG cần đưa vào, rồi bấm “Phát hành hoá đơn”.",
-      "Hoá đơn chỉ tạo được từ các dòng chứng từ ĐÃ XÁC NHẬN và chưa từng xuất hoá đơn; mỗi dòng trên hoá đơn luôn liên kết với đúng một chứng từ quản lý, nên tiền ký gửi và tiền bán trực tiếp không bao giờ trộn lẫn.",
-      "Gộp hay tách được chọn ngay trên form phát hành: tick ô “Gộp thành 1 hoá đơn GTGT” = một hoá đơn cho cả BH + KG; bỏ tick = tách hai hoá đơn — hoá đơn BH dùng Số hoá đơn/Ký hiệu chính, hoá đơn KG phải nhập thêm Số hoá đơn/Ký hiệu phần ký gửi. Ô tick được đặt sẵn theo mặc định (COMBINED / SEPARATE) ở Cài đặt.",
+      "Vào Hoá đơn GTGT (theo dõi nội bộ): chọn đối tác, nhập Số hoá đơn, Ký hiệu, Ngày hoá đơn và nhà cung cấp hoá đơn điện tử theo đúng hoá đơn đã xuất từ hệ thống hoá đơn chính thức, tick các dòng chứng từ BH/KG cần đưa vào, rồi bấm “Ghi nhận hoá đơn”.",
+      "Hoá đơn chỉ ghi nhận được từ các dòng chứng từ ĐÃ XÁC NHẬN và chưa từng ghi nhận hoá đơn; mỗi dòng trên hoá đơn luôn liên kết với đúng một chứng từ quản lý, nên tiền ký gửi và tiền bán trực tiếp không bao giờ trộn lẫn.",
+      "Gộp hay tách được chọn ngay trên form ghi nhận: tick ô “Gộp thành 1 hoá đơn GTGT” = một hoá đơn cho cả BH + KG; bỏ tick = tách hai hoá đơn — hoá đơn BH dùng Số hoá đơn/Ký hiệu chính, hoá đơn KG phải nhập thêm Số hoá đơn/Ký hiệu phần ký gửi. Ô tick được đặt sẵn theo mặc định (COMBINED / SEPARATE) ở Cài đặt.",
       "Bấm “Huỷ hoá đơn” ở danh sách khi cần huỷ: thao tác này chỉ mở lại đúng các dòng thuộc hoá đơn đó để xuất lại, các hoá đơn khác không bị ảnh hưởng.",
     ],
   },
@@ -190,7 +190,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Xem báo cáo & chi tiết số liệu",
     roles: ["CEO"],
     points: [
-      "Vào Báo cáo để xem đối soát ký gửi theo nhà cung cấp và theo đối tác; vào Phải trả nhà cung cấp / Phải thu đối tác để xem chi tiết công nợ, số đã thanh toán và hạn thanh toán; vào Hoá đơn GTGT để xem các hoá đơn pháp lý đã phát hành.",
+      "Vào Báo cáo để xem đối soát ký gửi theo nhà cung cấp và theo đối tác; vào Phải trả nhà cung cấp / Phải thu đối tác để xem chi tiết công nợ, số đã thanh toán và hạn thanh toán; vào Hoá đơn GTGT (theo dõi nội bộ) để xem các hoá đơn đã ghi nhận.",
       "Vào Tồn kho theo lô để xem tồn kho chi tiết theo từng lô (quyền sở hữu, nhà cung cấp, giá vốn, hạn trả); vào Sản phẩm để xem danh mục và tồn theo từng mặt hàng.",
       "Mọi danh sách và chứng từ đều mở xem được toàn bộ — dùng các bộ lọc ở đầu mỗi trang (quyền sở hữu, vị trí, trạng thái) để thu hẹp phạm vi cần xem.",
     ],
