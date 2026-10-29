@@ -148,12 +148,37 @@ export default async function DashboardPage() {
         />
         {canSeeMoney && (
           <Card title="Hàng đã bán và đã gửi ký gởi" tone="amber" className="lg:col-span-2">
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <StatCard label="Đã bán" value={`${formatNumber(d.flows.soldQty)} đơn vị`} sub={`Doanh thu thuần ${formatVND(d.flows.soldRevenue)}`} />
-              <StatCard label="Đã gửi ký gởi" value={`${formatNumber(d.flows.sentQty)} đơn vị`} sub={`Giá chuyển giao ${formatVND(d.flows.sentValue)}`} />
-              <StatCard label="Đối tác đã tiêu thụ" value={`${formatNumber(d.flows.consumedQty)} đơn vị`} sub="Theo báo cáo tiêu thụ đã xác nhận" />
-              <StatCard label="Còn ở đối tác" value={`${formatNumber(d.flows.stillQty)} đơn vị`} sub={`Giá chuyển giao ${formatVND(d.flows.stillValue)}`} />
-            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="pb-2 pr-3 font-medium">Hạng mục</th>
+                  <th className="pb-2 pr-3 text-right font-medium">Số lượng</th>
+                  <th className="pb-2 text-right font-medium">Giá trị</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <tr>
+                  <td className="py-2 pr-3 text-slate-700">Đã bán</td>
+                  <td className="py-2 pr-3 text-right font-medium text-slate-900">{formatNumber(d.flows.soldQty)} đơn vị</td>
+                  <td className="py-2 text-right text-slate-600">Doanh thu thuần {formatVND(d.flows.soldRevenue)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-3 text-slate-700">Đã gửi ký gởi</td>
+                  <td className="py-2 pr-3 text-right font-medium text-slate-900">{formatNumber(d.flows.sentQty)} đơn vị</td>
+                  <td className="py-2 text-right text-slate-600">Giá chuyển giao {formatVND(d.flows.sentValue)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-3 text-slate-700">Đối tác đã tiêu thụ</td>
+                  <td className="py-2 pr-3 text-right font-medium text-slate-900">{formatNumber(d.flows.consumedQty)} đơn vị</td>
+                  <td className="py-2 text-right text-slate-600">Theo báo cáo tiêu thụ đã xác nhận</td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-3 text-slate-700">Còn ở đối tác</td>
+                  <td className="py-2 pr-3 text-right font-medium text-slate-900">{formatNumber(d.flows.stillQty)} đơn vị</td>
+                  <td className="py-2 text-right text-slate-600">Giá chuyển giao {formatVND(d.flows.stillValue)}</td>
+                </tr>
+              </tbody>
+            </table>
             <p className="mt-3 text-xs leading-relaxed text-slate-500">
               Chỉ tính chứng từ bán hàng (BH) và phiếu gửi ký gởi (GK) đã xác nhận. Hàng còn ở đối tác
               tính theo giá chuyển giao mới nhất của từng lô.
