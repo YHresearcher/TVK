@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui";
 import { formatCompactVND, formatCompactVND2 } from "@/components/Charts";
 import MultiRingDonut from "@/components/MultiRingDonut";
-import { formatNumber } from "@/lib/format";
+import { formatNumber, formatVND } from "@/lib/format";
 import type { StockRings } from "@/lib/types";
 
 function pct(n: number): string {
@@ -12,16 +12,20 @@ function pct(n: number): string {
 }
 
 /** Thẻ cơ cấu tồn kho: biểu đồ 3 vòng đồng tâm (sở hữu × vị trí × trạng
- *  thái), cả ba vòng cùng tính theo giá vốn lô. Ở giữa vòng là tổng giá trị
- *  hàng TVK sở hữu theo giá vốn (kho TVK + hàng tại đối tác, không gồm
- *  hàng nhận ký gửi). Ba mức giá vốn/sỉ/lẻ bên dưới chỉ tính hàng của TVK
- *  trong kho — đó là ba cách định giá cùng một lượng hàng, không phải ba
- *  phần của một tổng nên không vẽ thành vòng. */
+ *  thái), cả ba vòng cùng phạm vi (toàn bộ hàng đang quản lý, kể cả hàng
+ *  giữ hộ) và cùng chuẩn giá vốn lô. Ở giữa vòng là TỔNG GIÁ TRỊ HÀNG ĐANG
+ *  QUẢN LÝ theo giá vốn, kèm dòng tách rõ hàng TVK sở hữu với hàng giữ hộ.
+ *  Ba mức giá vốn/sỉ/lẻ bên dưới chỉ tính hàng của TVK trong kho — đó là ba
+ *  cách định giá cùng một lượng hàng, không phải ba phần của một tổng nên
+ *  không vẽ thành vòng. */
 export default function StockCompositionCard({
   rings,
   tierValues,
   ownedBookValue,
   ownedQty,
+  managedBookValue,
+  custodyBookValue,
+  custodyQty,
   canSeeMoney,
   canSeeCost,
 }: {
@@ -29,6 +33,9 @@ export default function StockCompositionCard({
   tierValues: { cost: number; wholesale: number; retail: number };
   ownedBookValue: number;
   ownedQty: number;
+  managedBookValue: number;
+  custodyBookValue: number;
+  custodyQty: number;
   canSeeMoney: boolean;
   canSeeCost: boolean;
 }) {
@@ -57,18 +64,18 @@ export default function StockCompositionCard({
         <MultiRingDonut
           rings={rings}
           canSeeMoney={canSeeMoney}
-          centerLabel={canSeeMoney ? formatCompactVND(ownedBookValue) : `${formatNumber(ownedQty)} đơn vị`}
+          centerLabel={canSeeMoney ? formatCompactVND(managedBookValue) : `${formatNumber(ownedQty + custodyQty)} đơn vị`}
           centerLines={
             canSeeMoney
-              ? ["Tổng giá trị hàng TVK sở hữu", "theo giá vốn"]
-              : ["Hàng TVK tại kho", "và tại đối tác"]
+              ? ["Tổng giá trị hàng đang quản lý", "theo giá vốn"]
+              : ["Tổng hàng đang quản lý", "kể cả hàng giữ hộ"]
           }
         />
-        {canSeeMoney && (
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">
-            Ở giữa: tổng giá trị hàng TVK sở hữu theo giá vốn, kể cả hàng đang ở đối tác, không gồm hàng nhận ký gửi.
-          </p>
-        )}
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">
+          {canSeeMoney
+            ? `Trong đó: hàng TVK sở hữu ${formatVND(ownedBookValue)} · hàng giữ hộ ${formatVND(custodyBookValue)} (không phải tài sản).`
+            : `Trong đó: hàng TVK ${formatNumber(ownedQty)} đơn vị · giữ hộ ${formatNumber(custodyQty)} đơn vị.`}
+        </p>
       </div>
 
       {canSeeCost && (

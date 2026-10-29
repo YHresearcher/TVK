@@ -77,7 +77,7 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
         <StatBox label="Đã thanh toán" value={formatVND(stats.totalPaid)} sub="Tổng tiền đã thu" />
         <StatBox label="Hoá đơn đã xuất" value={formatNumber(stats.invoiceCount)} sub="Hoá đơn đang hiệu lực" />
         <StatBox label="Giá trị hoá đơn" value={formatVND(stats.invoiceTotal)} sub="Tổng tiền hoá đơn đang hiệu lực" />
-        <StatBox label="Hàng còn ở đối tác" value={formatNumber(stats.stillAtPartner)} sub="Số cái đang ở chỗ đối tác" />
+        <StatBox label="Hàng còn ở đối tác" value={formatNumber(stats.stillAtPartner)} sub="Số đơn vị đang ở chỗ đối tác" />
       </div>
 
       <div className="space-y-6">

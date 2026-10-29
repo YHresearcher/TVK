@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
-import { BarChart, GroupedBarChart, HBarList } from "@/components/Charts";
+import { BarChart, formatCompactVND, GroupedBarChart, HBarList } from "@/components/Charts";
 import PartnerStatsDialog from "@/components/PartnerStatsDialog";
 import StockCompositionCard from "@/components/StockCompositionCard";
 import {
@@ -79,6 +79,11 @@ export default async function DashboardPage() {
     d.bookInventoryValue > 0
       ? `${((v / d.bookInventoryValue) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}% tổng hàng sở hữu`
       : "—";
+  // Hiệu suất ký gửi: đã tiêu thụ trên đã gửi (phiếu GK + báo cáo BT đã
+  // xác nhận). "Đã bán" trực tiếp không nằm ở khối này.
+  const sentQty = d.flows.sentQty;
+  const consumedQty = d.flows.consumedQty;
+  const consumeRate = sentQty > 0 ? Math.round((consumedQty / sentQty) * 100) : 0;
   if (!d.configured) {
     return (
       <>
@@ -137,51 +142,49 @@ export default async function DashboardPage() {
           </Card>
         </div>
       )}
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <StockCompositionCard
           rings={d.rings}
           tierValues={d.warehouseTierValues}
           ownedBookValue={d.bookInventoryValue}
           ownedQty={d.ownedQty + d.atPartnersQty}
+          managedBookValue={d.bookInventoryValue + d.bookConsignedCustodyValue}
+          custodyBookValue={d.bookConsignedCustodyValue}
+          custodyQty={d.consignedQty}
           canSeeMoney={canSeeMoney}
           canSeeCost={canSeeCost}
         />
         {canSeeMoney && (
-          <Card title="Hàng đã bán và đã gửi ký gởi" tone="amber" className="lg:col-span-2">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                  <th className="pb-2 pr-3 font-medium">Hạng mục</th>
-                  <th className="pb-2 pr-3 text-right font-medium">Số lượng</th>
-                  <th className="pb-2 text-right font-medium">Giá trị</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                <tr>
-                  <td className="py-2 pr-3 text-slate-700">Đã bán</td>
-                  <td className="py-2 pr-3 text-right font-medium text-slate-900">{formatNumber(d.flows.soldQty)} đơn vị</td>
-                  <td className="py-2 text-right text-slate-600">Doanh thu thuần {formatVND(d.flows.soldRevenue)}</td>
-                </tr>
-                <tr>
-                  <td className="py-2 pr-3 text-slate-700">Đã gửi ký gởi</td>
-                  <td className="py-2 pr-3 text-right font-medium text-slate-900">{formatNumber(d.flows.sentQty)} đơn vị</td>
-                  <td className="py-2 text-right text-slate-600">Giá chuyển giao {formatVND(d.flows.sentValue)}</td>
-                </tr>
-                <tr>
-                  <td className="py-2 pr-3 text-slate-700">Đối tác đã tiêu thụ</td>
-                  <td className="py-2 pr-3 text-right font-medium text-slate-900">{formatNumber(d.flows.consumedQty)} đơn vị</td>
-                  <td className="py-2 text-right text-slate-600">Theo báo cáo tiêu thụ đã xác nhận</td>
-                </tr>
-                <tr>
-                  <td className="py-2 pr-3 text-slate-700">Còn ở đối tác</td>
-                  <td className="py-2 pr-3 text-right font-medium text-slate-900">{formatNumber(d.flows.stillQty)} đơn vị</td>
-                  <td className="py-2 text-right text-slate-600">Giá chuyển giao {formatVND(d.flows.stillValue)}</td>
-                </tr>
-              </tbody>
-            </table>
+          <Card title="Hiệu suất ký gửi" tone="amber">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Đang gửi đối tác</p>
+                <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatNumber(sentQty)} đơn vị</p>
+              </div>
+              <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Giá trị chuyển giao</p>
+                <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatCompactVND(d.flows.sentValue)}</p>
+              </div>
+              <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Đã tiêu thụ</p>
+                <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatNumber(consumedQty)} đơn vị</p>
+              </div>
+              <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tỷ lệ tiêu thụ</p>
+                <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{consumeRate}%</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${consumeRate}%` }} />
+              </div>
+              <div className="mt-1.5 flex justify-between gap-3 text-xs text-slate-500">
+                <span>Đã tiêu thụ {formatNumber(consumedQty)} đơn vị</span>
+                <span>Còn tại đối tác {formatNumber(d.flows.stillQty)} đơn vị</span>
+              </div>
+            </div>
             <p className="mt-3 text-xs leading-relaxed text-slate-500">
-              Chỉ tính chứng từ bán hàng (BH) và phiếu gửi ký gởi (GK) đã xác nhận. Hàng còn ở đối tác
-              tính theo giá chuyển giao mới nhất của từng lô.
+              Chỉ tính phiếu gửi ký gởi (GK) và báo cáo tiêu thụ (BT) đã xác nhận. Hàng còn tại đối tác tính theo giá chuyển giao mới nhất của từng lô.
             </p>
           </Card>
         )}
@@ -232,9 +235,9 @@ export default async function DashboardPage() {
               Doanh thu thuần <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
               {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
               {" · "}Lợi nhuận gộp <strong className="text-slate-900">{formatVND(d.grossProfitAll)}</strong>
-              {`(Gross Margin ${grossMargin}% · Markup on Cost ${roiAll}%)`}.
+              {` (Gross Margin ${grossMargin}% · Markup on Cost ${roiAll}%)`}.
               Giá vốn tính theo lô thực tế đã xuất (nhập trước – xuất trước); giảm giá đã trừ vào doanh thu thuần.
-              {" "}30 ngày gần nhất: doanh thu thuần {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn.
+              {" "}30 ngày gần nhất: doanh thu thuần {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn. Tổng số lượng đã bán (lũy kế): {formatNumber(d.flows.soldQty)} đơn vị.
             </p>
             <p className="text-xs leading-relaxed text-slate-500">Gross Margin là lãi gộp chia cho doanh thu thuần.</p>
             <p className="mb-3 text-xs leading-relaxed text-slate-500">Markup on Cost là lãi gộp chia cho giá vốn hàng đã bán.</p>

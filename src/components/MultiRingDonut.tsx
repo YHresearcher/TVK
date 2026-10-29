@@ -10,15 +10,15 @@ import type { RingSegment, StockRings } from "@/lib/types";
  *  (hoặc một dòng chú giải) thì hiện chi tiết của đoạn đó bên dưới, kèm link
  *  mở danh sách tồn kho đã lọc khi vòng đó có bộ lọc tương ứng. */
 
-const SIZE = 300;
+const SIZE = 340;
 const CENTER = SIZE / 2;
-const STROKE = 18;
-const GAP_DEG = 4;
+const STROKE = 20;
+const GAP_DEG = 10;
 
 const RING_DEFS = [
-  { key: "ownership", title: "Quyền sở hữu", radius: 141 },
-  { key: "location", title: "Vị trí", radius: 117 },
-  { key: "status", title: "Trạng thái", radius: 93 },
+  { key: "ownership", title: "Quyền sở hữu", radius: 156 },
+  { key: "location", title: "Vị trí", radius: 128 },
+  { key: "status", title: "Trạng thái", radius: 100 },
 ] as const;
 
 function pct(v: number, total: number): string {
@@ -72,7 +72,7 @@ export default function MultiRingDonut({
       <div className="flex flex-col gap-5">
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className="mx-auto w-full max-w-[300px] shrink-0"
+          className="mx-auto w-full max-w-[340px] shrink-0"
           role="img"
           aria-label="Biểu đồ cơ cấu tồn kho 3 vòng"
         >
@@ -112,7 +112,7 @@ export default function MultiRingDonut({
                       <title>{s.label}</title>
                     </circle>
                   ) : (
-                    <path key={key} d={arcPath(def.radius, start, start + sweep)} {...common}>
+                    <path key={key} d={arcPath(def.radius, start, start + sweep)} strokeLinecap="round" {...common}>
                       <title>{s.label}</title>
                     </path>
                   );
@@ -120,50 +120,51 @@ export default function MultiRingDonut({
               </g>
             );
           })}
-          <text x={CENTER} y={CENTER - 14} textAnchor="middle" fontSize="26" fontWeight="700" fill="#0f172a">
+          <text x={CENTER} y={CENTER - 16} textAnchor="middle" fontSize="30" fontWeight="700" fill="#0f172a">
             {centerLabel}
           </text>
-          <text x={CENTER} y={CENTER + 8} textAnchor="middle" fontSize="10.5" fill="#64748b">
+          <text x={CENTER} y={CENTER + 10} textAnchor="middle" fontSize="11" fill="#64748b">
             {centerLines[0]}
           </text>
-          <text x={CENTER} y={CENTER + 22} textAnchor="middle" fontSize="10.5" fill="#64748b">
+          <text x={CENTER} y={CENTER + 26} textAnchor="middle" fontSize="11" fill="#64748b">
             {centerLines[1]}
           </text>
         </svg>
 
-        <div className="min-w-0 flex-1 space-y-5">
+        <div className="min-w-0 flex-1 space-y-4">
           {RING_DEFS.map((def) => {
             const segs = rings[def.key];
             const total = segs.reduce((a, s) => a + Math.max(displayOf(s), 0), 0);
             return (
               <div key={def.key}>
                 <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">{def.title}</p>
-                <ul className="space-y-1">
+                <div className="flex flex-wrap gap-2">
                   {segs.map((s) => {
                     const key = `${def.key}:${s.key}`;
                     const isActive = activeKey === key;
                     return (
-                      <li key={s.key}>
-                        <button
-                          type="button"
-                          aria-pressed={selectedKey === key}
-                          onClick={() => toggleSelect(key)}
-                          onMouseEnter={() => setHoverKey(key)}
-                          onMouseLeave={() => setHoverKey(null)}
-                          className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm ${
-                            isActive ? "bg-slate-100 font-medium text-slate-900" : "text-slate-700 hover:bg-slate-50"
-                          }`}
-                        >
-                          <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
-                          <span className="min-w-0 flex-1">{s.label}</span>
-                          <span className="shrink-0 font-medium text-slate-900">{formatDisplay(displayOf(s))}</span>
-                          <span className="w-11 shrink-0 text-right text-xs text-slate-500">{pct(displayOf(s), total)}</span>
-                        </button>
-                      </li>
+                      <button
+                        key={s.key}
+                        type="button"
+                        aria-pressed={selectedKey === key}
+                        onClick={() => toggleSelect(key)}
+                        onMouseEnter={() => setHoverKey(key)}
+                        onMouseLeave={() => setHoverKey(null)}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm ${
+                          isActive
+                            ? "border-blue-600 bg-blue-50 font-medium text-blue-700"
+                            : "border-slate-300 bg-white text-slate-700 hover:border-blue-500 hover:text-blue-700"
+                        }`}
+                      >
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+                        <span>{s.label}</span>
+                        <span className="font-medium text-slate-900">{formatDisplay(displayOf(s))}</span>
+                        <span className="text-xs text-slate-500">{pct(displayOf(s), total)}</span>
+                      </button>
                     );
                   })}
-                  {segs.length === 0 && <li className="text-sm text-slate-500">Chưa có số liệu.</li>}
-                </ul>
+                  {segs.length === 0 && <p className="text-sm text-slate-500">Chưa có số liệu.</p>}
+                </div>
               </div>
             );
           })}
@@ -194,7 +195,7 @@ export default function MultiRingDonut({
           )}
         </div>
       ) : (
-        <p className="mt-4 text-xs text-slate-500">Bấm vào một đoạn trên biểu đồ hoặc một dòng chú giải để xem giá trị, tỷ trọng và số lô.</p>
+        <p className="mt-4 text-xs text-slate-500">Bấm vào một đoạn trên biểu đồ hoặc một chip chú giải để xem giá trị, tỷ trọng và số lô.</p>
       )}
     </div>
   );
