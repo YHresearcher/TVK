@@ -69,13 +69,14 @@ export const HELP_SECTIONS: HelpSection[] = [
   // ---------------------------------------------------------------- SALES
   {
     id: "sales-ban-hang-tai-quay",
-    title: "Bán hàng tại quầy",
+    title: "Ghi nhận đơn bán hàng (bán lẻ tại quầy đang tạm dừng)",
     roles: ["SALES"],
     points: [
-      "Vào Bán hàng: chọn Khách lẻ hoặc đối tác (giá tự theo loại đối tác: Gara thì giá gara, còn lại thì giá đại lý; khách lẻ thì giá lẻ), điền Tên khách hàng (đã chọn đối tác thì tên tự hiện, không sửa được), quét mã vạch hoặc gõ tên, mã xe, mã hàng rồi Enter để thêm dòng theo lô cũ nhất còn hàng (nhớt thì ưu tiên lô sắp hết hạn trước — FEFO; linh kiện thì nhập trước xuất trước — FIFO) — quét lại cùng mã để cộng số lượng; tick “Ghi nợ (tạo phải thu)” nếu bán nợ, rồi bấm “Bán hàng”. Muốn nhập nhiều dòng một lúc thì dùng thẻ “Nhập từ Excel (Bán hàng)” ngay dưới form.",
-      "Chứng từ tự tách theo lô bạn chọn: lô của TVK vào chứng từ BH, lô được ký gửi vào chứng từ KG và tự động tạo khoản phải trả cho nhà cung cấp của lô đó theo giá ký gửi. Vì vậy chọn đúng lô là bước quan trọng nhất.",
+      "Bán lẻ tại quầy đang TẠM DỪNG từ 30/10/2026: quầy bán trực tiếp (tìm hàng, quét mã, bấm bán) đã tắt — việc bán hàng diễn ra ở hệ thống khác, TVK chỉ lưu trữ thông tin để đối soát. Muốn ghi nhận một đơn bán, dùng thẻ “Nhập từ Excel (Bán hàng)” ở trang Bán hàng.",
+      "Vào Bán hàng → thẻ “Nhập từ Excel (Bán hàng)”: chọn đối tác (hoặc khách lẻ), ngày bán, tick “Ghi nợ (tạo phải thu)” nếu bán nợ, rồi tải file 6 cột (mã hàng, dòng xe, tên phụ tùng, số lượng, đơn giá). Hệ thống khớp hàng theo mã trước, thiếu mã thì theo tên + dòng xe, và tự phân bổ theo lô cũ nhất còn hàng (nhớt thì ưu tiên lô sắp hết hạn trước — FEFO; linh kiện thì nhập trước xuất trước — FIFO).",
+      "Chứng từ tự tách theo lô: lô của TVK vào chứng từ BH, lô được ký gửi vào chứng từ KG và tự động tạo khoản phải trả cho nhà cung cấp của lô đó theo giá ký gửi. Vì vậy kiểm tra đúng lô trong bảng xem trước là bước quan trọng nhất.",
       "Ô “Giảm giá cho phần BH” chỉ trừ vào phần tồn kho (BH); giảm giá không bao giờ làm thay đổi khoản phải trả cho nhà cung cấp của hàng ký gửi.",
-      "Bán xong, tồn kho và công nợ cập nhật ngay — kiểm tra lại ở hai bảng “Đơn hàng gần đây” và “Chứng từ quản lý (BH / KG)” ngay dưới form.",
+      "Ghi nhận xong, tồn kho và công nợ cập nhật ngay — kiểm tra lại ở hai bảng “Đơn hàng gần đây” và “Chứng từ quản lý (BH / KG)” ngay dưới form. Đơn đã ghi nhận và chứng từ đã xác nhận vẫn xem lại được đầy đủ.",
     ],
   },
   {
@@ -162,7 +163,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Phải trả, phải thu & đối soát",
     roles: ["ACCOUNTING"],
     points: [
-      "Phải trả nhà cung cấp phát sinh TỰ ĐỘNG khi một lô ký gửi bán được (bán tại quầy hoặc qua phân bổ tiêu thụ), tính theo đúng giá ký gửi đã thoả thuận của lô; giảm giá cho khách hàng không bao giờ làm thay đổi số phải trả này.",
+      "Phải trả nhà cung cấp phát sinh TỰ ĐỘNG khi một lô ký gửi bán được (ghi nhận qua Excel hoặc qua phân bổ tiêu thụ), tính theo đúng giá ký gửi đã thoả thuận của lô; giảm giá cho khách hàng không bao giờ làm thay đổi số phải trả này.",
       "Vào Phải trả nhà cung cấp / Phải thu đối tác để xem số còn nợ và hạn thanh toán; mỗi khi trả hoặc thu tiền, dùng form “Ghi nhận thanh toán cho nhà cung cấp (PC)” / “Ghi nhận tiền thu từ đối tác (PT)”, chọn đúng khoản đang mở và nhập số tiền.",
       "Tạo đợt đối soát (DS) theo kỳ cho từng nhà cung cấp hoặc đối tác: chọn kỳ và tick các khoản đang mở đưa vào đối soát để chốt số liệu với bên kia.",
       "Ở Phải thu đối tác, khoản quá hạn được tô đỏ ở cột Hạn thu kèm chữ “(quá hạn)” — ưu tiên nhắc đối tác thanh toán theo số ngày thanh toán đã khai báo ở hồ sơ đối tác.",

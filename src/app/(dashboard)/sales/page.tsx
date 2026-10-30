@@ -1,8 +1,8 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
-import PosSaleForm, { type PosBatch, type PosPartner, type PosProduct } from "@/components/PosSaleForm";
+import { type PosProduct } from "@/components/PosSaleForm";
 import ImportDealerSale from "@/components/ImportDealerSale";
 import ExportExcelButton from "@/components/ExportExcelButton";
-import { createCounterSaleAction, importDealerSaleAction } from "@/lib/actions";
+import { importDealerSaleAction } from "@/lib/actions";
 import { buildProductCodeMap, getCurrentProfile, getSalesDocumentCosts, listBatchesForSales, listPartners, listProductCodes, listProductFitments, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { compareLotOrder, isOilGroup } from "@/lib/product-match";
@@ -47,11 +47,6 @@ export default async function SalesPage({
     "Trạng thái": STATUS_LABELS[d.status] ?? d.status,
   }));
   const partnerOptions = partners.data.map((p) => ({ value: p.id, label: p.name, kind: p.partner_kind }));
-  const posPartners: PosPartner[] = partners.data.map((p) => ({
-    id: p.id,
-    name: p.name,
-    kind: p.partner_kind,
-  }));
   const fitmentsByProduct = new Map<string, string[]>();
   for (const f of fitments.data) {
     const v = f.vehicles as AnyRow | AnyRow[] | null;
@@ -81,7 +76,7 @@ export default async function SalesPage({
     products.data.map((p) => [p.id, p])
   );
   // Tra cứu mã hàng: mọi mã/SKU đã đăng ký (chuẩn hoá trim + hoa, như
-  // buildProductCodeMap) → sản phẩm; dùng chung cho quầy POS và import.
+  // buildProductCodeMap) → sản phẩm; dùng cho import bán hàng.
   const codeMap = buildProductCodeMap(products.data, productCodes.data);
   const dealerCodeMap: Record<string, { productId: string; productName: string; wholesalePrice: number }> = {};
   for (const [code, productId] of Object.entries(codeMap)) {
@@ -97,8 +92,7 @@ export default async function SalesPage({
   // Hàng đợi xuất kho: theo từng sản phẩm, lô cũ nhất trước; nhớt thì
   // FEFO (hạn gần nhất trước, lô không hạn xếp sau cùng). Mỗi lô mang tồn
   // tại vị trí kho mình giữ nhiều nhất (đúng vị trí phiếu sẽ trừ — cùng
-  // logic mainOwnLocations phía server). Dùng chung cho import bán đại lý
-  // và quầy POS (POS giữ thêm ownership thô để tách BH/KG khi tính tổng).
+  // logic mainOwnLocations phía server). Dùng cho import bán hàng.
   const mainOwnQtyByBatch = new Map<string, number>();
   for (const r of batchStock.data) {
     if (r.location_kind !== "OWN_WAREHOUSE") continue;
@@ -106,7 +100,6 @@ export default async function SalesPage({
     if (Number(r.qty) > prev) mainOwnQtyByBatch.set(r.batch_id, Number(r.qty));
   }
   const dealerFifoBatches: Record<string, { batch_id: string; batch_code: string; ownership: string; mainOwnQty: number }[]> = {};
-  const posFifoBatches: Record<string, PosBatch[]> = {};
   const groupByProduct = new Map(products.data.map((p) => [p.id, p.product_group]));
   for (const r of [...ownBatches].sort((a, b) =>
     compareLotOrder(a, b, isOilGroup(groupByProduct.get(a.product_id)))
@@ -119,31 +112,27 @@ export default async function SalesPage({
       ownership: OWNERSHIP_LABELS[r.ownership] ?? r.ownership,
       mainOwnQty: q,
     });
-    (posFifoBatches[r.product_id] ??= []).push({
-      batch_id: r.batch_id,
-      batch_code: r.batch_code,
-      ownership: r.ownership,
-      mainOwnQty: q,
-    });
   }
 
   return (
     <>
       <PageHeader
-        title="Bán hàng (tại quầy)"
-        description="Tìm hàng theo tên, mã xe, mã hàng hoặc barcode rồi Enter để thêm dòng — giá tự theo loại khách hàng: khách lẻ giá lẻ, Gara giá gara, đối tác khác giá đại lý. Lô của mình đi vào chứng từ BH; lô ký gửi đi vào chứng từ KG và tự động tạo khoản phải trả cho nhà cung cấp của lô đó theo giá ký gửi của lô. Giảm giá chỉ áp dụng cho phần BH."
+        title="Bán hàng"
+        description="Ghi nhận đơn bán qua file Excel và xem lại đơn hàng, chứng từ BH/KG. Bán lẻ tại quầy đang tạm dừng — việc bán hàng diễn ra ở hệ thống khác, TVK chỉ lưu trữ thông tin để đối soát."
       />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã bán xong — chứng từ đã xác nhận, tồn kho và công nợ đã cập nhật.</p>}
+      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã ghi nhận đơn bán xong — chứng từ đã xác nhận, tồn kho và công nợ đã cập nhật.</p>}
       <div className="space-y-6">
         {!readOnly && (
-          <PosSaleForm
-            partners={posPartners}
-            products={posProducts}
-            codeMap={codeMap}
-            fifoBatches={posFifoBatches}
-            action={createCounterSaleAction}
-          />
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Bán lẻ tại quầy đang tạm dừng</p>
+            <p className="mt-1 leading-relaxed">
+              Quầy bán trực tiếp (chọn hàng, quét mã, bấm bán) đã tắt tạm thời theo quyết định ngày 30/10/2026.
+              Muốn ghi nhận một đơn bán, dùng thẻ “Nhập từ Excel (Bán hàng)” bên dưới — một file là một đơn, hệ thống
+              tự phân bổ theo lô và tách chứng từ BH/KG như trước. Mở lại quầy: chỉ cần gắn lại form bán tại quầy,
+              không cần viết lại — code quầy vẫn giữ nguyên trong hệ thống.
+            </p>
+          </div>
         )}
         {!readOnly && (
           <Card title="Nhập từ Excel (Bán hàng)">

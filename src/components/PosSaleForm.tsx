@@ -1,5 +1,11 @@
 "use client";
 
+// Quầy bán lẻ tại quầy (POS) — TẠM NGỪNG từ 30/10/2026: component vẫn
+// giữ nguyên trong hệ thống để mở lại khi cần, chỉ không còn được gắn
+// vào trang Bán hàng; server action createCounterSaleAction hiện chặn
+// mọi lần gọi. Mở lại: gắn lại PosSaleForm vào trang Bán hàng và cho
+// action gọi lại createSaleFromForm.
+
 import { useMemo, useRef, useState } from "react";
 import { Card, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";

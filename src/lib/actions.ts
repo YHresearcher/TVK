@@ -24,7 +24,8 @@ async function userId() {
   return user?.id ?? null;
 }
 
-/** Chặn ghi trái quyền ở tầng action (phòng thủ thêm sau RLS + kiểm tra
+/**
+ * Chặn ghi trái quyền ở tầng action (phòng thủ thêm sau RLS + kiểm tra
  *  trong hàm RPC): chỉ các vai trò trong danh sách mới được chạy tiếp. */
 async function requireRole(roles: string[], message: string) {
   const supabase = await db();
@@ -1149,7 +1150,13 @@ export async function importConsignmentOutAction(formData: FormData) {
 }
 
 // ------------------------------------------------------------------ sales
-export async function createCounterSaleAction(formData: FormData) {
+/**
+ * Lõi tạo đơn bán từ FormData: tạo đơn + tách chứng từ BH/KG theo tính
+ * chất lô + xác nhận ngay (trừ kho, cập nhật công nợ). Dùng chung cho
+ * nhập đơn bán từ Excel (đường ghi nhận thông tin vẫn mở). Quầy bán lẻ
+ * tại quầy KHÔNG gọi lõi này nữa — xem createCounterSaleAction.
+ */
+async function createSaleFromForm(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","SALES"], "Chỉ Chủ cửa hàng và Bán hàng mới được bán hàng.");
   const lines = zipItems(formData, ["batch_id", "qty", "unit_price"]).filter(
@@ -1250,6 +1257,17 @@ export async function createCounterSaleAction(formData: FormData) {
   revalidatePath("/payables");
   revalidatePath("/receivables");
   redirect("/sales?ok=1");
+}
+
+/**
+ * Bán lẻ tại quầy (POS) — TẠM DỪNG theo quyết định 2026-10-30: chỉ tắt
+ * đường bán lẻ trực tiếp, còn ghi nhận đơn bán qua Excel vẫn mở (đi qua
+ * createSaleFromForm). Giữ action này để mọi form POST cũ/giả mạo đều bị
+ * chặn ở server, không chỉ ẩn trên giao diện. Mở lại: cho PosSaleForm
+ * gọi lại createSaleFromForm và gỡ dòng throw này.
+ */
+export async function createCounterSaleAction() {
+  throw new Error("Bán lẻ tại quầy đang tạm dừng — ghi nhận đơn bán bằng “Nhập từ Excel (Bán hàng)” ở trang Bán hàng.");
 }
 
 /**
@@ -1444,7 +1462,7 @@ export async function importDealerSaleAction(formData: FormData) {
     fd.append("qty", String(l.qty));
     fd.append("unit_price", String(l.unit_price));
   }
-  return createCounterSaleAction(fd);
+  return createSaleFromForm(fd);
 }
 
 // ------------------------------------------------- partner consumption

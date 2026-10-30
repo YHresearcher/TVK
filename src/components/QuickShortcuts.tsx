@@ -17,7 +17,7 @@ const SHORTCUTS: Record<string, { label: string; href: string }[]> = {
     { label: "Sổ cái kho", href: "/ledger" },
   ],
   SALES: [
-    { label: "Tạo đơn hàng", href: "/sales" },
+    { label: "Nhập đơn bán", href: "/sales" },
     { label: "Tìm sản phẩm", href: "/products" },
     { label: "Kiểm tra tồn kho", href: "/inventory" },
     { label: "Đối tác", href: "/partners" },
