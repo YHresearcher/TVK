@@ -99,6 +99,17 @@ export const PRICE_TIER_LABELS: Record<PriceTier, string> = {
   wholesale: "Giá đại lý",
 };
 
+/** Dữ liệu sản phẩm cho form bán hàng và import Excel */
+export interface PosProduct {
+  id: string;
+  name: string;
+  sku: string;
+  retailPrice: number;
+  garagePrice: number;
+  wholesalePrice: number;
+  fitments: string[];
+}
+
 /** Gara thì giá gara, đối tác còn lại thì giá đại lý, khách lẻ (không có loại) thì giá lẻ. */
 export function priceTierForKind(kind: string | null | undefined): PriceTier {
   if (!kind || kind === "RETAIL") return "retail";

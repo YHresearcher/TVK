@@ -7,6 +7,15 @@ const nextConfig = {
     // vẫn được làm mới ngay sau khi sửa.
     staleTimes: { dynamic: 30 },
   },
+  async redirects() {
+    return [
+      {
+        source: "/import",
+        destination: "/stock-in?tab=import",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

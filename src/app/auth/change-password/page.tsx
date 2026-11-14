@@ -7,6 +7,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { btnCls, btnGhostCls, inputCls, labelCls } from "@/components/ui";
 import PasswordRules from "@/components/PasswordRules";
 import { validatePassword } from "@/lib/password-policy";
+import { completePasswordChangeAction } from "@/lib/actions";
 
 type Phase = "checking" | "ready" | "nosession" | "saving";
 
@@ -78,13 +79,11 @@ export default function ChangePasswordPage() {
       setError(updError.message);
       return;
     }
-    // Đổi xong: gỡ cờ bắt buộc đổi mật khẩu trong hồ sơ của chính mình.
-    const { data: userData } = await supabase.auth.getUser();
-    if (userData.user) {
-      await supabase
-        .from("profiles")
-        .update({ must_change_password: false })
-        .eq("id", userData.user.id);
+    // Đổi xong: gỡ cờ bắt buộc đổi mật khẩu trong hồ sơ của chính mình qua Server Action an toàn.
+    try {
+      await completePasswordChangeAction();
+    } catch {
+      // Bỏ qua lỗi phụ nếu trigger database đã tự gỡ cờ
     }
     router.push("/dashboard");
     router.refresh();

@@ -1410,7 +1410,7 @@ export async function getPerformanceSeries(
   const byDoc = new Map<string, { revenue: number; cogs: number; date: string }>();
   for (const d of docRows) {
     byDoc.set(String(d.id), {
-      revenue: Math.max(Number(d.total_amount ?? 0) - Number(d.discount_amount ?? 0), 0),
+      revenue: Math.max(Number(d.total_amount ?? 0), 0),
       cogs: 0,
       date: String(d.doc_date),
     });

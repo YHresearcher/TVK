@@ -94,15 +94,15 @@ export default async function InvoicesPage({
         </div>
         {invoices.data.length === 0 ? <EmptyState message="Chưa có hoá đơn GTGT." /> : (
           <TableWrap>
-            <thead><tr><th className={thCls}>Số hoá đơn</th><th className={thCls}>Ký hiệu</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Tổng</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
+            <thead><tr><th className={thCls}>Số hoá đơn</th><th className={thCls}>Ký hiệu</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={`${thCls} text-right`}>Tổng</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
             <tbody>
               {invoices.data.map((inv) => (
-                <tr key={inv.id} className="border-t border-slate-100">
-                  <td className={`${tdCls} font-mono text-xs`}>{inv.invoice_no}</td>
+                <tr key={inv.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
+                  <td className={`${tdCls} font-mono text-xs font-semibold text-slate-900`}>{inv.invoice_no}</td>
                   <td className={tdCls}>{inv.symbol}</td>
                   <td className={tdCls}>{inv.partner_id ? partnerName.get(inv.partner_id) ?? "—" : "—"}</td>
                   <td className={tdCls}>{formatDate(inv.invoice_date)}</td>
-                  <td className={tdCls}>{formatVND(inv.total_amount)}</td>
+                  <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(inv.total_amount)}</td>
                   <td className={tdCls}><StatusBadge status={inv.status} /></td>
                   <td className={tdCls}>
                     {inv.status === "ISSUED" && !readOnly && (

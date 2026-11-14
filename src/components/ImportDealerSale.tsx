@@ -6,8 +6,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { formatNumber, formatVND, todayISO } from "@/lib/format";
 import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import { matchByNameVehicle, normCode, tierPriceOf } from "@/lib/product-match";
-import { PRICE_TIER_LABELS, priceTierForKind } from "@/lib/types";
-import type { PosProduct } from "@/components/PosSaleForm";
+import { PRICE_TIER_LABELS, priceTierForKind, type PosProduct } from "@/lib/types";
 
 /** Cột tiền: căn phải để dễ dò số. */
 const thNumCls = `${thCls} text-right`;

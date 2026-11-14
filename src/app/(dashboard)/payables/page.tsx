@@ -49,16 +49,16 @@ export default async function PayablesPage({
 
       {payables.data.length === 0 ? <EmptyState message="Chưa có khoản phải trả. Bán một lô ký gửi để tạo khoản phải trả." /> : (
         <TableWrap>
-          <thead><tr><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Số lượng</th><th className={thCls}>Giá ký gửi</th><th className={thCls}>Số tiền</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn nợ</th><th className={thCls}>Hạn trả</th><th className={thCls}>Trạng thái</th></tr></thead>
+          <thead><tr><th className={thCls}>Nhà cung cấp</th><th className={`${thCls} text-right`}>Số lượng</th><th className={`${thCls} text-right`}>Giá ký gửi</th><th className={`${thCls} text-right`}>Số tiền</th><th className={`${thCls} text-right`}>Đã trả</th><th className={`${thCls} text-right`}>Còn nợ</th><th className={thCls}>Hạn trả</th><th className={thCls}>Trạng thái</th></tr></thead>
           <tbody>
             {payables.data.map((p) => (
-              <tr key={p.id} className="border-t border-slate-100">
+              <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                 <td className={tdCls}>{supplierName.get(p.supplier_id) ?? "—"}</td>
-                <td className={tdCls}>{formatNumber(p.qty)}</td>
-                <td className={tdCls}>{formatVND(p.unit_price)}</td>
-                <td className={tdCls}>{formatVND(p.amount)}</td>
-                <td className={tdCls}>{formatVND(p.amount_paid)}</td>
-                <td className={`${tdCls} font-medium`}>{formatVND(Number(p.amount) - Number(p.amount_paid))}</td>
+                <td className={`${tdCls} text-right font-mono`}>{formatNumber(p.qty)}</td>
+                <td className={`${tdCls} text-right font-mono`}>{formatVND(p.unit_price)}</td>
+                <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(p.amount)}</td>
+                <td className={`${tdCls} text-right font-mono text-emerald-700`}>{formatVND(p.amount_paid)}</td>
+                <td className={`${tdCls} text-right font-mono font-medium text-rose-700`}>{formatVND(Number(p.amount) - Number(p.amount_paid))}</td>
                 <td className={tdCls}>{formatDate(p.due_date)}</td>
                 <td className={tdCls}><StatusBadge status={p.status} /></td>
               </tr>
@@ -121,14 +121,14 @@ export default async function PayablesPage({
         <div className="mt-6">
           <h2 className="mb-3 text-sm font-semibold text-slate-800">Các đợt đối soát</h2>
           <TableWrap>
-            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Kỳ</th><th className={thCls}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
+            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Kỳ</th><th className={`${thCls} text-right`}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
             <tbody>
               {supplierSettlements.map((s) => (
-                <tr key={s.id} className="border-t border-slate-100">
-                  <td className={`${tdCls} font-mono text-xs`}>{s.doc_code}</td>
+                <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
+                  <td className={`${tdCls} font-mono text-xs font-semibold text-slate-900`}>{s.doc_code}</td>
                   <td className={tdCls}>{supplierName.get(s.supplier_id) ?? "—"}</td>
                   <td className={tdCls}>{formatDate(s.period_from)} → {formatDate(s.period_to)}</td>
-                  <td className={tdCls}>{formatVND(s.total_amount)}</td>
+                  <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(s.total_amount)}</td>
                   <td className={tdCls}><StatusBadge status={s.status} /></td>
                 </tr>
               ))}

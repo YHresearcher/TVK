@@ -4,10 +4,9 @@ import ItemsRows from "@/components/ItemsRows";
 import ImportConsignmentOut from "@/components/ImportConsignmentOut";
 import { confirmConsignmentOutAction, createConsignmentOutAction, importConsignmentOutAction } from "@/lib/actions";
 import { buildProductCodeMap, getCurrentProfile, listBatchesForSales, listConsignmentOutSlips, listPartners, listProductCodes, listProductFitments, listProducts, listSuppliers } from "@/lib/queries";
-import type { PosProduct } from "@/components/PosSaleForm";
 import { formatDate } from "@/lib/format";
 import { compareLotOrder, isOilGroup } from "@/lib/product-match";
-import { OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
+import { OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow, type PosProduct } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -123,6 +122,15 @@ export default async function ConsignmentOutPage({
             <ItemsRows fields={[
               { name: "batch_id", label: "Lô (tại Kho TVK)", type: "select", options: batchOptions },
               { name: "qty", label: "Số lượng", type: "number" },
+              {
+                name: "term",
+                label: "Điều khoản",
+                type: "select",
+                options: [
+                  { value: "CONSIGNMENT", label: "Ký gửi" },
+                  { value: "PURCHASE", label: "Mua đứt" },
+                ],
+              },
               { name: "transfer_price", label: "Giá chuyển giao / giá thoả thuận (₫)", type: "number", step: "1000" },
             ]} initialRows={2} />
             <p className="text-xs text-slate-500">Kho nguồn được tự động xác định từ vị trí hiện tại của lô. Giá chuyển giao dùng để kiểm tra hạn mức ký gửi của đối tác khi xác nhận. Muốn bán đứt thì dùng mục Bán hàng — phiếu này chỉ gửi ký gửi.</p>

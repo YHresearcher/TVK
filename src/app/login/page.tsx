@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import { flagPasswordResetRequestedAction } from "@/lib/actions";
 
 const BRONZE = "#A78B5B";
 
@@ -57,8 +56,7 @@ export default function LoginPage() {
       setError(error.message);
       return;
     }
-    // Gắn cờ bắt buộc đổi mật khẩu cho lần đăng nhập sau khi đặt lại.
-    await flagPasswordResetRequestedAction(email);
+    // Liên kết đặt lại gửi qua email sẽ dẫn tới /auth/set-password
     setLoading(false);
     setNotice("Đã gửi liên kết đặt lại mật khẩu — hãy kiểm tra email của bạn.");
   }

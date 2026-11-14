@@ -1,6 +1,6 @@
 import { BackLink, Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
-import { confirmAllocationAction, createAllocationDocumentsAction } from "@/lib/actions";
+import { confirmAllocationAction, confirmAndIssueVatInvoiceAction, createAllocationDocumentsAction } from "@/lib/actions";
 import { getAllocationDetail, getCurrentProfile, listProducts } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
 import { NATURE_LABELS, isReadOnlyRole } from "@/lib/types";
@@ -22,6 +22,7 @@ export default async function AllocationDetailPage({
   const productName = new Map(products.data.map((p) => [p.id, `${p.sku} — ${p.name}`]));
   const documented = new Set(detail.documentedLineIds);
   const pendingCount = detail.lines.filter((l) => !documented.has(l.id)).length;
+  const hasUninvoiced = detail.lines.some((l) => l.invoice_status !== "INVOICED");
 
   return (
     <>
@@ -35,15 +36,25 @@ export default async function AllocationDetailPage({
       <Card title="Các dòng">
         {detail.lines.length === 0 ? <EmptyState message="Chưa có dòng nào." /> : (
           <TableWrap>
-            <thead><tr><th className={thCls}>Sản phẩm</th><th className={thCls}>Tính chất</th><th className={thCls}>Số lượng</th><th className={thCls}>Đơn giá</th><th className={thCls}>Thành tiền</th><th className={thCls}>Chứng từ</th><th className={thCls}>Trạng thái hoá đơn</th></tr></thead>
+            <thead>
+              <tr>
+                <th className={thCls}>Sản phẩm</th>
+                <th className={thCls}>Tính chất</th>
+                <th className={`${thCls} text-right`}>Số lượng</th>
+                <th className={`${thCls} text-right`}>Đơn giá</th>
+                <th className={`${thCls} text-right`}>Thành tiền</th>
+                <th className={thCls}>Chứng từ</th>
+                <th className={thCls}>Trạng thái hoá đơn</th>
+              </tr>
+            </thead>
             <tbody>
               {detail.lines.map((l) => (
-                <tr key={l.id} className="border-t border-slate-100">
+                <tr key={l.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                   <td className={tdCls}>{productName.get(l.product_id) ?? l.product_id}</td>
                   <td className={tdCls}>{NATURE_LABELS[l.nature] ?? l.nature}</td>
-                  <td className={tdCls}>{formatNumber(l.qty)}</td>
-                  <td className={tdCls}>{formatVND(l.unit_price)}</td>
-                  <td className={tdCls}>{formatVND(Number(l.qty) * Number(l.unit_price))}</td>
+                  <td className={`${tdCls} text-right font-mono`}>{formatNumber(l.qty)}</td>
+                  <td className={`${tdCls} text-right font-mono`}>{formatVND(l.unit_price)}</td>
+                  <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(Number(l.qty) * Number(l.unit_price))}</td>
                   <td className={tdCls}>{documented.has(l.id) ? "Đã tạo" : "Chờ tạo"}</td>
                   <td className={tdCls}><StatusBadge status={l.invoice_status} /></td>
                 </tr>
@@ -51,7 +62,15 @@ export default async function AllocationDetailPage({
             </tbody>
           </TableWrap>
         )}
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {!readOnly && hasUninvoiced && (
+            <form action={confirmAndIssueVatInvoiceAction}>
+              <input type="hidden" name="id" value={slip.id} />
+              <SubmitButton className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
+                ⚡ Xác nhận &amp; Xuất Hoá đơn GTGT (1-Click)
+              </SubmitButton>
+            </form>
+          )}
           {!readOnly && slip.status === "DRAFT" && (
             <form action={confirmAllocationAction}>
               <input type="hidden" name="id" value={slip.id} />
@@ -66,8 +85,8 @@ export default async function AllocationDetailPage({
               </SubmitButton>
             </form>
           )}
-          {slip.status === "CONFIRMED" && pendingCount === 0 && (
-            <p className="text-sm text-slate-500">Mọi dòng đều đã có chứng từ BH/KG. Sang Hoá đơn GTGT (theo dõi nội bộ) để ghi nhận hoá đơn đã xuất.</p>
+          {slip.status === "CONFIRMED" && !hasUninvoiced && (
+            <p className="text-sm text-emerald-600 font-medium">Mọi dòng đều đã có chứng từ BH/KG và đã xuất Hoá đơn GTGT.</p>
           )}
           <a href="/invoices" className={btnGhostCls}>Đi tới Hoá đơn GTGT (theo dõi nội bộ)</a>
         </div>

@@ -1,5 +1,5 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
-import { type PosProduct } from "@/components/PosSaleForm";
+import { type PosProduct } from "@/lib/types";
 import ImportDealerSale from "@/components/ImportDealerSale";
 import ExportExcelButton from "@/components/ExportExcelButton";
 import { importDealerSaleAction } from "@/lib/actions";
@@ -163,13 +163,13 @@ export default async function SalesPage({
             </div>
             {orders.data.length === 0 ? <EmptyState message="Chưa có đơn hàng." /> : (
               <TableWrap>
-                <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Ngày</th><th className={thCls}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
+                <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Ngày</th><th className={`${thCls} text-right`}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
                 <tbody>
                   {orders.data.slice(0, 20).map((o) => (
-                    <tr key={o.id} className="border-t border-slate-100">
+                    <tr key={o.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                       <td className={`${tdCls} font-mono text-xs`}>{o.doc_code}</td>
                       <td className={tdCls}>{formatDate(o.order_date)}</td>
-                      <td className={tdCls}>{formatVND(o.total_amount)}</td>
+                      <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(o.total_amount)}</td>
                       <td className={tdCls}><StatusBadge status={o.status} /></td>
                     </tr>
                   ))}
@@ -184,21 +184,21 @@ export default async function SalesPage({
             </div>
             {documents.data.length === 0 ? <EmptyState message="Chưa có chứng từ." /> : (
               <TableWrap>
-                <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Ngày</th><th className={thCls}>Tổng</th>{canSeeCost && (<><th className={`${thCls} text-right`}>Giá vốn</th><th className={`${thCls} text-right`}>Lãi gộp</th></>)}<th className={thCls}>Trạng thái</th></tr></thead>
+                <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Ngày</th><th className={`${thCls} text-right`}>Tổng</th>{canSeeCost && (<><th className={`${thCls} text-right`}>Giá vốn</th><th className={`${thCls} text-right`}>Lãi gộp</th></>)}<th className={thCls}>Trạng thái</th></tr></thead>
                 <tbody>
                   {documents.data.slice(0, 20).map((d) => {
                     const c = docCosts.get(String(d.id));
                     const profit = c ? Number(d.total_amount) - c.cost : null;
                     return (
-                      <tr key={d.id} className="border-t border-slate-100">
+                      <tr key={d.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                         <td className={`${tdCls} font-mono text-xs`}>{d.doc_code}</td>
                         <td className={tdCls}>{d.doc_kind}</td>
                         <td className={tdCls}>{formatDate(d.doc_date)}</td>
-                        <td className={tdCls}>{formatVND(d.total_amount)}</td>
+                        <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(d.total_amount)}</td>
                         {canSeeCost && (
                           <>
-                            <td className={`${tdCls} text-right`}>{c ? formatVND(c.cost) : "—"}</td>
-                            <td className={`${tdCls} text-right`}>{profit === null ? "—" : formatVND(profit)}</td>
+                            <td className={`${tdCls} text-right font-mono`}>{c ? formatVND(c.cost) : "—"}</td>
+                            <td className={`${tdCls} text-right font-mono font-medium text-emerald-700`}>{profit === null ? "—" : formatVND(profit)}</td>
                           </>
                         )}
                         <td className={tdCls}><StatusBadge status={d.status} /></td>

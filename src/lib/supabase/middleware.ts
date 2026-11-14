@@ -44,5 +44,35 @@ export async function updateSession(request: NextRequest) {
     redirectUrl.pathname = "/dashboard";
     return NextResponse.redirect(redirectUrl);
   }
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("must_change_password")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile?.must_change_password) {
+      const isServerAction = Boolean(request.headers.get("next-action"));
+      const isApiRoute = pathname.startsWith("/api/");
+      const isAuthPage = pathname.startsWith("/auth/");
+
+      // FS-01: Chặn triệt để mọi Server Action và API route (trừ public auth API nếu có)
+      // Không cho phép bất kỳ server action nào chạy khi chưa đổi mật khẩu,
+      // kể cả khi POST tới đường dẫn /auth/* (tránh lỗ hổng bypass qua path).
+      if (isServerAction || (isApiRoute && !pathname.startsWith("/api/auth/"))) {
+        return new NextResponse(
+          JSON.stringify({ error: "Tài khoản cần đổi mật khẩu trước khi thực hiện các thao tác khác." }),
+          { status: 403, headers: { "content-type": "application/json" } }
+        );
+      }
+      if (!isAuthPage && !isLoginPage) {
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = "/auth/change-password";
+        return NextResponse.redirect(redirectUrl);
+      }
+    }
+  }
+
   return response;
 }

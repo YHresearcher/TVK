@@ -12,7 +12,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { formatVND } from "@/lib/format";
 import { normalizeHeader } from "@/lib/excel-parse";
 import { normCode, tierPriceOf } from "@/lib/product-match";
-import { OWNERSHIP_LABELS, PRICE_TIER_LABELS, priceTierForKind, type PriceTier } from "@/lib/types";
+import { OWNERSHIP_LABELS, PRICE_TIER_LABELS, priceTierForKind, type PriceTier, type PosProduct } from "@/lib/types";
 
 export interface PosPartner {
   id: string;
@@ -20,15 +20,7 @@ export interface PosPartner {
   kind: string;
 }
 
-export interface PosProduct {
-  id: string;
-  name: string;
-  sku: string;
-  retailPrice: number;
-  garagePrice: number;
-  wholesalePrice: number;
-  fitments: string[];
-}
+export type { PosProduct };
 
 export interface PosBatch {
   batch_id: string;

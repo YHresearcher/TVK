@@ -6,8 +6,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { formatNumber, formatVND, todayISO } from "@/lib/format";
 import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import { matchByNameVehicle, normCode } from "@/lib/product-match";
-import { type AnyRow } from "@/lib/types";
-import type { PosProduct } from "@/components/PosSaleForm";
+import { type AnyRow, type PosProduct } from "@/lib/types";
 import type { DealerFifoBatchRow } from "@/components/ImportDealerSale";
 
 /** Cột tiền: căn phải để dễ dò số. */
@@ -20,6 +19,7 @@ interface RawRow {
   /** Mã hàng (SKU hoặc mã đã đăng ký) — chìa khoá khớp hàng khi tên trùng. */
   code: string;
   qty: number;
+  term: "CONSIGNMENT" | "PURCHASE";
   /** null = ô giá để trống → giá chuyển giao 0 (như trước). */
   price: number | null;
 }
@@ -27,6 +27,7 @@ interface RawRow {
 interface AllocLine {
   batchCode: string;
   ownership: string;
+  term: "CONSIGNMENT" | "PURCHASE";
   batchStock: number;
   qty: number;
   price: number;
@@ -48,6 +49,7 @@ const FIELD_ALIASES: Record<string, string[]> = {
   name: ["tenphutung", "tenhang", "ten", "name"],
   code: ["mahang", "mahanghoa", "masanpham", "masp", "maso", "sku", "code", "productcode", "maphutung"],
   qty: ["soluong", "sl", "qty", "quantity"],
+  term: ["dieukhoan", "dieukhoangiaohang", "hinhthuc", "term", "loai", "nguonhang"],
   price: ["giachuyengiaovnd", "giachuyengiao", "giathoathuan", "giavnd", "dongia", "transferprice"],
 };
 
@@ -104,11 +106,15 @@ export default function ImportConsignmentOut({
       for (const cells of aoa.slice(1) as unknown[][]) {
         if (cells.every((c) => toStr(c) === "")) continue;
         const priceCell = val(cells, "price");
+        const termRaw = toStr(val(cells, "term")).trim().toUpperCase();
+        const term: "CONSIGNMENT" | "PURCHASE" =
+          termRaw.includes("PURCHASE") || termRaw.includes("MUA") ? "PURCHASE" : "CONSIGNMENT";
         rows.push({
           vehicle: toStr(val(cells, "vehicle")),
           name: toStr(val(cells, "name")),
           code: toStr(val(cells, "code")),
           qty: toNum(val(cells, "qty")),
+          term,
           price: toStr(priceCell) === "" ? null : toNum(priceCell),
         });
       }
@@ -187,6 +193,7 @@ export default function ImportConsignmentOut({
               allocs.push({
                 batchCode: b.batch_code,
                 ownership: b.ownership,
+                term: r.term,
                 batchStock: b.mainOwnQty,
                 qty: take,
                 price,
@@ -250,10 +257,7 @@ export default function ImportConsignmentOut({
       r.allocs.map((l) => ({
         batchCode: l.batchCode,
         qty: l.qty,
-        // Phiếu GK chỉ còn một bản chất: ký gửi. "Mua đứt" đi qua
-        // mục bán sỉ. Server vốn đã mặc định mọi dòng không phải
-        // PURCHASE thành CONSIGNMENT.
-        term: "CONSIGNMENT",
+        term: l.term || "CONSIGNMENT",
         price: l.price,
       }))
     ),
@@ -381,6 +385,7 @@ export default function ImportConsignmentOut({
               <th className={thCls}>Sản phẩm</th>
               <th className={thCls}>Lô (FIFO)</th>
               <th className={thCls}>Tính chất</th>
+              <th className={thCls}>Điều khoản</th>
               <th className={thCls}>Tồn tại Kho TVK</th>
               <th className={thCls}>SL gửi</th>
               <th className={thNumCls}>Giá chuyển giao</th>
@@ -400,6 +405,7 @@ export default function ImportConsignmentOut({
                   <td className={tdCls}>{j === 0 ? r.productName ?? "—" : ""}</td>
                   <td className={`${tdCls} font-mono text-xs`}>{l?.batchCode ?? "—"}</td>
                   <td className={tdCls}>{l?.ownership ?? "—"}</td>
+                  <td className={tdCls}>{l ? (l.term === "PURCHASE" ? "Mua đứt" : "Ký gửi") : "—"}</td>
                   <td className={tdCls}>{l ? formatNumber(l.batchStock) : "—"}</td>
                   <td className={tdCls}>{l ? formatNumber(l.qty) : "—"}</td>
                   <td className={tdNumCls}>{l && l.price > 0 ? formatVND(l.price) : "—"}</td>
@@ -422,7 +428,7 @@ export default function ImportConsignmentOut({
           </tbody>
           <tfoot>
             <tr className="border-t border-slate-200 bg-slate-50 font-bold">
-              <td className={tdCls} colSpan={8}>Tổng</td>
+              <td className={tdCls} colSpan={9}>Tổng</td>
               <td className={tdCls}>{formatNumber(totalQty)}</td>
               <td className={tdCls}></td>
               <td className={tdNumCls}>{formatVND(totalAmount)}</td>
