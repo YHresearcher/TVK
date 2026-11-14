@@ -4,6 +4,8 @@ import { ComposedChart, formatCompactVND, GroupedBarChart, HBarList, StackedBarL
 import PartnerStatsDialog from "@/components/PartnerStatsDialog";
 import QuickShortcuts from "@/components/QuickShortcuts";
 import StockCompositionCard from "@/components/StockCompositionCard";
+import ExecutiveControlSection from "@/components/ExecutiveControlSection";
+import { getCashFlowRunway, getExecutiveAlerts } from "@/lib/audit";
 import {
   getCurrentProfile,
   getDashboard,
@@ -115,7 +117,7 @@ export default async function DashboardPage({
   const canSeeCost = ["OWNER", "ACCOUNTING", "CEO"].includes(profile.data?.role ?? "");
   const period = searchParams?.period ?? "90d";
   const { from, to } = periodRange(period, searchParams?.from, searchParams?.to);
-  const [d, partnerStats, groupPerf, slow, recent, perf, groupValue, consBars, agingBars] = await Promise.all([
+  const [d, partnerStats, groupPerf, slow, recent, perf, groupValue, consBars, agingBars, cashflow, alertsResult] = await Promise.all([
     getDashboard(),
     listPartnerStats(),
     getGroupPerformance(),
@@ -125,6 +127,8 @@ export default async function DashboardPage({
     canSeeCost ? getInventoryValueByGroup() : Promise.resolve([]),
     canSeeMoney ? getPartnerConsignmentBars() : Promise.resolve([]),
     canSeeMoney ? getReceivableAgingBars() : Promise.resolve([]),
+    canSeeMoney ? getCashFlowRunway() : Promise.resolve(null),
+    canSeeMoney ? getExecutiveAlerts() : Promise.resolve(null),
   ]);
   const grossMargin = d.revenueAll > 0 ? Math.round((d.grossProfitAll / d.revenueAll) * 100) : 0;
   const cogsAll = d.revenueAll - d.grossProfitAll;
@@ -171,6 +175,12 @@ export default async function DashboardPage({
       <p className="mt-2 text-xs text-slate-500">Chưa tách thuế GTGT.</p>
     </section>
   );
+
+  // Khối Executive Control: Cảnh báo đỏ & Dòng tiền 14-30 ngày cho CEO / Shadow Controller
+  const executiveSection =
+    !canSeeMoney || !cashflow || !alertsResult ? null : (
+      <ExecutiveControlSection cashflow={cashflow} alertsResult={alertsResult} />
+    );
 
   // Tầng 2 — Hàng hoá và sở hữu: của TVK, được ký gửi, gửi đối tác.
   const layer2 = (
@@ -563,11 +573,11 @@ export default async function DashboardPage({
       />
       <QuickShortcuts role={role} />
       {role === "SALES" ? (
-        <>{layer1}{layer3}{layer2}{layer4}{layer5}</>
+        <>{layer1}{executiveSection}{layer3}{layer2}{layer4}{layer5}</>
       ) : role === "WAREHOUSE" ? (
-        <>{layer2}{layer4}{layer1}{layer3}{layer5}</>
+        <>{layer2}{layer4}{layer1}{executiveSection}{layer3}{layer5}</>
       ) : (
-        <>{layer1}{layer2}{layer3}{layer4}{layer5}</>
+        <>{layer1}{executiveSection}{layer2}{layer3}{layer4}{layer5}</>
       )}
     </>
   );

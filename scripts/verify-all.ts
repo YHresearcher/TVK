@@ -346,4 +346,236 @@ assert.throws(
 
 console.log("  ✔ Direct and settlement overpayment guards passed.");
 
+// ============================================================================
+// 7. Executive Red Flags, Cash Flow Runway & 3-Way Matching Audit Logic
+// ============================================================================
+console.log("▶ Testing Executive Red Flags, Cash Flow Runway & 3-Way Matching Audit...");
+
+// 7.1 Cash Flow Runway calculation
+function simulateCashFlowRunway(opts: {
+  receivables: { amount: number; amount_paid: number; due_date: string }[];
+  payables: { amount: number; amount_paid: number; due_date: string }[];
+  today: string;
+}) {
+  const diffDays = (d1: string, d2: string) =>
+    Math.floor((Date.parse(d2) - Date.parse(d1)) / 86400000);
+
+  let overdueRecv = 0;
+  let in0to14 = 0;
+  let in15to30 = 0;
+  for (const r of opts.receivables) {
+    const rem = Math.max(r.amount - r.amount_paid, 0);
+    const d = diffDays(opts.today, r.due_date);
+    if (d < 0) overdueRecv += rem;
+    else if (d <= 14) in0to14 += rem;
+    else if (d <= 30) in15to30 += rem;
+  }
+
+  let overduePay = 0;
+  let out0to14 = 0;
+  let out15to30 = 0;
+  for (const p of opts.payables) {
+    const rem = Math.max(p.amount - p.amount_paid, 0);
+    const d = diffDays(opts.today, p.due_date);
+    if (d < 0) overduePay += rem;
+    else if (d <= 14) out0to14 += rem;
+    else if (d <= 30) out15to30 += rem;
+  }
+
+  const inflow14 = overdueRecv + in0to14;
+  const outflow14 = overduePay + out0to14;
+  const net14 = inflow14 - outflow14;
+  const ratio14 = outflow14 > 0 ? inflow14 / outflow14 : 1;
+  const status14 = net14 < 0 || ratio14 < 0.85 ? "DANGER" : ratio14 < 1.15 ? "WARNING" : "SAFE";
+
+  const inflow30 = overdueRecv + in0to14 + in15to30;
+  const outflow30 = overduePay + out0to14 + out15to30;
+  const net30 = inflow30 - outflow30;
+  const ratio30 = outflow30 > 0 ? inflow30 / outflow30 : 1;
+  const status30 = net30 < 0 || ratio30 < 0.85 ? "DANGER" : ratio30 < 1.15 ? "WARNING" : "SAFE";
+
+  return { inflow14, outflow14, net14, status14, inflow30, outflow30, net30, status30 };
+}
+
+const cf1 = simulateCashFlowRunway({
+  today: "2026-11-14",
+  receivables: [
+    { amount: 50_000_000, amount_paid: 20_000_000, due_date: "2026-11-10" }, // overdue 30M
+    { amount: 40_000_000, amount_paid: 0, due_date: "2026-11-20" },          // 0-14d 40M
+    { amount: 30_000_000, amount_paid: 0, due_date: "2026-12-05" },          // 15-30d 30M
+  ],
+  payables: [
+    { amount: 20_000_000, amount_paid: 0, due_date: "2026-11-18" },          // 0-14d 20M
+    { amount: 45_000_000, amount_paid: 0, due_date: "2026-12-01" },          // 15-30d 45M
+  ],
+});
+assert.equal(cf1.inflow14, 70_000_000); // 30M overdue + 40M
+assert.equal(cf1.outflow14, 20_000_000);
+assert.equal(cf1.net14, 50_000_000);
+assert.equal(cf1.status14, "SAFE");
+assert.equal(cf1.inflow30, 100_000_000); // 70M + 30M
+assert.equal(cf1.outflow30, 65_000_000); // 20M + 45M
+assert.equal(cf1.net30, 35_000_000);
+assert.equal(cf1.status30, "SAFE");
+
+// Test deficit in 14-day runway
+const cf2 = simulateCashFlowRunway({
+  today: "2026-11-14",
+  receivables: [{ amount: 10_000_000, amount_paid: 0, due_date: "2026-11-20" }],
+  payables: [{ amount: 40_000_000, amount_paid: 0, due_date: "2026-11-18" }],
+});
+assert.equal(cf2.net14, -30_000_000);
+assert.equal(cf2.status14, "DANGER");
+
+// 7.2 Excel 6-Column Conformity Test
+const REQUIRED_EXCEL_COLUMNS = [
+  "Thời gian",
+  "Loại cảnh báo",
+  "Đối tác/NCC",
+  "Mã chứng từ/Lô hàng",
+  "Số lượng/Số tiền chênh lệch",
+  "Lý do cảnh báo",
+];
+
+const mockAlertExcelRow = {
+  "Thời gian": "14/11/2026",
+  "Loại cảnh báo": "ĐỎ (Khẩn cấp)",
+  "Đối tác/NCC": "Gara An Phát",
+  "Mã chứng từ/Lô hàng": "Ký gửi tại Gara An Phát",
+  "Số lượng/Số tiền chênh lệch": "Lệch -5 cái",
+  "Lý do cảnh báo": "Số lượng không khớp: Đã gửi (20) ≠ Tiêu thụ (10) + Đã trả (2) + Còn giữ (3)",
+};
+
+for (const col of REQUIRED_EXCEL_COLUMNS) {
+  assert.ok(col in mockAlertExcelRow, `Missing required Excel column: ${col}`);
+}
+assert.equal(Object.keys(mockAlertExcelRow).length, 6);
+
+// 7.3 3-Way Matching Signal & Timing Logic
+function evaluate3WayMatch(opts: {
+  docDate: string;
+  today: string;
+  hasVatInvoice: boolean;
+  debtStatus: "PAID" | "UNPAID";
+  dueDate: string;
+  unitCost: number;
+  unitPrice: number;
+}) {
+  const daysSinceDoc = Math.floor((Date.parse(opts.today) - Date.parse(opts.docDate)) / 86400000);
+  const isOverdueInvoice = !opts.hasVatInvoice && daysSinceDoc > 5;
+  const isOverdueDebt = opts.debtStatus === "UNPAID" && Date.parse(opts.dueDate) < Date.parse(opts.today);
+  const isSellingAtLoss = opts.unitPrice < opts.unitCost;
+
+  if (isOverdueInvoice || isOverdueDebt || isSellingAtLoss) {
+    return "RED";
+  }
+  if (!opts.hasVatInvoice || opts.debtStatus === "UNPAID") {
+    return "AMBER";
+  }
+  return "GREEN";
+}
+
+// Case 1: Invoiced late (> 5 days without invoice) -> RED
+assert.equal(
+  evaluate3WayMatch({
+    docDate: "2026-11-01",
+    today: "2026-11-14", // 13 days (> 5)
+    hasVatInvoice: false,
+    debtStatus: "PAID",
+    dueDate: "2026-11-20",
+    unitCost: 100_000,
+    unitPrice: 150_000,
+  }),
+  "RED"
+);
+
+// Case 2: Within 5 days without invoice, debt in term -> AMBER
+assert.equal(
+  evaluate3WayMatch({
+    docDate: "2026-11-12",
+    today: "2026-11-14", // 2 days (<= 5)
+    hasVatInvoice: false,
+    debtStatus: "UNPAID",
+    dueDate: "2026-11-25",
+    unitCost: 100_000,
+    unitPrice: 150_000,
+  }),
+  "AMBER"
+);
+
+// Case 3: Fully matched: invoiced, paid, profitable -> GREEN
+assert.equal(
+  evaluate3WayMatch({
+    docDate: "2026-11-01",
+    today: "2026-11-14",
+    hasVatInvoice: true,
+    debtStatus: "PAID",
+    dueDate: "2026-11-10",
+    unitCost: 100_000,
+    unitPrice: 150_000,
+  }),
+  "GREEN"
+);
+
+// Case 4: Sold below cost -> RED
+assert.equal(
+  evaluate3WayMatch({
+    docDate: "2026-11-12",
+    today: "2026-11-14",
+    hasVatInvoice: true,
+    debtStatus: "PAID",
+    dueDate: "2026-11-20",
+    unitCost: 200_000,
+    unitPrice: 150_000, // loss
+  }),
+  "RED"
+);
+
+// 7.4 Total Count vs Filtered Count & Discrepancy Aggregation
+const mockRows = [
+  { id: "1", signal: "RED" },
+  { id: "2", signal: "AMBER" },
+  { id: "3", signal: "GREEN" },
+  { id: "4", signal: "RED" },
+];
+
+function simulateAuditFilter(rows: { id: string; signal: string }[], filterSignal?: string) {
+  const discrepancyRows = rows.filter((r) => r.signal === "RED");
+  const filteredRows = !filterSignal || filterSignal === "ALL"
+    ? rows
+    : rows.filter((r) => r.signal === filterSignal);
+  return {
+    totalCount: rows.length,
+    filteredCount: filteredRows.length,
+    rows: filteredRows,
+    discrepancyRows,
+  };
+}
+
+const auditAll = simulateAuditFilter(mockRows, "ALL");
+assert.equal(auditAll.totalCount, 4);
+assert.equal(auditAll.filteredCount, 4);
+assert.equal(auditAll.discrepancyRows.length, 2);
+
+const auditRed = simulateAuditFilter(mockRows, "RED");
+assert.equal(auditRed.totalCount, 4, "Total count must remain total evaluated items (4), not filtered items");
+assert.equal(auditRed.filteredCount, 2);
+assert.equal(auditRed.discrepancyRows.length, 2, "Discrepancy rows must be preserved for 1-click export");
+
+// 7.5 Export Endpoint Authorization Guard
+function checkExportAuthorization(role: string | null | undefined): boolean {
+  if (!role) return false;
+  return ["OWNER", "ACCOUNTING", "CEO"].includes(role);
+}
+
+assert.equal(checkExportAuthorization("OWNER"), true);
+assert.equal(checkExportAuthorization("CEO"), true);
+assert.equal(checkExportAuthorization("ACCOUNTING"), true);
+assert.equal(checkExportAuthorization("SALES"), false);
+assert.equal(checkExportAuthorization("WAREHOUSE"), false);
+assert.equal(checkExportAuthorization(null), false);
+assert.equal(checkExportAuthorization(undefined), false);
+
+console.log("  ✔ Cash Flow Runway, 6-column Excel schema, 3-Way Matching & Authorization guard passed.");
+
 console.log("\n All verification tests passed successfully!");

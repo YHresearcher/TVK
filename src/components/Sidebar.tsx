@@ -62,6 +62,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/payables", label: "Phải trả nhà cung cấp" },
       { href: "/receivables", label: "Phải thu đối tác" },
+      { href: "/audit-center", label: "Kiểm soát & Đối soát" },
       { href: "/reports", label: "Báo cáo" },
     ],
   },

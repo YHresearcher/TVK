@@ -2167,11 +2167,12 @@ export async function confirmAndIssueVatInvoiceAction(formData: FormData) {
   }
 
   // 3. Lấy tất cả sales_document_lines chưa xuất hoá đơn của phiếu phân bổ này
-  const lineIds = (lines ?? []).map((l: AnyRow) => l.id as string);
-  const { data: docLineRows } = await supabase
-    .from("sales_document_lines")
-    .select("id, allocation_line_id")
-    .in("allocation_line_id", lineIds);
+  const { data: docLineRows } = lineIds.length
+    ? await supabase
+        .from("sales_document_lines")
+        .select("id, allocation_line_id")
+        .in("allocation_line_id", lineIds)
+    : { data: [] as AnyRow[] };
 
   const candidateDocLineIds = ((docLineRows ?? []) as AnyRow[]).map(
     (l) => l.id as string
