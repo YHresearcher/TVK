@@ -190,3 +190,7 @@ export const REF_DOC_TYPE_LABELS: Record<string, string> = {
   SALES_DOCUMENT: "Chứng từ bán hàng",
   RETURN_DOCUMENT: "Phiếu trả hàng",
 };
+
+export { SEMANTIC_COLORS } from "@/lib/tokens";
+export type { SemanticColorToken } from "@/lib/tokens";
+

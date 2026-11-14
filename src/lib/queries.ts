@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { buildAging } from "@/lib/aging";
+import { todayISO } from "@/lib/format";
 import type { AnyRow, Profile, RingSegment, StockRings } from "@/lib/types";
 
 export interface QueryResult<T> {
@@ -1973,3 +1974,244 @@ export async function getConsignmentSlipDetail(slipId: string): Promise<Document
     note: "Đã tiêu thụ / còn giữ tính theo lô tại đối tác này; một lô có thể đi trên nhiều phiếu.",
   };
 }
+
+/**
+ * 4 nhóm tuổi nợ phục vụ Bàn điều hành CEO (Executive Receivables Aging):
+ * Chưa đến hạn, 1–30 ngày, 31–60 ngày, >60 ngày
+ */
+export interface ExecutiveAgingBucket {
+  key: string;
+  label: string;
+  amount: number;
+  pct: number;
+  color: string;
+  count: number;
+}
+
+export async function getExecutiveReceivableAging(): Promise<{
+  buckets: ExecutiveAgingBucket[];
+  total: number;
+  overdueTotal: number;
+  overdueRatio: number | null;
+}> {
+  const supabase = await client();
+  if (!supabase) {
+    return {
+      buckets: [],
+      total: 0,
+      overdueTotal: 0,
+      overdueRatio: null,
+    };
+  }
+
+  const { data: recs } = await supabase
+    .from("partner_receivables")
+    .select("amount, amount_paid, due_date, status")
+    .in("status", ["UNPAID", "PARTIAL"]);
+
+  const today = todayISO();
+  const rows = (recs ?? []) as AnyRow[];
+
+  let notDue = 0;
+  let notDueCount = 0;
+  let band1To30 = 0;
+  let band1To30Count = 0;
+  let band31To60 = 0;
+  let band31To60Count = 0;
+  let bandOver60 = 0;
+  let bandOver60Count = 0;
+
+  for (const r of rows) {
+    const remain = Math.max(Number(r.amount ?? 0) - Number(r.amount_paid ?? 0), 0);
+    if (remain <= 0) continue;
+    if (!r.due_date) {
+      notDue += remain;
+      notDueCount += 1;
+      continue;
+    }
+    const due = String(r.due_date).slice(0, 10);
+    const diff = Math.floor((Date.parse(today) - Date.parse(due)) / 86400000);
+    if (diff <= 0) {
+      notDue += remain;
+      notDueCount += 1;
+    } else if (diff <= 30) {
+      band1To30 += remain;
+      band1To30Count += 1;
+    } else if (diff <= 60) {
+      band31To60 += remain;
+      band31To60Count += 1;
+    } else {
+      bandOver60 += remain;
+      bandOver60Count += 1;
+    }
+  }
+
+  const total = notDue + band1To30 + band31To60 + bandOver60;
+  const overdueTotal = band1To30 + band31To60 + bandOver60;
+  const overdueRatio = total > 0 ? (overdueTotal / total) * 100 : null;
+
+  const buckets: ExecutiveAgingBucket[] = [
+    {
+      key: "not_due",
+      label: "Chưa đến hạn",
+      amount: notDue,
+      pct: total > 0 ? (notDue / total) * 100 : 0,
+      color: "#10B981", // Emerald
+      count: notDueCount,
+    },
+    {
+      key: "1_30",
+      label: "1–30 ngày",
+      amount: band1To30,
+      pct: total > 0 ? (band1To30 / total) * 100 : 0,
+      color: "#F59E0B", // Amber
+      count: band1To30Count,
+    },
+    {
+      key: "31_60",
+      label: "31–60 ngày",
+      amount: band31To60,
+      pct: total > 0 ? (band31To60 / total) * 100 : 0,
+      color: "#F97316", // Orange
+      count: band31To60Count,
+    },
+    {
+      key: "over_60",
+      label: ">60 ngày",
+      amount: bandOver60,
+      pct: total > 0 ? (bandOver60 / total) * 100 : 0,
+      color: "#EF4444", // Red
+      count: bandOver60Count,
+    },
+  ];
+
+  return { buckets, total, overdueTotal, overdueRatio };
+}
+
+/** Nhóm hàng tạo lợi nhuận cao nhất cho CEO Dashboard */
+export interface CategoryProfitabilityRow {
+  group: string;
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+  grossMargin: number | null;
+  qty: number;
+}
+
+export async function getTopCategoriesProfitability(
+  fromISO?: string,
+  toISO?: string
+): Promise<CategoryProfitabilityRow[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+
+  let docQuery = supabase
+    .from("sales_documents")
+    .select("id, doc_date")
+    .eq("status", "CONFIRMED");
+
+  if (fromISO) docQuery = docQuery.gte("doc_date", fromISO);
+  if (toISO) docQuery = docQuery.lte("doc_date", toISO);
+
+  const { data: docs } = await docQuery.limit(5000);
+  const docRows = (docs ?? []) as AnyRow[];
+  if (docRows.length === 0) return [];
+
+  const docIds = docRows.map((d) => String(d.id));
+
+  const CHUNK_SIZE = 100;
+  const lines: AnyRow[] = [];
+  for (let i = 0; i < docIds.length; i += CHUNK_SIZE) {
+    const chunk = docIds.slice(i, i + CHUNK_SIZE);
+    const { data: chunkLines } = await supabase
+      .from("sales_document_lines")
+      .select("document_id, product_id, qty, line_total, batch_id, allocation_line_id")
+      .in("document_id", chunk)
+      .limit(10000);
+    if (chunkLines?.length) {
+      lines.push(...(chunkLines as AnyRow[]));
+    }
+  }
+
+  const { data: productsRes } = await supabase.from("products").select("id, product_group").limit(5000);
+  const products = (productsRes ?? []) as AnyRow[];
+
+  const groupOf = new Map(
+    products.map((p) => [String(p.id), String(p.product_group ?? "").trim() || "Chưa xếp nhóm"])
+  );
+
+  const allocIds = Array.from(
+    new Set(lines.map((l) => String(l.allocation_line_id ?? "")).filter(Boolean))
+  );
+  const directBatchIds = Array.from(
+    new Set(lines.map((l) => String(l.batch_id ?? "")).filter(Boolean))
+  );
+
+  const allocBatch = new Map<string, string>();
+  if (allocIds.length) {
+    const { data: allocs } = await supabase
+      .from("allocation_lines")
+      .select("id, batch_id")
+      .in("id", allocIds)
+      .limit(5000);
+    for (const a of (allocs ?? []) as AnyRow[]) {
+      allocBatch.set(String(a.id), String(a.batch_id));
+    }
+  }
+
+  const allBatchIds = Array.from(
+    new Set([...directBatchIds, ...Array.from(allocBatch.values())])
+  );
+
+  const batchCost = new Map<string, number>();
+  if (allBatchIds.length) {
+    for (let i = 0; i < allBatchIds.length; i += CHUNK_SIZE) {
+      const chunk = allBatchIds.slice(i, i + CHUNK_SIZE);
+      const { data: batches } = await supabase
+        .from("stock_batches")
+        .select("id, unit_cost")
+        .in("id", chunk)
+        .limit(5000);
+      for (const b of (batches ?? []) as AnyRow[]) {
+        batchCost.set(String(b.id), Number(b.unit_cost ?? 0));
+      }
+    }
+  }
+
+  const byGroup = new Map<string, { revenue: number; cogs: number; qty: number }>();
+
+  for (const l of lines) {
+    const group = groupOf.get(String(l.product_id)) || "Chưa xếp nhóm";
+    const cur = byGroup.get(group) ?? { revenue: 0, cogs: 0, qty: 0 };
+    const rev = Number(l.line_total ?? 0);
+    const qty = Number(l.qty ?? 0);
+    const batchId = l.batch_id
+      ? String(l.batch_id)
+      : allocBatch.get(String(l.allocation_line_id ?? ""));
+    const cost = qty * (batchCost.get(batchId ?? "") ?? 0);
+
+    cur.revenue += rev;
+    cur.cogs += cost;
+    cur.qty += qty;
+    byGroup.set(group, cur);
+  }
+
+  const rows: CategoryProfitabilityRow[] = Array.from(byGroup.entries()).map(
+    ([group, data]) => {
+      const grossProfit = data.revenue - data.cogs;
+      const grossMargin = data.revenue > 0 ? (grossProfit / data.revenue) * 100 : null;
+      return {
+        group,
+        revenue: data.revenue,
+        cogs: data.cogs,
+        grossProfit,
+        grossMargin,
+        qty: data.qty,
+      };
+    }
+  );
+
+  rows.sort((a, b) => b.grossProfit - a.grossProfit);
+  return rows;
+}
+

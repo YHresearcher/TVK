@@ -56,7 +56,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar userName={userName} role={role} />
+      <Sidebar userName={userName} role={role} rawRole={rawRole} />
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Thanh trên cùng cho màn hình nhỏ: hamburger + Trợ giúp.
             Từ lg trở lên ẩn — khi đó dùng sidebar tĩnh và hàng Trợ giúp

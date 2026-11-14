@@ -449,7 +449,7 @@ export function ComposedChart({
           </g>
         );
       })}
-      {points.length > 1 && <polyline points={linePath} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" />}
+      {points.length > 1 && <path d={linePath} fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" />}
       {points.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5">
           <title>{`${p.d.label}: biên lợi nhuận ${(p.d.margin as number).toFixed(1)}%`}</title>

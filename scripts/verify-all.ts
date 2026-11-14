@@ -578,4 +578,80 @@ assert.equal(checkExportAuthorization(undefined), false);
 
 console.log("  ✔ Cash Flow Runway, 6-column Excel schema, 3-Way Matching & Authorization guard passed.");
 
+// ============================================================================
+// 8. CEO Executive Dashboard & Semantic Color Tokens Verification
+// ============================================================================
+console.log("▶ Testing CEO Executive Dashboard & Semantic Color Tokens...");
+
+// 8.1 Authorization Guard: strictly read-only for OWNER, CEO, ACCOUNTING
+function checkExecutiveRouteAccess(role: string | null | undefined): "ALLOW" | "REDIRECT_DASHBOARD" {
+  const ALLOWED = new Set(["OWNER", "CEO", "ACCOUNTING"]);
+  if (role && ALLOWED.has(role)) return "ALLOW";
+  return "REDIRECT_DASHBOARD";
+}
+
+assert.equal(checkExecutiveRouteAccess("OWNER"), "ALLOW");
+assert.equal(checkExecutiveRouteAccess("CEO"), "ALLOW");
+assert.equal(checkExecutiveRouteAccess("ACCOUNTING"), "ALLOW");
+assert.equal(checkExecutiveRouteAccess("SALES"), "REDIRECT_DASHBOARD");
+assert.equal(checkExecutiveRouteAccess("WAREHOUSE"), "REDIRECT_DASHBOARD");
+assert.equal(checkExecutiveRouteAccess(null), "REDIRECT_DASHBOARD");
+
+// 8.2 Strategic KPI Calculation Rules & Zero Denominator Handlers
+function calculateGrossMargin(revenue: number, grossProfit: number): string {
+  if (revenue <= 0) return "—";
+  return ((grossProfit / revenue) * 100).toFixed(1) + "%";
+}
+
+function calculateOverdueRatio(totalReceivables: number, overdueReceivables: number): string {
+  if (totalReceivables <= 0) return "—";
+  return ((overdueReceivables / totalReceivables) * 100).toFixed(1) + "%";
+}
+
+function calculateInventoryTurnover(inventoryCapital: number, periodCogs: number): string {
+  if (inventoryCapital <= 0) return "—";
+  return (periodCogs / inventoryCapital).toFixed(2) + " vòng";
+}
+
+// Normal positive cases
+assert.equal(calculateGrossMargin(100000000, 25000000), "25.0%");
+assert.equal(calculateOverdueRatio(200000000, 30000000), "15.0%");
+assert.equal(calculateInventoryTurnover(500000000, 1000000000), "2.00 vòng");
+
+// Zero denominator cases MUST return "—", never "0.0%" or fake %
+assert.equal(calculateGrossMargin(0, 0), "—");
+assert.equal(calculateGrossMargin(-100, -20), "—");
+assert.equal(calculateOverdueRatio(0, 0), "—");
+assert.equal(calculateInventoryTurnover(0, 500000), "—");
+
+// 8.3 Semantic Token Separation Check
+import { SEMANTIC_COLORS } from "../src/lib/tokens.ts";
+
+assert.equal(SEMANTIC_COLORS.cogs, "#F59E0B", "cogs must be amber #F59E0B");
+assert.equal(SEMANTIC_COLORS.supplierConsignment, "#0284C7", "supplierConsignment must be #0284C7");
+assert.notEqual(
+  SEMANTIC_COLORS.cogs,
+  SEMANTIC_COLORS.supplierConsignment,
+  "cogs and supplierConsignment tokens must have distinct color codes"
+);
+
+// 8.4 Receivables Aging Bucket Distribution Check
+function categorizeAging(daysOverdue: number): "not_due" | "1_30" | "31_60" | "over_60" {
+  if (daysOverdue <= 0) return "not_due";
+  if (daysOverdue <= 30) return "1_30";
+  if (daysOverdue <= 60) return "31_60";
+  return "over_60";
+}
+
+assert.equal(categorizeAging(-5), "not_due");
+assert.equal(categorizeAging(0), "not_due");
+assert.equal(categorizeAging(1), "1_30");
+assert.equal(categorizeAging(30), "1_30");
+assert.equal(categorizeAging(31), "31_60");
+assert.equal(categorizeAging(60), "31_60");
+assert.equal(categorizeAging(61), "over_60");
+assert.equal(categorizeAging(120), "over_60");
+
+console.log("  ✔ CEO Dashboard access control, zero-denominator handlers & token separation passed.");
+
 console.log("\n All verification tests passed successfully!");

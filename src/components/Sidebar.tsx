@@ -62,7 +62,6 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/payables", label: "Phải trả nhà cung cấp" },
       { href: "/receivables", label: "Phải thu đối tác" },
-      { href: "/audit-center", label: "Kiểm soát & Đối soát" },
       { href: "/reports", label: "Báo cáo" },
     ],
   },
@@ -102,12 +101,21 @@ function activeGroupId(pathname: string): string | null {
 export default function Sidebar({
   userName,
   role,
+  rawRole,
 }: {
   userName: string;
   role: string;
+  rawRole?: string;
 }) {
   const pathname = usePathname();
   const currentGroup = activeGroupId(pathname);
+  const isOwnerOrCeo =
+    rawRole === "OWNER" ||
+    rawRole === "CEO" ||
+    role === "OWNER" ||
+    role === "CEO" ||
+    role === "Chủ cửa hàng" ||
+    role === "CEO (chỉ xem)";
 
   // Kiểu accordion: tại một thời điểm chỉ MỘT nhóm mở — mở nhóm khác thì
   // nhóm đang mở tự thu lại. Nhóm chứa trang đang xem tự mở khi chuyển
@@ -205,6 +213,18 @@ export default function Sidebar({
             {TOP_ITEM.label}
           </Link>
         </div>
+
+        {isOwnerOrCeo && (
+          <div>
+            <Link
+              href="/executive"
+              className={itemCls("/executive")}
+              onClick={() => setMobileOpen(false)}
+            >
+              Bàn điều hành CEO
+            </Link>
+          </div>
+        )}
 
         {GROUPS.map((group) => {
           const expanded = openId === group.id;
