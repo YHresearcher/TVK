@@ -54,7 +54,7 @@ Mỗi loại chứng từ có tiền tố riêng và số chạy liên tục, **
 ### A4. Nguyên tắc tiền — ba quy tắc không bao giờ phá
 
 1. **Giảm giá chỉ áp dụng trên phần tồn kho (BH).** Giảm giá cho khách không bao giờ làm thay đổi số tiền phải trả nhà cung cấp cho hàng ký gửi.
-2. **Khoản phải trả nhà cung cấp chỉ sinh ra khi hàng ký gửi BÁN ĐƯỢC**, tính theo **giá ký gửi đã thoả thuận của đúng lô đó** — không sinh khi nhận hàng, không sinh khi gửi đi.
+2. **Khoản phải trả nhà cung cấp sinh ra theo 2 cách:** (a) khi hàng ký gửi BÁN ĐƯỢC, tính theo **giá ký gửi đã thoả thuận của đúng lô đó** — không sinh khi nhận hàng, không sinh khi gửi đi; (b) khi xác nhận phiếu nhập mua hàng (PN), bằng **tổng tiền phiếu**, hạn trả = ngày nhập + số ngày trả khi mua hàng của nhà cung cấp đó.
 3. **Phân bổ trước, hoá đơn sau.** Một lần tiêu thụ có thể gồm cả hàng mình và hàng ký gửi; hệ thống luôn phân bổ rõ từng dòng thuộc lô nào/tính chất nào trước, rồi mới xuất hoá đơn GTGT từ các dòng đã phân bổ. Một hoá đơn GTGT có thể chứa cả hai tính chất (mỗi tính chất một dòng), nhưng chứng từ nội bộ BH/KG luôn tách riêng và liên kết với hoá đơn ở cấp độ từng dòng — tiền hai phía không bao giờ trộn lẫn.
 
 ### A5. Sơ đồ luồng vận hành tổng quát
@@ -106,7 +106,7 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 | **Bán hàng & Hoá đơn** | Bán hàng | Bán lẻ tại quầy TẠM DỪNG từ 30/10/2026 — chỉ ghi nhận đơn bán qua file Excel; bảng đơn hàng và chứng từ BH/KG có nút Xuất Excel; bảng chứng từ BH/KG có thêm cột Giá vốn và Lãi gộp, chỉ Chủ cửa hàng, Kế toán và CEO xem được (giá vốn theo lô thực tế đã xuất, chứng từ nháp chưa có giá vốn) |
 | | Hoá đơn GTGT (theo dõi nội bộ) | Ghi nhận/huỷ ghi nhận hoá đơn đã xuất từ hệ thống hoá đơn chính thức, theo các dòng BH/KG đã xác nhận; bảng hoá đơn có nút Xuất Excel |
 | | Trả hàng & bảo hành | Lập phiếu trả hàng TH; bảng phiếu trả có nút Xuất Excel |
-| **Công nợ & Báo cáo** | Phải trả nhà cung cấp | Khoản phải trả phát sinh từ hàng ký gửi bán được; ghi thanh toán; bảng **Tuổi nợ phải trả** gom theo nhà cung cấp, 3 nhóm quá hạn 1–6 tháng |
+| **Công nợ & Báo cáo** | Phải trả nhà cung cấp | Khoản phải trả phát sinh từ hàng ký gửi bán được và từ phiếu nhập mua hàng đã xác nhận; ghi thanh toán; bảng **Tuổi nợ phải trả** gom theo nhà cung cấp, 3 nhóm quá hạn 1–6 tháng |
 | | Phải thu đối tác | Khoản đối tác/khách còn nợ; ghi thu tiền; bảng **Tuổi nợ phải thu** gom theo đối tác, 3 nhóm quá hạn 1–6 tháng |
 | | Báo cáo | Đối soát nhà cung cấp/đối tác, xuất CSV |
 | **Danh mục** | Nhà cung cấp | Hồ sơ NCC, hạn trả mặc định, cho phép ký gửi tiếp (ô D) hay không |
@@ -238,7 +238,7 @@ Khi đối tác báo đã bán được hàng họ đang giữ: vào **Ký gửi
 Hoá đơn GTGT chính thức được xuất từ hệ thống hoá đơn riêng; TVK chỉ ghi nhận lại để theo dõi nội bộ, không phát hành hoá đơn pháp lý tại đây. Vào **Bán hàng & Hoá đơn → Hoá đơn GTGT (theo dõi nội bộ)**: tick các dòng chứng từ BH/KG đã xác nhận chưa ghi nhận hoá đơn, chọn đối tác, nhập số hoá đơn/ký hiệu/ngày theo đúng hoá đơn đã xuất. **Ngay trên form có ô chọn "Gộp thành 1 hoá đơn GTGT"**: tick = ghi nhận **1 hoá đơn** chứa cả hai phần; bỏ tick = **tách 2 ghi nhận** (hoá đơn BH dùng số/ký hiệu chính; hoá đơn KG phải nhập thêm số/ký hiệu ở hai ô "phần ký gửi"). Ô chọn được đặt sẵn theo mặc định ở Cài đặt (mục dưới), đổi tại form chỉ áp dụng cho lần ghi nhận đó. Huỷ ghi nhận chỉ mở lại đúng các dòng thuộc hoá đơn đó.
 
 ### D5. Công nợ
-- **Phải trả nhà cung cấp**: tự sinh từ chứng từ KG khi hàng ký gửi bán được, theo đúng giá ký gửi của lô. Ghi thanh toán từng phần/toàn bộ; trạng thái Chưa trả / Trả một phần / Đã trả theo số còn lại.
+- **Phải trả nhà cung cấp**: tự sinh theo 2 cách — từ chứng từ KG khi hàng ký gửi bán được, theo đúng giá ký gửi của lô; và từ phiếu nhập mua hàng (PN) khi xác nhận, bằng tổng tiền phiếu, hạn trả theo số ngày trả của nhà cung cấp đó. Ghi thanh toán từng phần/toàn bộ; trạng thái Chưa trả / Trả một phần / Đã trả theo số còn lại.
 - **Phải thu đối tác**: sinh từ phần bán cho đối tác/khách mua chịu. Ghi thu tiền tương tự; hoá đơn quá hạn được đánh dấu để đôn đốc.
 - **Đối soát theo kỳ (DS):** ở trang Phải thu đối tác có nút "Tạo đợt đối soát (DS) cho một đối tác" — gom toàn bộ các khoản chưa chốt với một đối tác (hoặc một nhà cung cấp ở phía phải trả) trong một kỳ thành một đợt để hai bên xác nhận số liệu. **Phiếu thu/chi (PT/PC):** mỗi lần ghi nhận tiền thực tế (thu tiền mặt/chuyển khoản từ đối tác, hoặc chi trả cho nhà cung cấp) hệ thống sinh một phiếu PT hoặc PC có mã riêng, ghi rõ phương thức (tiền mặt/ngân hàng) và có thể gắn vào đợt đối soát DS tương ứng — đây là chứng từ tiền đối ứng với công nợ, giúp truy vết "khoản nợ này đã thu/chi bằng phiếu nào".
 

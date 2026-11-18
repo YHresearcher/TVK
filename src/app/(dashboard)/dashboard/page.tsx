@@ -169,7 +169,7 @@ export default async function DashboardPage({
           <StatCard label="Lợi nhuận gộp (lũy kế)" value={formatVND(d.grossProfitAll)} sub={`Gross Margin ${grossMargin}% · Markup on Cost ${roiAll}%`} tone="emerald" />
         )}
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ TVK" tone="violet" />
-        <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp cho hàng ký gửi đã bán" tone="rose" />
+        <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp (hàng ký gửi đã bán + hàng mua chưa trả)" tone="rose" />
         <StatCard label="Giá trị hàng sở hữu" value={formatVND(ownedRealValue)} sub="Theo giá bán / giá chuyển giao" tone="sky" />
       </div>
       <p className="mt-2 text-xs text-slate-500">Chưa tách thuế GTGT.</p>

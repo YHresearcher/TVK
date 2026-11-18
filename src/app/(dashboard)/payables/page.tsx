@@ -3,7 +3,7 @@ import SubmitButton from "@/components/SubmitButton";
 import AgingTable from "@/components/AgingTable";
 import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordPayablePaymentAction } from "@/lib/actions";
-import { getCurrentProfile, listPayables, listSettlements, listSuppliers } from "@/lib/queries";
+import { getCurrentProfile, listPayables, listPurchaseReceipts, listSalesDocuments, listSettlements, listSuppliers } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
 
@@ -14,22 +14,32 @@ export default async function PayablesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [payables, settlements, suppliers, profile] = await Promise.all([
+  const [payables, settlements, suppliers, salesDocs, purchaseReceipts, profile] = await Promise.all([
     listPayables(),
     listSettlements(),
     listSuppliers(),
+    listSalesDocuments(),
+    listPurchaseReceipts(),
     getCurrentProfile(),
   ]);
   const configured = payables.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const supplierName = new Map(suppliers.data.map((s) => [s.id, s.name]));
+  // Mã chứng từ gốc của từng khoản phải trả: khoản mua hàng -> phiếu nhập
+  // (PN-...), khoản ký gửi đã bán -> chứng từ bán (BH/KG-...).
+  const salesDocCode = new Map(salesDocs.data.map((d) => [d.id, d.doc_code]));
+  const purchaseReceiptCode = new Map(purchaseReceipts.data.map((r) => [r.id, r.doc_code]));
+  const sourceLabel = (p: (typeof payables.data)[number]) =>
+    p.source_kind === "PURCHASE"
+      ? (purchaseReceiptCode.get(p.purchase_receipt_id) ?? "Phiếu nhập")
+      : (salesDocCode.get(p.source_document_id) ?? "—");
   const open = payables.data.filter((p) => p.status === "UNPAID" || p.status === "PARTIAL");
   const totalOutstanding = open.reduce((a, p) => a + Number(p.amount) - Number(p.amount_paid), 0);
   const supplierSettlements = settlements.data.filter((s) => s.party_kind === "SUPPLIER");
 
   return (
     <>
-      <PageHeader title="Phải trả nhà cung cấp" description="Khoản phải trả được tạo tự động khi một lô ký gửi bán được, theo đúng giá ký gửi đã thoả thuận của lô đó. Giảm giá cho khách hàng không bao giờ thay đổi các số tiền này." />
+      <PageHeader title="Phải trả nhà cung cấp" description="Khoản phải trả được tạo tự động theo 2 cách: khi một lô ký gửi bán được (theo đúng giá ký gửi đã thoả thuận của lô đó), và khi xác nhận phiếu nhập mua hàng (bằng tổng tiền phiếu, hạn trả theo số ngày trả của nhà cung cấp đó). Giảm giá cho khách hàng không bao giờ thay đổi các số tiền này." />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <p className="mb-4 text-sm text-slate-600">Tổng còn nợ: <strong>{formatVND(totalOutstanding)}</strong></p>
@@ -47,15 +57,16 @@ export default async function PayablesPage({
         </div>
       )}
 
-      {payables.data.length === 0 ? <EmptyState message="Chưa có khoản phải trả. Bán một lô ký gửi để tạo khoản phải trả." /> : (
+      {payables.data.length === 0 ? <EmptyState message="Chưa có khoản phải trả. Xác nhận một phiếu nhập mua hàng hoặc bán một lô ký gửi để tạo khoản phải trả." /> : (
         <TableWrap>
-          <thead><tr><th className={thCls}>Nhà cung cấp</th><th className={`${thCls} text-right`}>Số lượng</th><th className={`${thCls} text-right`}>Giá ký gửi</th><th className={`${thCls} text-right`}>Số tiền</th><th className={`${thCls} text-right`}>Đã trả</th><th className={`${thCls} text-right`}>Còn nợ</th><th className={thCls}>Hạn trả</th><th className={thCls}>Trạng thái</th></tr></thead>
+          <thead><tr><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Chứng từ</th><th className={`${thCls} text-right`}>Số lượng</th><th className={`${thCls} text-right`}>Giá ký gửi</th><th className={`${thCls} text-right`}>Số tiền</th><th className={`${thCls} text-right`}>Đã trả</th><th className={`${thCls} text-right`}>Còn nợ</th><th className={thCls}>Hạn trả</th><th className={thCls}>Trạng thái</th></tr></thead>
           <tbody>
             {payables.data.map((p) => (
               <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                 <td className={tdCls}>{supplierName.get(p.supplier_id) ?? "—"}</td>
-                <td className={`${tdCls} text-right font-mono`}>{formatNumber(p.qty)}</td>
-                <td className={`${tdCls} text-right font-mono`}>{formatVND(p.unit_price)}</td>
+                <td className={`${tdCls} font-mono text-xs`}>{sourceLabel(p)}</td>
+                <td className={`${tdCls} text-right font-mono`}>{p.qty == null ? "—" : formatNumber(p.qty)}</td>
+                <td className={`${tdCls} text-right font-mono`}>{p.unit_price == null ? "—" : formatVND(p.unit_price)}</td>
                 <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(p.amount)}</td>
                 <td className={`${tdCls} text-right font-mono text-emerald-700`}>{formatVND(p.amount_paid)}</td>
                 <td className={`${tdCls} text-right font-mono font-medium text-rose-700`}>{formatVND(Number(p.amount) - Number(p.amount_paid))}</td>
@@ -76,7 +87,7 @@ export default async function PayablesPage({
                 <option value="">— Chọn —</option>
                 {open.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {supplierName.get(p.supplier_id)} — còn nợ {formatVND(Number(p.amount) - Number(p.amount_paid))}
+                    {supplierName.get(p.supplier_id)} — {sourceLabel(p)} — còn nợ {formatVND(Number(p.amount) - Number(p.amount_paid))}
                   </option>
                 ))}
               </select></div>
@@ -107,7 +118,7 @@ export default async function PayablesPage({
               {open.map((p) => (
                 <label key={p.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="payable_id" value={p.id} className="h-4 w-4" />
-                  {supplierName.get(p.supplier_id)} — còn nợ {formatVND(Number(p.amount) - Number(p.amount_paid))}, hạn {formatDate(p.due_date)}
+                  {supplierName.get(p.supplier_id)} — {sourceLabel(p)} — còn nợ {formatVND(Number(p.amount) - Number(p.amount_paid))}, hạn {formatDate(p.due_date)}
                 </label>
               ))}
             </div>

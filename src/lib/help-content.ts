@@ -163,7 +163,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Phải trả, phải thu & đối soát",
     roles: ["ACCOUNTING"],
     points: [
-      "Phải trả nhà cung cấp phát sinh TỰ ĐỘNG khi một lô ký gửi bán được (ghi nhận qua Excel hoặc qua phân bổ tiêu thụ), tính theo đúng giá ký gửi đã thoả thuận của lô; giảm giá cho khách hàng không bao giờ làm thay đổi số phải trả này.",
+      "Phải trả nhà cung cấp phát sinh TỰ ĐỘNG khi một lô ký gửi bán được (ghi nhận qua Excel hoặc qua phân bổ tiêu thụ), tính theo đúng giá ký gửi đã thoả thuận của lô; giảm giá cho khách hàng không bao giờ làm thay đổi số phải trả này. Xác nhận phiếu nhập mua hàng (PN) cũng tự tạo một khoản phải trả bằng tổng tiền phiếu, hạn trả theo số ngày trả của nhà cung cấp đó.",
       "Vào Phải trả nhà cung cấp / Phải thu đối tác để xem số còn nợ và hạn thanh toán; mỗi khi trả hoặc thu tiền, dùng form “Ghi nhận thanh toán cho nhà cung cấp (PC)” / “Ghi nhận tiền thu từ đối tác (PT)”, chọn đúng khoản đang mở và nhập số tiền.",
       "Tạo đợt đối soát (DS) theo kỳ cho từng nhà cung cấp hoặc đối tác: chọn kỳ và tick các khoản đang mở đưa vào đối soát để chốt số liệu với bên kia.",
       "Ở Phải thu đối tác, khoản quá hạn được tô đỏ ở cột Hạn thu kèm chữ “(quá hạn)” — ưu tiên nhắc đối tác thanh toán theo số ngày thanh toán đã khai báo ở hồ sơ đối tác.",

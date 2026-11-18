@@ -21,14 +21,14 @@ export default async function SuppliersPage({
   const editing = canEdit ? suppliers.data.find((s) => s.id === searchParams.edit) : undefined;
   return (
     <>
-      <PageHeader title="Nhà cung cấp" description="Nhà cung cấp là người cung cấp hàng cho cửa hàng, hoặc ký gửi hàng cho cửa hàng bán hộ — khác với đối tác là người nhận ký gửi từ cửa hàng. Điều khoản ký gửi nằm ở đây: sau khi bán phải thanh toán trong bao nhiêu ngày, hàng ký gửi chưa bán được giữ bao lâu, và nhà cung cấp này có cho phép ký gửi tiếp (ô D) hay không." />
+      <PageHeader title="Nhà cung cấp" description="Nhà cung cấp là người cung cấp hàng cho cửa hàng, hoặc ký gửi hàng cho cửa hàng bán hộ — khác với đối tác là người nhận ký gửi từ cửa hàng. Điều khoản ký gửi nằm ở đây: sau khi bán phải thanh toán trong bao nhiêu ngày, hàng ký gửi chưa bán được giữ bao lâu, và nhà cung cấp này có cho phép ký gửi tiếp (ô D) hay không. Hạn trả tiền mua hàng cũng nằm ở đây: tính từ ngày nhập kho, theo số ngày riêng của từng nhà cung cấp." />
       {!suppliers.configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {suppliers.data.length === 0 ? <EmptyState message="Chưa có nhà cung cấp." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Tên</th><th className={thCls}>Điện thoại</th><th className={thCls}>Mã số thuế</th><th className={thCls}>Thanh toán sau bán (ngày)</th><th className={thCls}>Thời hạn trả hàng (ngày)</th><th className={thCls}>Ký gửi tiếp</th>{canEdit && <th className={thCls}>Thao tác</th>}</tr></thead>
+              <thead><tr><th className={thCls}>Tên</th><th className={thCls}>Điện thoại</th><th className={thCls}>Mã số thuế</th><th className={thCls}>Thanh toán sau bán (ngày)</th><th className={thCls}>Hạn trả tiền mua hàng (ngày)</th><th className={thCls}>Thời hạn trả hàng (ngày)</th><th className={thCls}>Ký gửi tiếp</th>{canEdit && <th className={thCls}>Thao tác</th>}</tr></thead>
               <tbody>
                 {suppliers.data.map((s) => (
                   <tr key={s.id} className="border-t border-slate-100">
@@ -36,6 +36,7 @@ export default async function SuppliersPage({
                     <td className={tdCls}>{s.phone ?? "—"}</td>
                     <td className={tdCls}>{s.tax_code ?? "—"}</td>
                     <td className={tdCls}>{s.consignment_pay_days}</td>
+                    <td className={tdCls}>{s.purchase_pay_days ?? 30}</td>
                     <td className={tdCls}>{s.consignment_return_days}</td>
                     <td className={tdCls}>{s.allow_sub_consignment ? "Cho phép" : "Khoá"}</td>
                     {canEdit && (
@@ -69,6 +70,7 @@ export default async function SuppliersPage({
               <div><label className={labelCls}>Thanh toán sau bán (ngày)</label><input name="consignment_pay_days" type="number" defaultValue={editing?.consignment_pay_days ?? 30} className={inputCls} /></div>
               <div><label className={labelCls}>Thời hạn trả hàng (ngày)</label><input name="consignment_return_days" type="number" defaultValue={editing?.consignment_return_days ?? 90} className={inputCls} /></div>
             </div>
+            <div><label className={labelCls}>Hạn trả tiền mua hàng (ngày)</label><input name="purchase_pay_days" type="number" defaultValue={editing?.purchase_pay_days ?? 30} className={inputCls} /></div>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" name="allow_sub_consignment" defaultChecked={editing?.allow_sub_consignment ?? false} className="h-4 w-4" />
               Cho phép ký gửi tiếp hàng của nhà cung cấp này (ô D)
