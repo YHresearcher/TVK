@@ -3,7 +3,7 @@ import SubmitButton from "@/components/SubmitButton";
 import AgingTable from "@/components/AgingTable";
 import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordPayablePaymentAction } from "@/lib/actions";
-import { getCurrentProfile, listPayables, listPurchaseReceipts, listSalesDocuments, listSettlements, listSuppliers } from "@/lib/queries";
+import { getCurrentProfile, listCashFunds, listPayables, listPurchaseReceipts, listSalesDocuments, listSettlements, listSuppliers } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
 
@@ -14,17 +14,20 @@ export default async function PayablesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [payables, settlements, suppliers, salesDocs, purchaseReceipts, profile] = await Promise.all([
+  const [payables, settlements, suppliers, salesDocs, purchaseReceipts, funds, profile] = await Promise.all([
     listPayables(),
     listSettlements(),
     listSuppliers(),
     listSalesDocuments(),
     listPurchaseReceipts(),
+    listCashFunds(),
     getCurrentProfile(),
   ]);
   const configured = payables.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const supplierName = new Map(suppliers.data.map((s) => [s.id, s.name]));
+  const activeFunds = funds.data.filter((f) => f.is_active);
+  const hasBankFund = activeFunds.some((f) => f.kind === "BANK");
   // Mã chứng từ gốc của từng khoản phải trả: khoản mua hàng -> phiếu nhập
   // (PN-...), khoản ký gửi đã bán -> chứng từ bán (BH/KG-...).
   const salesDocCode = new Map(salesDocs.data.map((d) => [d.id, d.doc_code]));
@@ -95,6 +98,15 @@ export default async function PayablesPage({
               <div><label className={labelCls}>Số tiền *</label><input name="amount" type="number" step="1000" required className={inputCls} /></div>
               <div><label className={labelCls}>Phương thức</label>
                 <select name="method" className={inputCls}><option value="BANK">Chuyển khoản</option><option value="CASH">Tiền mặt</option></select></div>
+            </div>
+            <div><label className={labelCls}>Quỹ tiền *</label>
+              <select name="fund_id" required className={inputCls}>
+                <option value="">— Chọn —</option>
+                {activeFunds.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name} — {f.kind === "CASH" ? "Tiền mặt" : "Ngân hàng"}</option>
+                ))}
+              </select>
+              {!hasBankFund && <p className="mt-1 text-xs text-slate-500">Chưa có tài khoản ngân hàng — thêm ở Cài đặt → Quỹ tiền.</p>}
             </div>
             <div><label className={labelCls}>Ngày thanh toán</label><input name="payment_date" type="date" className={inputCls} /></div>
             <SubmitButton className={`${btnCls} w-full`}>Ghi nhận thanh toán</SubmitButton>

@@ -2,8 +2,9 @@ import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, btnCls, inputCls, labelCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import UserAdminPanel from "@/components/UserAdminPanel";
-import { createWarehouseAction, updateWarehouseAction, updateVatModeAction } from "@/lib/actions";
-import { getCurrentProfile, listLocations } from "@/lib/queries";
+import { createCashFundAction, createWarehouseAction, updateCashFundAction, updateWarehouseAction, updateVatModeAction } from "@/lib/actions";
+import { getCashFundBalances, getCurrentProfile, listCashFunds, listLocations } from "@/lib/queries";
+import { formatVND } from "@/lib/format";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isReadOnlyRole, type AnyRow } from "@/lib/types";
@@ -13,9 +14,11 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: { ok?: string; edit?: string };
+  searchParams: { ok?: string; edit?: string; editFund?: string };
 }) {
   const locations = await listLocations();
+  const funds = await listCashFunds();
+  const fundBalances = await getCashFundBalances();
   const me = (await getCurrentProfile()).data;
   const supabase = await createClient();
   let vatMode = "COMBINED";
@@ -36,6 +39,12 @@ export default async function SettingsPage({
   const canEditWarehouse = ["OWNER", "WAREHOUSE"].includes(me?.role ?? "");
   const editingWarehouse = canEditWarehouse
     ? warehouses.find((l) => l.id === searchParams.edit)
+    : undefined;
+  // Quỹ tiền: chỉ Chủ cửa hàng + Kế toán thấy và sửa (tiền chỉ 2 vai trò này đụng).
+  const canEditFunds = ["OWNER", "ACCOUNTING"].includes(me?.role ?? "");
+  const fundBalance = new Map(fundBalances.data.map((f) => [f.fund_id, f]));
+  const editingFund = canEditFunds
+    ? funds.data.find((f) => f.id === searchParams.editFund)
     : undefined;
 
   return (
@@ -118,6 +127,72 @@ export default async function SettingsPage({
             </p>
           )}
         </Card>
+
+        {canEditFunds && (
+        <Card title="Quỹ tiền">
+          <p className="mb-3 text-xs leading-relaxed text-slate-500">
+            Két tiền mặt và tài khoản ngân hàng của TVK. Số dư đầu kỳ là số
+            tiền thực tế trong quỹ tại thời điểm nhập — đã bao gồm ảnh hưởng
+            của các phiếu thu/chi cũ (chưa gắn quỹ). Từ nay mỗi lần ghi thu
+            (PT) hay chi (PC) phải chọn quỹ, số dư tự cập nhật theo.
+          </p>
+          {funds.data.length === 0 ? <EmptyState message="Chưa có quỹ tiền." /> : (
+            <ul className="space-y-1 text-sm">
+              {funds.data.map((f) => {
+                const b = fundBalance.get(f.id);
+                return (
+                  <li key={f.id} className="flex items-baseline justify-between gap-2">
+                    <span>
+                      <span className="font-medium">{f.name}</span>{" "}
+                      <span className="text-xs text-slate-500">({f.kind === "CASH" ? "Tiền mặt" : "Ngân hàng"}){!f.is_active ? " · đã tắt" : ""}</span>
+                    </span>
+                    <span className="flex shrink-0 items-baseline gap-2">
+                      <span className="font-bold">{formatVND(b?.balance ?? f.opening_balance)}</span>
+                      <Link href={`/settings?editFund=${f.id}`} className="font-medium text-blue-700 hover:underline">
+                        Sửa
+                      </Link>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <form
+            key={editingFund?.id ?? "new-fund"}
+            action={editingFund ? updateCashFundAction : createCashFundAction}
+            className="mt-4 space-y-2 border-t border-slate-100 pt-3"
+          >
+            {editingFund && <input type="hidden" name="id" value={editingFund.id} />}
+            <div><label className={labelCls}>Tên quỹ *</label><input name="name" required placeholder="Két tiền mặt / Vietcombank — 1234" defaultValue={editingFund?.name ?? ""} className={inputCls} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              {editingFund ? (
+                <div><label className={labelCls}>Loại quỹ</label><input value={editingFund.kind === "CASH" ? "Tiền mặt" : "Ngân hàng"} disabled className={inputCls} /></div>
+              ) : (
+                <div><label className={labelCls}>Loại quỹ</label>
+                  <select name="kind" className={inputCls}>
+                    <option value="CASH">Tiền mặt (két)</option>
+                    <option value="BANK">Ngân hàng</option>
+                  </select></div>
+              )}
+              <div><label className={labelCls}>Số dư đầu kỳ *</label><input name="opening_balance" type="number" step="1000" required defaultValue={editingFund?.opening_balance ?? 0} className={inputCls} /></div>
+            </div>
+            {editingFund && (
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="is_active" defaultChecked={editingFund.is_active} className="h-4 w-4" />
+                Đang dùng (bỏ tick để tắt quỹ, giữ nguyên lịch sử)
+              </label>
+            )}
+            <div className="flex items-center gap-3">
+              <SubmitButton className={btnCls}>{editingFund ? "Lưu thay đổi" : "Thêm quỹ"}</SubmitButton>
+              {editingFund && (
+                <Link href="/settings" className="text-sm text-slate-500 hover:underline">
+                  Huỷ
+                </Link>
+              )}
+            </div>
+          </form>
+        </Card>
+        )}
 
         {me?.role === "OWNER" && (
           <Card title="Quản lý tài khoản" className="lg:col-span-2">

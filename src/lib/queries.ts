@@ -121,6 +121,11 @@ export const listVatInvoices = () =>
   list("vat_invoices", { column: "invoice_date" });
 export const listPayables = () =>
   list("supplier_payables", { column: "created_at" });
+export const listCashFunds = () =>
+  list("cash_funds", { column: "name", ascending: true });
+/** Số dư từng quỹ (số dư đầu kỳ + biến động thu/chi đã ghi). */
+export const getCashFundBalances = () =>
+  list("v_cash_fund_balances", { column: "fund_name", ascending: true });
 export const listReceivables = () =>
   list("partner_receivables", { column: "created_at" });
 export const listReturnDocuments = () =>

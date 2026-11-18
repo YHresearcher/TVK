@@ -4,7 +4,7 @@ import SubmitButton from "@/components/SubmitButton";
 import AgingTable from "@/components/AgingTable";
 import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordReceivablePaymentAction } from "@/lib/actions";
-import { getCurrentProfile, listPartners, listReceivables, listSettlements } from "@/lib/queries";
+import { getCurrentProfile, listCashFunds, listPartners, listReceivables, listSettlements } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
 
@@ -15,15 +15,18 @@ export default async function ReceivablesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [receivables, settlements, partners, profile] = await Promise.all([
+  const [receivables, settlements, partners, funds, profile] = await Promise.all([
     listReceivables(),
     listSettlements(),
     listPartners(),
+    listCashFunds(),
     getCurrentProfile(),
   ]);
   const configured = receivables.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
+  const activeFunds = funds.data.filter((f) => f.is_active);
+  const hasBankFund = activeFunds.some((f) => f.kind === "BANK");
   const open = receivables.data.filter((r) => r.status === "UNPAID" || r.status === "PARTIAL");
   const totalOutstanding = open.reduce((a, r) => a + Number(r.amount) - Number(r.amount_paid), 0);
   const partnerSettlements = settlements.data.filter((s) => s.party_kind === "PARTNER");
@@ -87,6 +90,15 @@ export default async function ReceivablesPage({
               <div><label className={labelCls}>Số tiền *</label><input name="amount" type="number" step="1000" required className={inputCls} /></div>
               <div><label className={labelCls}>Phương thức</label>
                 <select name="method" className={inputCls}><option value="BANK">Chuyển khoản</option><option value="CASH">Tiền mặt</option></select></div>
+            </div>
+            <div><label className={labelCls}>Quỹ tiền *</label>
+              <select name="fund_id" required className={inputCls}>
+                <option value="">— Chọn —</option>
+                {activeFunds.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name} — {f.kind === "CASH" ? "Tiền mặt" : "Ngân hàng"}</option>
+                ))}
+              </select>
+              {!hasBankFund && <p className="mt-1 text-xs text-slate-500">Chưa có tài khoản ngân hàng — thêm ở Cài đặt → Quỹ tiền.</p>}
             </div>
             <div><label className={labelCls}>Ngày thu</label><input name="payment_date" type="date" className={inputCls} /></div>
             <SubmitButton className={`${btnCls} w-full`}>Ghi nhận thu tiền</SubmitButton>

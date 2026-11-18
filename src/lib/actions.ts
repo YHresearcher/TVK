@@ -2301,15 +2301,39 @@ export async function confirmReturnAction(formData: FormData) {
 }
 
 // ------------------------------------------------------- payables / money
+/** Quỹ tiền phải khớp phương thức: tiền mặt -> két tiền mặt, chuyển khoản -> tài khoản ngân hàng. */
+async function validateFundForMethod(
+  supabase: Awaited<ReturnType<typeof db>>,
+  fundId: string,
+  method: string
+) {
+  if (!fundId) throw new Error("Chọn quỹ tiền cho lần thu/chi này.");
+  const { data: fund } = await supabase
+    .from("cash_funds")
+    .select("id, kind, is_active")
+    .eq("id", fundId)
+    .maybeSingle();
+  if (!fund) throw new Error("Không tìm thấy quỹ tiền đã chọn.");
+  if (!fund.is_active) throw new Error("Quỹ tiền đã chọn đang tắt — chọn quỹ khác hoặc bật lại ở Cài đặt.");
+  if (method === "CASH" && fund.kind !== "CASH")
+    throw new Error("Quỹ đã chọn là tài khoản ngân hàng — thanh toán tiền mặt phải chọn két tiền mặt.");
+  if (method !== "CASH" && fund.kind !== "BANK")
+    throw new Error("Quỹ đã chọn là két tiền mặt — chuyển khoản phải chọn tài khoản ngân hàng.");
+}
+
 export async function recordPayablePaymentAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được ghi nhận thanh toán.");
+  const method = str(formData, "method") || "BANK";
+  const fundId = str(formData, "fund_id");
+  await validateFundForMethod(supabase, fundId, method);
   done(
     await supabase.from("payments").insert({
       payment_kind: "OUT",
       payable_id: str(formData, "payable_id"),
       amount: num(formData, "amount"),
-      method: str(formData, "method") || "BANK",
+      method,
+      fund_id: fundId,
       payment_date: optDate(formData, "payment_date") ?? undefined,
       note: optStr(formData, "note"),
       created_by: await userId(),
@@ -2317,18 +2341,23 @@ export async function recordPayablePaymentAction(formData: FormData) {
     "Ghi nhận thanh toán"
   );
   revalidatePath("/payables");
+  revalidatePath("/dashboard");
   redirect("/payables?ok=1");
 }
 
 export async function recordReceivablePaymentAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được ghi nhận thu tiền.");
+  const method = str(formData, "method") || "BANK";
+  const fundId = str(formData, "fund_id");
+  await validateFundForMethod(supabase, fundId, method);
   done(
     await supabase.from("payments").insert({
       payment_kind: "IN",
       receivable_id: str(formData, "receivable_id"),
       amount: num(formData, "amount"),
-      method: str(formData, "method") || "BANK",
+      method,
+      fund_id: fundId,
       payment_date: optDate(formData, "payment_date") ?? undefined,
       note: optStr(formData, "note"),
       created_by: await userId(),
@@ -2336,6 +2365,7 @@ export async function recordReceivablePaymentAction(formData: FormData) {
     "Ghi nhận thu tiền"
   );
   revalidatePath("/receivables");
+  revalidatePath("/dashboard");
   redirect("/receivables?ok=1");
 }
 
@@ -2404,6 +2434,46 @@ export async function updateVatModeAction(formData: FormData) {
     "Lưu cài đặt"
   );
   revalidatePath("/settings");
+}
+
+// ------------------------------------------------------------- quỹ tiền
+export async function createCashFundAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được thêm quỹ tiền.");
+  const name = str(formData, "name");
+  if (!name) throw new Error("Thiếu tên quỹ tiền.");
+  const opening = num(formData, "opening_balance");
+  if (opening < 0) throw new Error("Số dư đầu kỳ không được âm.");
+  done(
+    await supabase.from("cash_funds").insert({
+      name,
+      kind: str(formData, "kind") === "BANK" ? "BANK" : "CASH",
+      opening_balance: opening,
+    }),
+    "Thêm quỹ tiền"
+  );
+  revalidatePath("/settings");
+  redirect("/settings?ok=1");
+}
+
+export async function updateCashFundAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được sửa quỹ tiền.");
+  const id = str(formData, "id");
+  const name = str(formData, "name");
+  if (!id || !name) throw new Error("Thiếu tên quỹ tiền.");
+  const opening = num(formData, "opening_balance");
+  if (opening < 0) throw new Error("Số dư đầu kỳ không được âm.");
+  done(
+    await supabase.from("cash_funds").update({
+      name,
+      opening_balance: opening,
+      is_active: formData.get("is_active") === "on",
+    }).eq("id", id),
+    "Cập nhật quỹ tiền"
+  );
+  revalidatePath("/settings");
+  redirect("/settings?ok=1");
 }
 
 export async function createStockAdjustmentAction(formData: FormData) {

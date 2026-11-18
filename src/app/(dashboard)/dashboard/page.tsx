@@ -7,6 +7,7 @@ import StockCompositionCard from "@/components/StockCompositionCard";
 import ExecutiveControlSection from "@/components/ExecutiveControlSection";
 import { getCashFlowRunway, getExecutiveAlerts } from "@/lib/audit";
 import {
+  getCashFundBalances,
   getCurrentProfile,
   getDashboard,
   getGroupPerformance,
@@ -117,7 +118,7 @@ export default async function DashboardPage({
   const canSeeCost = ["OWNER", "ACCOUNTING", "CEO"].includes(profile.data?.role ?? "");
   const period = searchParams?.period ?? "90d";
   const { from, to } = periodRange(period, searchParams?.from, searchParams?.to);
-  const [d, partnerStats, groupPerf, slow, recent, perf, groupValue, consBars, agingBars, cashflow, alertsResult] = await Promise.all([
+  const [d, partnerStats, groupPerf, slow, recent, perf, groupValue, consBars, agingBars, cashflow, alertsResult, cashBalancesRes] = await Promise.all([
     getDashboard(),
     listPartnerStats(),
     getGroupPerformance(),
@@ -129,7 +130,10 @@ export default async function DashboardPage({
     canSeeMoney ? getReceivableAgingBars() : Promise.resolve([]),
     canSeeMoney ? getCashFlowRunway() : Promise.resolve(null),
     canSeeMoney ? getExecutiveAlerts() : Promise.resolve(null),
+    canSeeMoney ? getCashFundBalances() : Promise.resolve({ configured: true, data: [] }),
   ]);
+  const cashBalances = cashBalancesRes.data ?? [];
+  const totalCash = cashBalances.reduce((a, f) => a + Number(f.balance ?? 0), 0);
   const grossMargin = d.revenueAll > 0 ? Math.round((d.grossProfitAll / d.revenueAll) * 100) : 0;
   const cogsAll = d.revenueAll - d.grossProfitAll;
   // Gross Margin: lãi gộp trên doanh thu thuần. Markup on Cost: lãi gộp
@@ -173,6 +177,26 @@ export default async function DashboardPage({
         <StatCard label="Giá trị hàng sở hữu" value={formatVND(ownedRealValue)} sub="Theo giá bán / giá chuyển giao" tone="sky" />
       </div>
       <p className="mt-2 text-xs text-slate-500">Chưa tách thuế GTGT.</p>
+      {cashBalances.length > 0 && (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tiền mặt & ngân hàng</p>
+          <div className="mt-2 space-y-1 text-sm">
+            {cashBalances.map((f) => (
+              <div key={f.fund_id} className="flex items-baseline justify-between gap-2">
+                <span>
+                  {f.fund_name}{" "}
+                  <span className="text-xs text-slate-500">({f.kind === "CASH" ? "Tiền mặt" : "Ngân hàng"})</span>
+                </span>
+                <span className="font-bold">{formatVND(f.balance)}</span>
+              </div>
+            ))}
+            <div className="flex items-baseline justify-between gap-2 border-t border-slate-100 pt-1 font-bold">
+              <span>Tổng tiền đang có</span>
+              <span>{formatVND(totalCash)}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 
