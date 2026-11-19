@@ -16,14 +16,23 @@ export function toNum(v: unknown): number {
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
   let s = String(v ?? "").trim().replace(/\s/g, "");
   if (!s) return 0;
+  let isNegative = false;
+  if (s.startsWith("(") && s.endsWith(")")) {
+    isNegative = true;
+    s = s.slice(1, -1).trim();
+  }
+  if (!s) return 0;
   // Vietnamese thousand separators: 2.916.000 or 2.916.000,5
   if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
     s = s.replace(/\./g, "").replace(",", ".");
   } else {
     s = s.replace(/,/g, "");
   }
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
+  let n = Number(s);
+  if (!Number.isFinite(n)) return 0;
+  if (isNegative) n = -Math.abs(n);
+  if (n === 0) n = 0;
+  return n;
 }
 
 /**
@@ -76,7 +85,7 @@ function validISODate(s: string): boolean {
  * The xlsx library is loaded on demand (only when a file is picked) so the
  * import pages stay light on first load.
  */
-export async function readFirstSheetAOA(buf: ArrayBuffer): Promise<unknown[][]> {
+export async function readFirstSheetAOA(buf: ArrayBuffer | Uint8Array): Promise<unknown[][]> {
   const XLSX = await import("xlsx");
   const wb = XLSX.read(buf);
   const ws = wb.Sheets[wb.SheetNames[0]];

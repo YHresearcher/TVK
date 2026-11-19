@@ -194,3 +194,7 @@ export const REF_DOC_TYPE_LABELS: Record<string, string> = {
 export { SEMANTIC_COLORS } from "@/lib/tokens";
 export type { SemanticColorToken } from "@/lib/tokens";
 
+// Management Accounting & Reconciliation Types
+export * from "@/types";
+
+

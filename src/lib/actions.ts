@@ -2439,40 +2439,53 @@ export async function updateVatModeAction(formData: FormData) {
 // ------------------------------------------------------------- quỹ tiền
 export async function createCashFundAction(formData: FormData) {
   const supabase = await db();
-  await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được thêm quỹ tiền.");
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được thêm quỹ tiền.");
   const name = str(formData, "name");
   if (!name) throw new Error("Thiếu tên quỹ tiền.");
   const opening = num(formData, "opening_balance");
   if (opening < 0) throw new Error("Số dư đầu kỳ không được âm.");
+  const openingDate = str(formData, "opening_balance_date") || "2026-01-01";
   done(
     await supabase.from("cash_funds").insert({
       name,
       kind: str(formData, "kind") === "BANK" ? "BANK" : "CASH",
       opening_balance: opening,
+      opening_balance_date: openingDate,
     }),
     "Thêm quỹ tiền"
   );
   revalidatePath("/settings");
+  revalidatePath("/cashflow");
+  const returnTo = optStr(formData, "return_to");
+  if (returnTo) redirect(returnTo);
   redirect("/settings?ok=1");
 }
 
 export async function updateCashFundAction(formData: FormData) {
   const supabase = await db();
-  await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được sửa quỹ tiền.");
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được sửa quỹ tiền.");
   const id = str(formData, "id");
   const name = str(formData, "name");
   if (!id || !name) throw new Error("Thiếu tên quỹ tiền.");
   const opening = num(formData, "opening_balance");
   if (opening < 0) throw new Error("Số dư đầu kỳ không được âm.");
+  const openingDate = optStr(formData, "opening_balance_date");
+  const updateData: AnyRow = {
+    name,
+    opening_balance: opening,
+    is_active: formData.get("is_active") === "on",
+  };
+  if (openingDate) {
+    updateData.opening_balance_date = openingDate;
+  }
   done(
-    await supabase.from("cash_funds").update({
-      name,
-      opening_balance: opening,
-      is_active: formData.get("is_active") === "on",
-    }).eq("id", id),
+    await supabase.from("cash_funds").update(updateData).eq("id", id),
     "Cập nhật quỹ tiền"
   );
   revalidatePath("/settings");
+  revalidatePath("/cashflow");
+  const returnTo = optStr(formData, "return_to");
+  if (returnTo) redirect(returnTo);
   redirect("/settings?ok=1");
 }
 
@@ -2760,3 +2773,380 @@ export async function deleteUserAction(formData: FormData) {
   // Dòng profiles tự xoá theo khoá ngoại (on delete cascade).
   revalidatePath("/settings");
 }
+
+// ------------------------------------------------------------- Sổ Quản Trị & Khoản Mục Thu Chi
+export async function createCashCategoryAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được tạo khoản mục thu/chi.");
+  const uid = await userId();
+
+  const rawCode = str(formData, "code");
+  const name = str(formData, "name");
+  const kind = str(formData, "kind") === "IN" ? "IN" : "OUT";
+  const rawGroup = str(formData, "group_key").toUpperCase();
+  const groupKey = ["SALARY", "RENT", "TRANSPORT", "TAX", "OTHER"].includes(rawGroup)
+    ? rawGroup
+    : "OTHER";
+  const isFixed = formData.get("is_fixed") === "on" || formData.get("is_fixed") === "true";
+  const monthlyBudget = Math.max(0, num(formData, "monthly_budget"));
+
+  if (!rawCode) throw new Error("Mã khoản mục không được để trống.");
+  if (!name) throw new Error("Tên khoản mục không được để trống.");
+
+  const code = storeCode(rawCode.toUpperCase());
+
+  done(
+    await supabase.from("cash_categories").insert({
+      code,
+      name,
+      kind,
+      group_key: groupKey,
+      is_fixed: isFixed,
+      monthly_budget: monthlyBudget,
+      is_active: true,
+      is_system: false,
+      created_by: uid,
+    }),
+    "Tạo khoản mục thu chi"
+  );
+
+  revalidatePath("/settings");
+  revalidatePath("/cashflow");
+  const returnTo = optStr(formData, "return_to");
+  if (returnTo) redirect(returnTo);
+  return { ok: true };
+}
+
+export async function updateCashCategoryAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được cập nhật khoản mục thu/chi.");
+
+  const id = str(formData, "id");
+  const name = str(formData, "name");
+  if (!id) throw new Error("Thiếu ID khoản mục.");
+  if (!name) throw new Error("Tên khoản mục không được để trống.");
+
+  const updateData: AnyRow = {
+    name,
+  };
+
+  const rawGroup = str(formData, "group_key").toUpperCase();
+  if (rawGroup && ["SALARY", "RENT", "TRANSPORT", "TAX", "OTHER"].includes(rawGroup)) {
+    updateData.group_key = rawGroup;
+  }
+
+  if (formData.has("is_fixed")) {
+    updateData.is_fixed = formData.get("is_fixed") === "on" || formData.get("is_fixed") === "true";
+  }
+
+  if (formData.has("monthly_budget")) {
+    updateData.monthly_budget = Math.max(0, num(formData, "monthly_budget"));
+  }
+
+  if (formData.has("is_active")) {
+    updateData.is_active = formData.get("is_active") === "on" || formData.get("is_active") === "true";
+  }
+
+  done(
+    await supabase.from("cash_categories").update(updateData).eq("id", id),
+    "Cập nhật khoản mục thu chi"
+  );
+
+  revalidatePath("/settings");
+  revalidatePath("/cashflow");
+  const returnTo = optStr(formData, "return_to");
+  if (returnTo) redirect(returnTo);
+  return { ok: true };
+}
+
+export async function toggleCashCategoryAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được bật/tắt khoản mục.");
+
+  const id = str(formData, "id");
+  if (!id) throw new Error("Thiếu ID khoản mục.");
+
+  let nextActive: boolean;
+  if (formData.has("is_active")) {
+    nextActive = formData.get("is_active") === "on" || formData.get("is_active") === "true";
+  } else {
+    const { data: cat } = await supabase
+      .from("cash_categories")
+      .select("is_active")
+      .eq("id", id)
+      .single();
+    if (!cat) throw new Error("Khoản mục không tồn tại.");
+    nextActive = !cat.is_active;
+  }
+
+  done(
+    await supabase.from("cash_categories").update({ is_active: nextActive }).eq("id", id),
+    "Đổi trạng thái khoản mục"
+  );
+
+  revalidatePath("/settings");
+  revalidatePath("/cashflow");
+  const returnTo = optStr(formData, "return_to");
+  if (returnTo) redirect(returnTo);
+  return { ok: true, is_active: nextActive };
+}
+
+// ------------------------------------------------------------- Sổ Quỹ & Giao Dịch Dòng Tiền
+export async function createOperatingCashMovementAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được ghi nhận thu/chi vận hành.");
+  const uid = await userId();
+
+  const fundId = str(formData, "fund_id");
+  const categoryId = str(formData, "category_id");
+  const amount = num(formData, "amount");
+  const movementDate = str(formData, "movement_date") || todayISO();
+  const note = optStr(formData, "note");
+
+  if (!fundId) throw new Error("Chưa chọn quỹ tiền thực hiện.");
+  if (!categoryId) throw new Error("Chưa chọn khoản mục thu/chi.");
+  if (amount <= 0) throw new Error("Số tiền thu/chi phải lớn hơn 0.");
+
+  const { data: fund, error: fundErr } = await supabase
+    .from("cash_funds")
+    .select("id, is_active")
+    .eq("id", fundId)
+    .single();
+  if (fundErr || !fund) throw new Error("Không tìm thấy quỹ tiền.");
+  if (!fund.is_active) throw new Error("Quỹ tiền đã chọn đang tắt.");
+
+  const { data: category, error: catErr } = await supabase
+    .from("cash_categories")
+    .select("name, kind")
+    .eq("id", categoryId)
+    .single();
+  if (catErr || !category) throw new Error("Không tìm thấy thông tin khoản mục.");
+
+  const finalAmount = category.kind === "IN" ? Math.abs(amount) : -Math.abs(amount);
+  const finalNote = note || (category.kind === "IN" ? `Thu vận hành: ${category.name}` : `Chi vận hành: ${category.name}`);
+
+  done(
+    await supabase.from("cash_movements").insert({
+      fund_id: fundId,
+      movement_kind: "OPERATING",
+      category_id: categoryId,
+      amount: finalAmount,
+      movement_date: movementDate,
+      note: finalNote,
+      created_by: uid,
+    }),
+    "Ghi nhận thu chi vận hành"
+  );
+
+  revalidatePath("/cashflow");
+  revalidatePath("/executive");
+  const returnTo = optStr(formData, "return_to");
+  if (returnTo) redirect(returnTo);
+  return { ok: true };
+}
+
+export async function transferInternalCashFundsAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được chuyển quỹ nội bộ.");
+
+  const sourceFundId = str(formData, "source_fund_id");
+  const destFundId = str(formData, "dest_fund_id");
+  const amount = num(formData, "amount");
+  const transferDate = str(formData, "transfer_date") || todayISO();
+  const note = optStr(formData, "note");
+
+  if (!sourceFundId || !destFundId) throw new Error("Chưa chọn đầy đủ quỹ nguồn và quỹ đích.");
+  if (sourceFundId === destFundId) throw new Error("Quỹ nguồn và quỹ đích không được trùng nhau.");
+  if (amount <= 0) throw new Error("Số tiền chuyển quỹ phải lớn hơn 0.");
+
+  const { data, error } = await supabase.rpc("transfer_internal_cash_funds", {
+    p_source_fund_id: sourceFundId,
+    p_dest_fund_id: destFundId,
+    p_amount: amount,
+    p_transfer_date: transferDate,
+    p_note: note || "Chuyển quỹ nội bộ",
+  });
+
+  if (error) throw new Error(`Chuyển quỹ nội bộ: ${error.message}`);
+
+  revalidatePath("/cashflow");
+  revalidatePath("/executive");
+  const returnTo = optStr(formData, "return_to");
+  if (returnTo) redirect(returnTo);
+  return { ok: true, transfer_id: data };
+}
+
+export async function cancelCashMovementAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được huỷ phiếu dòng tiền.");
+
+  const movementId = str(formData, "movement_id");
+  const reason = str(formData, "reason").trim();
+
+  if (!movementId) throw new Error("Thiếu ID giao dịch quỹ cần huỷ.");
+  if (!reason) throw new Error("Bắt buộc phải nhập lý do huỷ phiếu.");
+
+  const { data, error } = await supabase.rpc("cancel_cash_movement_reversal", {
+    p_movement_id: movementId,
+    p_reason: reason,
+  });
+
+  if (error) throw new Error(`Huỷ phiếu dòng tiền: ${error.message}`);
+
+  revalidatePath("/cashflow");
+  revalidatePath("/receivables");
+  revalidatePath("/payables");
+  revalidatePath("/executive");
+  const returnTo = optStr(formData, "return_to");
+  if (returnTo) redirect(returnTo);
+  return { ok: true, reversal_id: data };
+}
+
+// ------------------------------------------------------------- Đối Chiếu Kế Toán 2 Tầng
+export async function createReconciliationPeriodAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được tạo kỳ đối chiếu.");
+  const uid = await userId();
+
+  const periodType = str(formData, "period_type") || "MONTH";
+  const name = str(formData, "name");
+  const fromDate = str(formData, "from_date");
+  const toDate = str(formData, "to_date");
+  const note = optStr(formData, "note");
+
+  if (!name) throw new Error("Thiếu tên kỳ đối chiếu.");
+  if (!fromDate || !toDate) throw new Error("Thiếu khoảng thời gian đối chiếu (từ ngày - đến ngày).");
+  if (toDate < fromDate) throw new Error("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.");
+
+  const { data, error } = await supabase
+    .from("reconciliation_periods")
+    .insert({
+      period_type: periodType as "MONTH" | "WEEK" | "CUSTOM",
+      name,
+      from_date: fromDate,
+      to_date: toDate,
+      status: "OPEN",
+      note,
+      created_by: uid,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw new Error(`Tạo kỳ đối chiếu: ${error.message}`);
+
+  revalidatePath("/reconciliation");
+  const returnTo = optStr(formData, "return_to");
+  if (returnTo) redirect(returnTo);
+  return { ok: true, period_id: data?.id };
+}
+
+export async function updateReconciliationEntryAction(
+  input:
+    | FormData
+    | {
+        entryId: string;
+        accountingAmount?: number;
+        discrepancyStatus?: string;
+        explanationNote?: string | null;
+      }
+) {
+  const supabase = await db();
+  await requireRole(
+    ["OWNER", "ACCOUNTING"],
+    "Chỉ Chủ cửa hàng và Kế toán mới được cập nhật số liệu đối chiếu."
+  );
+
+  let id: string;
+  const updateData: AnyRow = { updated_at: new Date().toISOString() };
+  let returnTo: string | null = null;
+
+  if (input instanceof FormData) {
+    id = str(input, "id");
+    if (input.has("accounting_amount")) {
+      updateData.accounting_amount = num(input, "accounting_amount");
+    }
+    const discrepancyStatus = optStr(input, "discrepancy_status");
+    if (
+      discrepancyStatus &&
+      ["MATCHED", "PENDING", "VALID_TAX_TIMING", "ACCOUNTING_ERROR", "TVK_ERROR"].includes(
+        discrepancyStatus
+      )
+    ) {
+      updateData.discrepancy_status = discrepancyStatus;
+    }
+    if (input.has("explanation_note")) {
+      updateData.explanation_note = optStr(input, "explanation_note");
+    }
+    returnTo = optStr(input, "return_to");
+  } else {
+    id = input.entryId;
+    if (input.accountingAmount !== undefined) {
+      updateData.accounting_amount = input.accountingAmount;
+    }
+    if (input.discrepancyStatus) {
+      updateData.discrepancy_status = input.discrepancyStatus;
+    }
+    if (input.explanationNote !== undefined) {
+      updateData.explanation_note = input.explanationNote;
+    }
+  }
+
+  if (!id) throw new Error("Thiếu ID dòng đối chiếu.");
+
+  const { data, error } = await supabase
+    .from("reconciliation_entries")
+    .update(updateData)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Cập nhật dòng đối chiếu: ${error.message}`);
+
+  revalidatePath("/reconciliation");
+  if (returnTo) redirect(returnTo);
+  return { ok: true, data };
+}
+
+export async function createReconciliationSnapshotAction(
+  input:
+    | FormData
+    | {
+        periodId: string;
+        name?: string;
+        note?: string;
+      }
+) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được chốt kỳ đối chiếu.");
+
+  let periodId: string;
+  let name: string | null = null;
+  let note: string | null = null;
+  let returnTo: string | null = null;
+
+  if (input instanceof FormData) {
+    periodId = str(input, "period_id");
+    name = optStr(input, "name");
+    note = optStr(input, "note");
+    returnTo = optStr(input, "return_to");
+  } else {
+    periodId = input.periodId;
+    name = input.name || null;
+    note = input.note || null;
+  }
+
+  if (!periodId) throw new Error("Thiếu ID kỳ đối chiếu.");
+
+  const { data, error } = await supabase.rpc("create_reconciliation_snapshot", {
+    p_period_id: periodId,
+    p_name: name,
+    p_note: note,
+  });
+
+  if (error) throw new Error(`Chốt kỳ đối chiếu: ${error.message}`);
+
+  revalidatePath("/reconciliation");
+  if (returnTo) redirect(returnTo);
+  return { ok: true, snapshot_id: data };
+}
+

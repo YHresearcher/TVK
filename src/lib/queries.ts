@@ -2220,3 +2220,396 @@ export async function getTopCategoriesProfitability(
   return rows;
 }
 
+// =====================================================================
+// SỔ QUỸ, DANH MỤC THU CHI & DÒNG TIỀN QUẢN TRỊ (/cashflow)
+// =====================================================================
+
+export interface CashCategoryRow {
+  id: string;
+  code: string;
+  name: string;
+  kind: "IN" | "OUT";
+  group_key: "SALARY" | "RENT" | "TRANSPORT" | "TAX" | "OTHER";
+  is_fixed: boolean;
+  monthly_budget: number;
+  is_active: boolean;
+  is_system: boolean;
+  created_at: string;
+}
+
+export interface CashMovementFilters {
+  fund_id?: string;
+  movement_kind?: string;
+  from_date?: string;
+  to_date?: string;
+  search?: string;
+  limit?: number;
+}
+
+export interface UnifiedCashMovementRow {
+  id: string;
+  fund_id: string;
+  fund_name: string;
+  fund_kind: string;
+  payment_id: string | null;
+  payment_doc_code: string | null;
+  amount: number;
+  movement_date: string;
+  created_at: string;
+  movement_kind: "DEBT_PAYMENT" | "OPERATING" | "INTERNAL_TRANSFER" | "REVERSAL";
+  category_id: string | null;
+  category_name: string | null;
+  category_kind: string | null;
+  category_group_key: string | null;
+  transfer_id: string | null;
+  counter_fund_id: string | null;
+  counter_fund_name: string | null;
+  counter_movement_id: string | null;
+  note: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  is_cancelled: boolean;
+  cancel_reason: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancelled_by_name: string | null;
+  reversal_of_id: string | null;
+  reversal_entry_id: string | null;
+}
+
+export interface MonthlyCashflowSummaryRow {
+  monthKey: string;
+  monthLabel: string;
+  actualIn: number;
+  actualOut: number;
+  netCashflow: number;
+  revenue: number;
+  cogs: number;
+  grossProfit: number;
+  operatingExpense: number;
+  operatingIncome: number;
+  netManagementProfit: number;
+}
+
+/**
+ * Danh sách khoản mục thu / chi vận hành
+ */
+export async function listCashCategories(includeInactive = false): Promise<CashCategoryRow[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+  let q = supabase
+    .from("cash_categories")
+    .select("*")
+    .order("kind", { ascending: true })
+    .order("group_key", { ascending: true })
+    .order("name", { ascending: true });
+  if (!includeInactive) {
+    q = q.eq("is_active", true);
+  }
+  const { data } = await q;
+  return ((data ?? []) as AnyRow[]).map((c) => ({
+    id: String(c.id),
+    code: String(c.code ?? ""),
+    name: String(c.name ?? ""),
+    kind: c.kind === "IN" ? "IN" : "OUT",
+    group_key: c.group_key ?? "OTHER",
+    is_fixed: Boolean(c.is_fixed),
+    monthly_budget: Number(c.monthly_budget ?? 0),
+    is_active: Boolean(c.is_active),
+    is_system: Boolean(c.is_system),
+    created_at: String(c.created_at ?? ""),
+  }));
+}
+
+/**
+ * Sổ biến động quỹ tiền hợp nhất (Công nợ + Vận hành + Chuyển quỹ + Bút toán đảo)
+ */
+export async function listCashMovements(
+  filters?: CashMovementFilters
+): Promise<UnifiedCashMovementRow[]> {
+  const supabase = await client();
+  if (!supabase) return [];
+
+  let q = supabase
+    .from("cash_movements")
+    .select("*")
+    .order("movement_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (filters?.fund_id && filters.fund_id !== "ALL") {
+    q = q.eq("fund_id", filters.fund_id);
+  }
+  if (filters?.movement_kind && filters.movement_kind !== "ALL") {
+    q = q.eq("movement_kind", filters.movement_kind);
+  }
+  if (filters?.from_date) {
+    q = q.gte("movement_date", filters.from_date);
+  }
+  if (filters?.to_date) {
+    q = q.lte("movement_date", filters.to_date);
+  }
+  if (filters?.limit) {
+    q = q.limit(filters.limit);
+  } else {
+    q = q.limit(500);
+  }
+
+  const [movsRes, fundsRes, catsRes, profilesRes] = await Promise.all([
+    q,
+    supabase.from("cash_funds").select("id, name, kind"),
+    supabase.from("cash_categories").select("id, code, name, kind, group_key"),
+    supabase.from("profiles").select("id, full_name"),
+  ]);
+
+  const rawMovs = (movsRes.data ?? []) as AnyRow[];
+  const fundMap = new Map<string, AnyRow>();
+  for (const f of (fundsRes.data ?? []) as AnyRow[]) {
+    fundMap.set(String(f.id), f);
+  }
+
+  const categoryMap = new Map<string, AnyRow>();
+  for (const c of (catsRes.data ?? []) as AnyRow[]) {
+    categoryMap.set(String(c.id), c);
+  }
+
+  const profileMap = new Map<string, AnyRow>();
+  for (const p of (profilesRes.data ?? []) as AnyRow[]) {
+    profileMap.set(String(p.id), p);
+  }
+
+  const paymentIds = Array.from(
+    new Set(rawMovs.map((m) => m.payment_id ? String(m.payment_id) : "").filter(Boolean))
+  );
+  const paymentMap = new Map<string, AnyRow>();
+  if (paymentIds.length > 0) {
+    const { data: pmts } = await supabase
+      .from("payments")
+      .select("id, doc_code, payment_kind, note")
+      .in("id", paymentIds)
+      .limit(2000);
+    for (const p of (pmts ?? []) as AnyRow[]) {
+      paymentMap.set(String(p.id), p);
+    }
+  }
+
+  let mapped: UnifiedCashMovementRow[] = rawMovs.map((r) => {
+    const fund = fundMap.get(String(r.fund_id));
+    const category = r.category_id ? categoryMap.get(String(r.category_id)) : null;
+    const counterFund = r.counter_fund_id ? fundMap.get(String(r.counter_fund_id)) : null;
+    const payment = r.payment_id ? paymentMap.get(String(r.payment_id)) : null;
+    const createdProfile = r.created_by ? profileMap.get(String(r.created_by)) : null;
+    const cancelledProfile = r.cancelled_by ? profileMap.get(String(r.cancelled_by)) : null;
+
+    return {
+      id: String(r.id),
+      fund_id: String(r.fund_id),
+      fund_name: String(fund?.name ?? "Quỹ tiền"),
+      fund_kind: String(fund?.kind ?? "CASH"),
+      payment_id: r.payment_id ? String(r.payment_id) : null,
+      payment_doc_code: payment?.doc_code ? String(payment.doc_code) : null,
+      amount: Number(r.amount ?? 0),
+      movement_date: String(r.movement_date ?? ""),
+      created_at: String(r.created_at ?? ""),
+      movement_kind: r.movement_kind ?? "DEBT_PAYMENT",
+      category_id: r.category_id ? String(r.category_id) : null,
+      category_name: category?.name ? String(category.name) : null,
+      category_kind: category?.kind ? String(category.kind) : null,
+      category_group_key: category?.group_key ? String(category.group_key) : null,
+      transfer_id: r.transfer_id ? String(r.transfer_id) : null,
+      counter_fund_id: r.counter_fund_id ? String(r.counter_fund_id) : null,
+      counter_fund_name: counterFund?.name ? String(counterFund.name) : null,
+      counter_movement_id: r.counter_movement_id ? String(r.counter_movement_id) : null,
+      note: r.note ? String(r.note) : null,
+      created_by: r.created_by ? String(r.created_by) : null,
+      created_by_name: createdProfile?.full_name ? String(createdProfile.full_name) : null,
+      is_cancelled: Boolean(r.is_cancelled),
+      cancel_reason: r.cancel_reason ? String(r.cancel_reason) : null,
+      cancelled_at: r.cancelled_at ? String(r.cancelled_at) : null,
+      cancelled_by: r.cancelled_by ? String(r.cancelled_by) : null,
+      cancelled_by_name: cancelledProfile?.full_name ? String(cancelledProfile.full_name) : null,
+      reversal_of_id: r.reversal_of_id ? String(r.reversal_of_id) : null,
+      reversal_entry_id: r.reversal_entry_id ? String(r.reversal_entry_id) : null,
+    };
+  });
+
+  if (filters?.search && filters.search.trim().length > 0) {
+    const s = filters.search.trim().toLowerCase();
+    mapped = mapped.filter((m) => {
+      return (
+        (m.payment_doc_code && m.payment_doc_code.toLowerCase().includes(s)) ||
+        (m.note && m.note.toLowerCase().includes(s)) ||
+        (m.category_name && m.category_name.toLowerCase().includes(s)) ||
+        (m.fund_name && m.fund_name.toLowerCase().includes(s)) ||
+        (m.cancel_reason && m.cancel_reason.toLowerCase().includes(s))
+      );
+    });
+  }
+
+  return mapped;
+}
+
+/**
+ * Báo cáo tổng hợp Thực thu - Thực chi và Lãi ròng quản trị 6 tháng gần nhất
+ */
+export async function getMonthlyCashflowSummary(): Promise<MonthlyCashflowSummaryRow[]> {
+  const supabase = await client();
+  const today = todayISO();
+  const [curY, curM] = today.split("-").map(Number);
+  const buckets: MonthlyCashflowSummaryRow[] = [];
+  const monthMap = new Map<string, number>();
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(Date.UTC(curY, curM - 1 - i, 1));
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth() + 1;
+    const padM = String(m).padStart(2, "0");
+    const key = `${y}-${padM}`;
+    const label = `Tháng ${padM}/${y}`;
+    monthMap.set(key, buckets.length);
+    buckets.push({
+      monthKey: key,
+      monthLabel: label,
+      actualIn: 0,
+      actualOut: 0,
+      netCashflow: 0,
+      revenue: 0,
+      cogs: 0,
+      grossProfit: 0,
+      operatingExpense: 0,
+      operatingIncome: 0,
+      netManagementProfit: 0,
+    });
+  }
+
+  if (!supabase) return buckets;
+
+  const fromISO = `${buckets[0].monthKey}-01`;
+  const toISO = today;
+
+  // 1. Biến động dòng tiền thực tế từ cash_movements
+  const { data: movements } = await supabase
+    .from("cash_movements")
+    .select("movement_date, amount, movement_kind, is_cancelled")
+    .gte("movement_date", fromISO)
+    .lte("movement_date", toISO)
+    .limit(5000);
+
+  for (const m of (movements ?? []) as AnyRow[]) {
+    if (m.is_cancelled) continue;
+    const kind = String(m.movement_kind ?? "DEBT_PAYMENT");
+    if (kind === "INTERNAL_TRANSFER" || kind === "REVERSAL") continue;
+
+    const dateStr = String(m.movement_date ?? "").slice(0, 7);
+    const idx = monthMap.get(dateStr);
+    if (idx === undefined) continue;
+
+    const amt = Number(m.amount ?? 0);
+    if (amt > 0) {
+      buckets[idx].actualIn += amt;
+      if (kind === "OPERATING") {
+        buckets[idx].operatingIncome += amt;
+      }
+    } else if (amt < 0) {
+      const out = Math.abs(amt);
+      buckets[idx].actualOut += out;
+      if (kind === "OPERATING") {
+        buckets[idx].operatingExpense += out;
+      }
+    }
+  }
+
+  // 2. Doanh thu & giá vốn từ đơn bán hàng CONFIRMED
+  const { data: docs } = await supabase
+    .from("sales_documents")
+    .select("id, doc_date, total_amount")
+    .eq("status", "CONFIRMED")
+    .gte("doc_date", fromISO)
+    .lte("doc_date", toISO)
+    .limit(3000);
+
+  const docRows = (docs ?? []) as AnyRow[];
+  if (docRows.length > 0) {
+    const docIds = docRows.map((d) => String(d.id));
+    const { data: lines } = await supabase
+      .from("sales_document_lines")
+      .select("document_id, qty, batch_id, allocation_line_id")
+      .in("document_id", docIds)
+      .limit(20000);
+
+    const lineRows = (lines ?? []) as AnyRow[];
+    const allocIds = Array.from(
+      new Set(lineRows.map((l) => String(l.allocation_line_id ?? "")).filter(Boolean))
+    );
+    const batchIds = Array.from(
+      new Set(lineRows.map((l) => String(l.batch_id ?? "")).filter(Boolean))
+    );
+
+    const allocBatch = new Map<string, string>();
+    if (allocIds.length) {
+      const { data: allocs } = await supabase
+        .from("allocation_lines")
+        .select("id, batch_id")
+        .in("id", allocIds)
+        .limit(5000);
+      for (const a of (allocs ?? []) as AnyRow[]) {
+        allocBatch.set(String(a.id), String(a.batch_id));
+      }
+    }
+
+    if (allocBatch.size) {
+      for (const b of Array.from(allocBatch.values())) {
+        batchIds.push(b);
+      }
+    }
+
+    const batchCost = new Map<string, number>();
+    if (batchIds.length) {
+      const { data: batches } = await supabase
+        .from("stock_batches")
+        .select("id, unit_cost")
+        .in("id", Array.from(new Set(batchIds)))
+        .limit(5000);
+      for (const b of (batches ?? []) as AnyRow[]) {
+        batchCost.set(String(b.id), Number(b.unit_cost ?? 0));
+      }
+    }
+
+    const byDoc = new Map<string, { revenue: number; cogs: number; date: string }>();
+    for (const d of docRows) {
+      byDoc.set(String(d.id), {
+        revenue: Math.max(Number(d.total_amount ?? 0), 0),
+        cogs: 0,
+        date: String(d.doc_date),
+      });
+    }
+
+    for (const l of lineRows) {
+      const b = byDoc.get(String(l.document_id));
+      if (!b) continue;
+      const batchId = l.batch_id
+        ? String(l.batch_id)
+        : allocBatch.get(String(l.allocation_line_id ?? ""));
+      b.cogs += Number(l.qty ?? 0) * (batchCost.get(batchId ?? "") ?? 0);
+    }
+
+    for (const b of Array.from(byDoc.values())) {
+      const dateStr = b.date.slice(0, 7);
+      const idx = monthMap.get(dateStr);
+      if (idx !== undefined) {
+        buckets[idx].revenue += b.revenue;
+        buckets[idx].cogs += b.cogs;
+      }
+    }
+  }
+
+  // 3. Tính toán các chỉ số quản trị
+  for (const b of buckets) {
+    b.netCashflow = b.actualIn - b.actualOut;
+    b.grossProfit = b.revenue - b.cogs;
+    b.netManagementProfit = b.grossProfit - b.operatingExpense + b.operatingIncome;
+  }
+
+  return buckets;
+}
+
+

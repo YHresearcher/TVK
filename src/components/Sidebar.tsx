@@ -9,6 +9,7 @@ import SubmitButton from "@/components/SubmitButton";
 interface NavItem {
   href: string;
   label: string;
+  roles?: string[];
 }
 
 interface NavGroup {
@@ -62,6 +63,9 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/payables", label: "Phải trả nhà cung cấp" },
       { href: "/receivables", label: "Phải thu đối tác" },
+      { href: "/cashflow", label: "Sổ quỹ & Dòng tiền", roles: ["OWNER", "CEO", "ACCOUNTING"] },
+      { href: "/reconciliation", label: "Đối chiếu Kế toán", roles: ["OWNER", "CEO", "ACCOUNTING"] },
+      { href: "/audit-center", label: "Kiểm soát nội bộ 3 chiều", roles: ["OWNER", "CEO", "ACCOUNTING"] },
       { href: "/reports", label: "Báo cáo" },
     ],
   },
@@ -229,6 +233,19 @@ export default function Sidebar({
         {GROUPS.map((group) => {
           const expanded = openId === group.id;
           const containsActive = group.id === currentGroup;
+          const visibleItems = group.items.filter((item) => {
+            if (!item.roles) return true;
+            const currentRoleKey = (rawRole || role || "").trim();
+            return item.roles.some(
+              (r) =>
+                r === currentRoleKey ||
+                (r === "OWNER" && currentRoleKey === "Chủ cửa hàng") ||
+                (r === "CEO" && currentRoleKey === "CEO (chỉ xem)") ||
+                (r === "ACCOUNTING" && currentRoleKey.toLowerCase().includes("kế toán"))
+            );
+          });
+          if (visibleItems.length === 0) return null;
+
           return (
             <div key={group.id}>
               <button
@@ -260,7 +277,7 @@ export default function Sidebar({
               </button>
               {expanded && (
                 <ul className="mt-1 space-y-1">
-                  {group.items.map((item) => (
+                  {visibleItems.map((item) => (
                     <li key={item.href}>
                       <Link
                         href={item.href}

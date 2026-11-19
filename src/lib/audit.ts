@@ -5,6 +5,10 @@ import type { AnyRow } from "@/lib/types";
 export interface CashFlowRunway {
   configured: boolean;
   today: string;
+  // Thành phần ngân quỹ thực tế
+  currentAvailableCash: number;
+  fixedCost14: number;
+  fixedCost30: number;
   // Kỳ 14 ngày
   inflow14: number;
   outflow14: number;
@@ -127,6 +131,9 @@ export async function getCashFlowRunway(): Promise<CashFlowRunway> {
   const emptyResult: CashFlowRunway = {
     configured: false,
     today,
+    currentAvailableCash: 0,
+    fixedCost14: 0,
+    fixedCost30: 0,
     inflow14: 0,
     outflow14: 0,
     net14: 0,
@@ -150,7 +157,7 @@ export async function getCashFlowRunway(): Promise<CashFlowRunway> {
 
   if (!supabase) return emptyResult;
 
-  const [receivablesRes, payablesRes] = await Promise.all([
+  const [receivablesRes, payablesRes, fundBalancesRes, fixedCategoriesRes, appSettingsRes] = await Promise.all([
     supabase
       .from("partner_receivables")
       .select("amount, amount_paid, status, due_date")
@@ -159,10 +166,45 @@ export async function getCashFlowRunway(): Promise<CashFlowRunway> {
       .from("supplier_payables")
       .select("amount, amount_paid, status, due_date")
       .in("status", ["UNPAID", "PARTIAL"]),
+    supabase
+      .from("v_cash_fund_balances")
+      .select("fund_id, balance, is_active"),
+    supabase
+      .from("cash_categories")
+      .select("monthly_budget, is_fixed, is_active")
+      .eq("is_fixed", true)
+      .eq("is_active", true),
+    supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "monthly_fixed_costs")
+      .maybeSingle(),
   ]);
 
   const receivables = (receivablesRes.data ?? []) as AnyRow[];
   const payables = (payablesRes.data ?? []) as AnyRow[];
+  const fundBalances = (fundBalancesRes.data ?? []) as AnyRow[];
+  const fixedCategories = (fixedCategoriesRes.data ?? []) as AnyRow[];
+
+  // 1. Tiền sẵn có hiện tại (Tổng số dư các quỹ đang hoạt động)
+  const currentAvailableCash = fundBalances
+    .filter((f) => f.is_active !== false)
+    .reduce((sum, f) => sum + Number(f.balance ?? 0), 0);
+
+  // 2. Chi phí cố định dự kiến hàng tháng
+  let monthlyFixedCost = fixedCategories.reduce((sum, c) => sum + Number(c.monthly_budget ?? 0), 0);
+  if (monthlyFixedCost <= 0 && appSettingsRes.data?.value) {
+    const val = Number(appSettingsRes.data.value);
+    if (!Number.isNaN(val) && val > 0) {
+      monthlyFixedCost = val;
+    }
+  }
+  if (monthlyFixedCost <= 0) {
+    monthlyFixedCost = 30_000_000; // Mặc định 30 triệu VND/tháng cho chi phí cố định vận hành TVK
+  }
+
+  const fixedCost14 = Math.round((monthlyFixedCost * 14) / 30);
+  const fixedCost30 = monthlyFixedCost;
 
   let overdueReceivables = 0;
   let inflow0to14 = 0;
@@ -208,11 +250,14 @@ export async function getCashFlowRunway(): Promise<CashFlowRunway> {
     }
   }
 
-  // Dòng tiền 14 ngày: Đến hạn trong 14 ngày (+ khoản quá hạn thanh toán)
+  // Dòng tiền 14 ngày:
+  // Công thức: net14 = currentAvailableCash + inflow14 - outflow14 - fixedCost14
   const inflow14 = overdueReceivables + inflow0to14;
   const outflow14 = overduePayables + outflow0to14;
-  const net14 = inflow14 - outflow14;
-  const safetyRatio14 = outflow14 > 0 ? inflow14 / outflow14 : inflow14 > 0 ? 99 : 1;
+  const net14 = currentAvailableCash + inflow14 - outflow14 - fixedCost14;
+  const totalDemand14 = outflow14 + fixedCost14;
+  const totalSupply14 = currentAvailableCash + inflow14;
+  const safetyRatio14 = totalDemand14 > 0 ? totalSupply14 / totalDemand14 : totalSupply14 > 0 ? 99 : 1;
 
   let safetyStatus14: "SAFE" | "WARNING" | "DANGER" = "SAFE";
   if (net14 < 0 || safetyRatio14 < 0.85) {
@@ -221,11 +266,14 @@ export async function getCashFlowRunway(): Promise<CashFlowRunway> {
     safetyStatus14 = "WARNING";
   }
 
-  // Dòng tiền 30 ngày: Đến hạn trong 30 ngày (+ quá hạn)
+  // Dòng tiền 30 ngày:
+  // Công thức: net30 = currentAvailableCash + inflow30 - outflow30 - fixedCost30
   const inflow30 = overdueReceivables + inflow0to14 + inflow15to30;
   const outflow30 = overduePayables + outflow0to14 + outflow15to30;
-  const net30 = inflow30 - outflow30;
-  const safetyRatio30 = outflow30 > 0 ? inflow30 / outflow30 : inflow30 > 0 ? 99 : 1;
+  const net30 = currentAvailableCash + inflow30 - outflow30 - fixedCost30;
+  const totalDemand30 = outflow30 + fixedCost30;
+  const totalSupply30 = currentAvailableCash + inflow30;
+  const safetyRatio30 = totalDemand30 > 0 ? totalSupply30 / totalDemand30 : totalSupply30 > 0 ? 99 : 1;
 
   let safetyStatus30: "SAFE" | "WARNING" | "DANGER" = "SAFE";
   if (net30 < 0 || safetyRatio30 < 0.85) {
@@ -237,18 +285,21 @@ export async function getCashFlowRunway(): Promise<CashFlowRunway> {
   // Khuyến nghị điều hành
   let recommendation = "";
   if (safetyStatus14 === "DANGER") {
-    recommendation = `⚠️ BÁO ĐỘNG NGÂN QUỸ 14 NGÀY: Thâm hụt ròng ${formatVND(Math.abs(net14))} đ (chi trả vượt thu). Cần ưu tiên đôn đốc thu ${formatVND(overdueReceivables)} đ công nợ quá hạn từ các gara ngay trong tuần này.`;
+    recommendation = `⚠️ BÁO ĐỘNG NGÂN QUỸ 14 NGÀY: Dự kiến thâm hụt ròng ${formatVND(Math.abs(net14))} đ (chi trả và chi cố định vượt tiền sẵn có + thu). Cần ưu tiên đôn đốc thu ${formatVND(overdueReceivables)} đ công nợ quá hạn từ các gara ngay trong tuần này.`;
   } else if (safetyStatus30 === "DANGER") {
-    recommendation = `⚠️ ÁP LỰC THANH KHOẢN 30 NGÀY: Dự kiến thâm hụt ròng ${formatVND(Math.abs(net30))} đ do đến hạn trả NCC. Cần kế hoạch thu nợ đối tác và giãn hạn thanh toán các lô ký gửi.`;
+    recommendation = `⚠️ ÁP LỰC THANH KHOẢN 30 NGÀY: Dự kiến thâm hụt ròng ${formatVND(Math.abs(net30))} đ do đến hạn trả NCC và chi phí vận hành. Cần kế hoạch thu nợ đối tác và giãn hạn thanh toán các lô ký gửi.`;
   } else if (safetyStatus14 === "WARNING") {
-    recommendation = `⚡ NGÂN QUỸ CÂN BẰNG TẠM THỜI: Dòng tiền ròng 14 ngày dương nhẹ (+${formatVND(net14)} đ), tỷ lệ độ phủ ${Math.round(safetyRatio14 * 100)}%. Cần bám sát lịch thu tiền gara để không trễ hẹn NCC.`;
+    recommendation = `⚡ NGÂN QUỸ CÂN BẰNG TẠM THỜI: Dòng tiền ròng 14 ngày dự kiến +${formatVND(net14)} đ, tỷ lệ độ phủ ${Math.round(safetyRatio14 * 100)}%. Cần bám sát lịch thu tiền gara để không trễ hẹn NCC.`;
   } else {
-    recommendation = `✅ DÒNG TIỀN AN TOÀN: Dòng tiền ròng 30 ngày dự kiến thặng dư +${formatVND(net30)} đ (độ phủ chi trả đạt ${Math.round(safetyRatio30 * 100)}%). Ngân quỹ ổn định.`;
+    recommendation = `✅ DÒNG TIỀN AN TOÀN: Dòng tiền ròng 30 ngày dự kiến thặng dư +${formatVND(net30)} đ (độ phủ ngân quỹ đạt ${Math.round(safetyRatio30 * 100)}%). Ngân quỹ ổn định.`;
   }
 
   return {
     configured: true,
     today,
+    currentAvailableCash,
+    fixedCost14,
+    fixedCost30,
     inflow14,
     outflow14,
     net14,

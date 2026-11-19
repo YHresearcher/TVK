@@ -285,7 +285,7 @@ export default async function ExecutivePage({
               </h2>
             </div>
             <p className="mt-0.5 text-xs text-slate-500">
-              Cân đối Dòng tiền thu về (phải thu gara/đối tác) so với Dòng tiền phải chi (trả NCC ký gửi đã bán).
+              Cân đối Tiền sẵn có hiện tại + Phải thu đến hạn − Phải trả NCC − Chi cố định vận hành dự kiến.
             </p>
           </div>
 
@@ -314,13 +314,21 @@ export default async function ExecutivePage({
             </div>
 
             <div className="mt-3 space-y-2 text-xs">
+              <div className="flex justify-between text-blue-700">
+                <span>Tiền sẵn có hiện tại:</span>
+                <span className="font-bold">+{formatVND(cashflow.currentAvailableCash)} đ</span>
+              </div>
               <div className="flex justify-between text-emerald-700">
-                <span>Dòng tiền vào (Thu nợ gara):</span>
+                <span>Phải thu đến hạn (Thu nợ gara):</span>
                 <span className="font-bold">+{formatVND(cashflow.inflow14)} đ</span>
               </div>
               <div className="flex justify-between text-rose-700">
-                <span>Dòng tiền ra (Trả nợ NCC):</span>
+                <span>Phải trả NCC đến hạn (Trả nợ NCC):</span>
                 <span className="font-bold">-{formatVND(cashflow.outflow14)} đ</span>
+              </div>
+              <div className="flex justify-between text-amber-700">
+                <span>Chi cố định dự kiến (Vận hành cố định):</span>
+                <span className="font-bold">-{formatVND(cashflow.fixedCost14)} đ</span>
               </div>
               <div className="border-t border-slate-100 pt-2 flex justify-between font-bold text-sm">
                 <span className="text-slate-800">Dòng tiền ròng:</span>
@@ -334,7 +342,7 @@ export default async function ExecutivePage({
             <div className="mt-3 border-t border-slate-100 pt-2 text-[11px] text-slate-500 flex justify-between">
               <span>Độ phủ ngân quỹ:</span>
               <span className="font-semibold text-slate-800">
-                {cashflow.outflow14 > 0 ? `${Math.round(cashflow.safetyRatio14 * 100)}%` : "100%"}
+                {Math.round(cashflow.safetyRatio14 * 100)}%
               </span>
             </div>
           </div>
@@ -349,13 +357,21 @@ export default async function ExecutivePage({
             </div>
 
             <div className="mt-3 space-y-2 text-xs">
+              <div className="flex justify-between text-blue-700">
+                <span>Tiền sẵn có hiện tại:</span>
+                <span className="font-bold">+{formatVND(cashflow.currentAvailableCash)} đ</span>
+              </div>
               <div className="flex justify-between text-emerald-700">
-                <span>Dòng tiền vào (Thu nợ gara):</span>
+                <span>Phải thu đến hạn (Thu nợ gara):</span>
                 <span className="font-bold">+{formatVND(cashflow.inflow30)} đ</span>
               </div>
               <div className="flex justify-between text-rose-700">
-                <span>Dòng tiền ra (Trả nợ NCC):</span>
+                <span>Phải trả NCC đến hạn (Trả nợ NCC):</span>
                 <span className="font-bold">-{formatVND(cashflow.outflow30)} đ</span>
+              </div>
+              <div className="flex justify-between text-amber-700">
+                <span>Chi cố định dự kiến (Vận hành cố định):</span>
+                <span className="font-bold">-{formatVND(cashflow.fixedCost30)} đ</span>
               </div>
               <div className="border-t border-slate-100 pt-2 flex justify-between font-bold text-sm">
                 <span className="text-slate-800">Dòng tiền ròng:</span>
@@ -369,7 +385,7 @@ export default async function ExecutivePage({
             <div className="mt-3 border-t border-slate-100 pt-2 text-[11px] text-slate-500 flex justify-between">
               <span>Độ phủ ngân quỹ:</span>
               <span className="font-semibold text-slate-800">
-                {cashflow.outflow30 > 0 ? `${Math.round(cashflow.safetyRatio30 * 100)}%` : "100%"}
+                {Math.round(cashflow.safetyRatio30 * 100)}%
               </span>
             </div>
           </div>
