@@ -203,7 +203,7 @@ export default function ImportConsignmentOut({
             }
           }
           if (need > 0)
-            error = `Không đủ hàng theo FIFO (còn ${formatNumber(available)}; thiếu ${formatNumber(need)})`;
+            error = `Không đủ hàng (còn ${formatNumber(available)}; thiếu ${formatNumber(need)})`;
         }
       }
       return {

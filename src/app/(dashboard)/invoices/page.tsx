@@ -38,7 +38,7 @@ export default async function InvoicesPage({
     <>
       <PageHeader
         title="Hoá đơn GTGT (theo dõi nội bộ)"
-        description="Theo dõi nội bộ các hoá đơn GTGT đã xuất từ hệ thống hoá đơn chính thức. Hoá đơn được ghi nhận từ các dòng chứng từ BH/KG đã xác nhận — mỗi dòng chỉ ghi nhận đúng một lần, và mỗi dòng trên hoá đơn luôn liên kết với chứng từ quản lý của nó, nên tiền ký gửi và tiền bán trực tiếp không bao giờ trộn lẫn. Ngay trên form ghi nhận, bạn chọn Gộp (1 hoá đơn) hoặc Tách (2 hoá đơn: BH riêng, KG riêng) cho từng lần ghi nhận; ô chọn được đặt sẵn theo mặc định ở Cài đặt."
+        description="Theo dõi nội bộ các hoá đơn GTGT đã xuất từ hệ thống hoá đơn chính thức. Hoá đơn được ghi nhận từ các dòng phiếu bán đã xác nhận (bán hàng BH / hàng ký gửi KG) — mỗi dòng chỉ ghi nhận đúng một lần, và mỗi dòng trên hoá đơn luôn gắn với phiếu bán của nó, nên tiền ký gửi và tiền bán trực tiếp không bao giờ trộn lẫn. Ngay trên form ghi nhận, bạn chọn Gộp (1 hoá đơn) hoặc Tách (2 hoá đơn: BH riêng, KG riêng) cho từng lần ghi nhận; ô chọn được đặt sẵn theo mặc định ở Cài đặt."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã ghi nhận hoá đơn.</p>}
@@ -46,7 +46,7 @@ export default async function InvoicesPage({
         {!readOnly && (
         <Card title="Ghi nhận hoá đơn GTGT từ dòng chứng từ">
           {uninvoiced.data.length === 0 ? (
-            <EmptyState message="Chưa có dòng chứng từ chưa xuất hoá đơn. Hãy xác nhận chứng từ bán hàng hoặc chứng từ phân bổ trước." />
+            <EmptyState message="Chưa có dòng phiếu chưa xuất hoá đơn. Hãy xác nhận phiếu bán hàng hoặc phiếu chia hàng trước." />
           ) : (
             <form action={createVatInvoiceAction} className="space-y-4">
               <div className="grid gap-3 md:grid-cols-5">
@@ -117,7 +117,7 @@ export default async function InvoicesPage({
             </tbody>
           </TableWrap>
         )}
-        <p className="text-xs text-slate-500">Huỷ ghi nhận chỉ mở lại các dòng phân bổ thuộc hoá đơn đó — các hoá đơn khác không bị ảnh hưởng.</p>
+        <p className="text-xs text-slate-500">Huỷ ghi nhận chỉ mở lại các dòng đã chia thuộc hoá đơn đó — các hoá đơn khác không bị ảnh hưởng.</p>
       </div>
     </>
   );

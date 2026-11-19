@@ -122,7 +122,7 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
 
         <Card title="Đối chiếu hàng gửi đối tác (số đã gửi phải bằng số đã bán + đã trả lại + còn giữ)">
           <TableWrap>
-            <thead><tr><th className={thCls}>Đã gửi</th><th className={thCls}>Đã tiêu thụ</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th><th className={thCls}>Kiểm tra</th></tr></thead>
+            <thead><tr><th className={thCls}>Đã gửi</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th><th className={thCls}>Kiểm tra</th></tr></thead>
             <tbody>
               <tr className="border-t border-slate-100">
                 <td className={tdCls}>{formatNumber(sent)}</td>
@@ -180,7 +180,7 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
                 </tbody>
               </TableWrap>
               <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                Đã bán là số lượng đối tác đã tiêu thụ theo báo cáo đã xác nhận. Lô đã bán hết hoặc đã trả hết vẫn hiện để đối chiếu đủ lịch sử ký gửi.
+                Đã bán là số lượng đối tác đã bán theo báo cáo đã xác nhận. Lô đã bán hết hoặc đã trả hết vẫn hiện để đối chiếu đủ lịch sử ký gửi.
               </p>
             </>
           )}

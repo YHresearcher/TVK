@@ -616,7 +616,7 @@ export default async function ExecutivePage({
 
                     <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
                       <span>Đã gửi: {formatNumber(dist.sent)}</span>
-                      <span>Đã tiêu thụ: {formatNumber(dist.consumed)}</span>
+                      <span>Đã bán: {formatNumber(dist.consumed)}</span>
                       <span>Còn giữ: {formatNumber(dist.remaining)}</span>
                       <span className="font-medium text-emerald-600">
                         Tiêu thụ: {consumptionPct}%

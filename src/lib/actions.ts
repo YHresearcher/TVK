@@ -12,7 +12,7 @@ import { priceTierForKind, type PriceTier } from "@/lib/types";
 
 async function db() {
   const supabase = await createClient();
-  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  if (!supabase) throw new Error("Hệ thống chưa cài đặt xong — hãy báo chủ cửa hàng.");
   return supabase;
 }
 
@@ -1571,7 +1571,7 @@ export async function importDealerSaleAction(formData: FormData) {
       }
     }
     if (need > 0)
-      invalid.push(`${r.label} (không đủ hàng theo FIFO, còn ${r.qty - need})`);
+      invalid.push(`${r.label} (không đủ hàng, còn ${r.qty - need})`);
   }
   if (invalid.length)
     rejectImport(invalid);
@@ -1789,7 +1789,7 @@ export async function importAllocationAction(formData: FormData) {
     if (!report) throw new Error("Không tìm thấy báo cáo tiêu thụ đã chọn.");
   }
   const partnerLoc = await partnerLocationId(supabase, partnerId);
-  if (!partnerLoc) throw new Error("Đối tác chưa có kho ảo (chưa từng nhận ký gửi).");
+  if (!partnerLoc) throw new Error("Đối tác chưa có kho riêng trên hệ thống (chưa từng nhận ký gửi).");
 
   const { data: allProducts } = await supabase.from("products").select("id, sku").limit(5000);
   const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
@@ -1932,10 +1932,10 @@ export async function createAllocationDocumentsAction(formData: FormData) {
     .in("allocation_line_id", lineIds);
   const doneSet = new Set((existing ?? []).map((r: AnyRow) => r.allocation_line_id));
   const pending = (lines ?? []).filter((l: AnyRow) => !doneSet.has(l.id));
-  if (!pending.length) throw new Error("Mọi dòng phân bổ đều đã có chứng từ.");
+  if (!pending.length) throw new Error("Mọi dòng đã chia đều đã có phiếu bán rồi.");
 
   const fromLocation = await partnerLocationId(supabase, slip.partner_id);
-  if (!fromLocation) throw new Error("Không tìm thấy kho ảo của đối tác.");
+  if (!fromLocation) throw new Error("Không tìm thấy kho của đối tác trên hệ thống.");
 
   const groups: Record<string, AnyRow[]> = { BH: [], KG: [] };
   for (const l of pending) {
@@ -2124,7 +2124,7 @@ export async function confirmAndIssueVatInvoiceAction(formData: FormData) {
   const pending = (lines ?? []).filter((l: AnyRow) => !doneSet.has(l.id));
   if (pending.length > 0) {
     const fromLocation = await partnerLocationId(supabase, slip.partner_id);
-    if (!fromLocation) throw new Error("Không tìm thấy kho ảo của đối tác.");
+    if (!fromLocation) throw new Error("Không tìm thấy kho của đối tác trên hệ thống.");
 
     const groups: Record<string, AnyRow[]> = { BH: [], KG: [] };
     for (const l of pending) {
@@ -2371,13 +2371,13 @@ export async function recordReceivablePaymentAction(formData: FormData) {
 
 export async function createSettlementAction(formData: FormData) {
   const supabase = await db();
-  await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được tạo đợt đối soát.");
+  await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được tạo đợt chốt sổ.");
   const partyKind = str(formData, "party_kind");
   const isSupplier = partyKind === "SUPPLIER";
   const selectedIds = formData
     .getAll(isSupplier ? "payable_id" : "receivable_id")
     .map((v) => String(v));
-  if (!selectedIds.length) throw new Error("Chọn ít nhất một dòng công nợ đang mở.");
+  if (!selectedIds.length) throw new Error("Chọn ít nhất một khoản nợ chưa trả hết.");
 
   const table = isSupplier ? "supplier_payables" : "partner_receivables";
   const { data: balances, error } = await supabase
@@ -2405,7 +2405,7 @@ export async function createSettlementAction(formData: FormData) {
       })
       .select("id")
       .single(),
-    "Tạo đợt đối soát"
+    "Tạo đợt chốt sổ"
   );
   done(
     await supabase.from("settlement_lines").insert(
@@ -2416,7 +2416,7 @@ export async function createSettlementAction(formData: FormData) {
         amount: Number(b.amount) - Number(b.amount_paid),
       }))
     ),
-    "Thêm dòng đối soát"
+    "Thêm dòng chốt sổ"
   );
   revalidatePath(isSupplier ? "/payables" : "/receivables");
   redirect(`${isSupplier ? "/payables" : "/receivables"}?ok=1`);

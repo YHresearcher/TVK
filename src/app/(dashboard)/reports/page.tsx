@@ -59,11 +59,11 @@ export default async function ReportsPage() {
           {canSeeEstimates && (<p className="mb-3 text-sm leading-relaxed text-slate-600">
             Cột “Giá trị còn giữ (ước tính)” tính theo giá chuyển giao của phiếu gửi gần nhất — là số tiền sẽ thu
             khi đối tác bán hết số hàng còn giữ. Đây chỉ là ước tính để dễ hình dung, chưa phải khoản phải thu:
-            phải thu chỉ phát sinh khi đối tác tiêu thụ hàng.
+            phải thu chỉ phát sinh khi đối tác bán hàng.
           </p>)}
           {partners.data.length === 0 ? <EmptyState message="Chưa có dữ liệu." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã tiêu thụ</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th>{canSeeEstimates && (<th className={thCls}>Giá trị còn giữ (ước tính)</th>)}<th className={thCls}>Kiểm tra</th>{canSeeReceivables && (<th className={thCls}>Còn phải thu</th>)}</tr></thead>
+              <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th>{canSeeEstimates && (<th className={thCls}>Giá trị còn giữ (ước tính)</th>)}<th className={thCls}>Kiểm tra</th>{canSeeReceivables && (<th className={thCls}>Còn phải thu</th>)}</tr></thead>
               <tbody>
                 {partners.data.map((r) => {
                   const ok = Number(r.qty_sent) === Number(r.qty_consumed) + Number(r.qty_returned) + Number(r.qty_still_at_partner);

@@ -49,7 +49,7 @@ export default async function SettingsPage({
 
   return (
     <>
-      <PageHeader title="Cài đặt" description="Các tuỳ chọn toàn hệ thống. Chế độ hoá đơn GTGT phải khớp với quyết định của kế toán cùng với mô hình hợp đồng ký gửi." />
+      <PageHeader title="Cài đặt" description="Các cài đặt dùng chung cho cả hệ thống. Cách ghi hoá đơn GTGT phải theo đúng quyết định của kế toán và hợp đồng ký gửi đã ký." />
       {!locations.configured && <NotConfigured />}
       {isReadOnlyRole(me?.role) ? (
         <Card title="Vai trò chỉ xem">
@@ -74,8 +74,8 @@ export default async function SettingsPage({
               </select>
             </div>
             <p className="text-xs text-slate-500">
-              Đây là chế độ MẶC ĐỊNH khi mở form ghi nhận hoá đơn — người ghi vẫn chọn lại Gộp/Tách ngay trên form cho từng lần ghi nhận, nên đối tác nào cần cách riêng vẫn xử lý được. Dù chọn cách nào, các chứng từ quản lý nội bộ (BH / KG) luôn tách riêng và mỗi
-              dòng hoá đơn luôn liên kết với đúng một chứng từ. Cài đặt này chỉ quyết định cách
+              Đây là chế độ MẶC ĐỊNH khi mở form ghi nhận hoá đơn — người ghi vẫn chọn lại Gộp/Tách ngay trên form cho từng lần ghi nhận, nên đối tác nào cần cách riêng vẫn xử lý được. Dù chọn cách nào, các phiếu bán nội bộ (BH / KG) luôn tách riêng và mỗi
+              dòng hoá đơn luôn gắn với đúng một phiếu bán. Cài đặt này chỉ quyết định cách
               nhóm các dòng khi ghi nhận hoá đơn.
             </p>
             <SubmitButton className={btnCls}>Lưu</SubmitButton>
@@ -123,7 +123,7 @@ export default async function SettingsPage({
           )}
           {partnerWarehouses.length > 0 && (
             <p className="mt-4 text-xs text-slate-500">
-              Kho ảo của đối tác ({partnerWarehouses.length}) được tạo tự động khi phiếu gửi ký gửi đầu tiên cho một đối tác được xác nhận.
+              Kho của đối tác trên hệ thống ({partnerWarehouses.length}) được tạo tự động khi phiếu gửi ký gửi đầu tiên cho một đối tác được xác nhận.
             </p>
           )}
         </Card>

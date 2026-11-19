@@ -500,7 +500,7 @@ export default function CashflowQuickActions({
               <div>
                 <h3 className="text-base font-bold text-slate-900">Cài Đặt Khoản Mục Thu / Chi Vận Hành</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Quản lý danh mục khoản mục gọn phục vụ đối soát và dự báo chi phí cố định dòng tiền.
+                  Quản lý danh mục khoản mục gọn phục vụ đối chiếu và dự báo chi phí cố định dòng tiền.
                 </p>
               </div>
               <button type="button" onClick={closeModal} className="text-slate-400 hover:text-slate-600">

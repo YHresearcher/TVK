@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
   const supabase = await createClient();
   if (!supabase) {
-    return NextResponse.json({ error: "Supabase chưa được cấu hình" }, { status: 503 });
+    return NextResponse.json({ error: "Hệ thống chưa cài đặt xong — hãy báo chủ cửa hàng." }, { status: 503 });
   }
   const { data, error } = await supabase.from(view).select("*").limit(5000);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

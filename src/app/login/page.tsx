@@ -129,7 +129,7 @@ export default function LoginPage() {
 
           {!configured ? (
             <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-800">
-              Supabase chưa được cấu hình. Hãy đặt{" "}
+              Hệ thống chưa cài đặt xong. Hãy đặt{" "}
               <code>NEXT_PUBLIC_SUPABASE_URL</code> và{" "}
               <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> trong{" "}
               <code>.env.local</code> trước (xem <code>supabase/README.md</code>).

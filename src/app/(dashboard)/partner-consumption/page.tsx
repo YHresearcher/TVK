@@ -76,7 +76,7 @@ export default async function PartnerConsumptionPage({
   return (
     <>
       <PageHeader
-        title="Tiêu thụ của đối tác & Phân bổ"
+        title="Tiêu thụ của đối tác & Chia hàng đã bán"
         description="Quy trình: đối tác báo đã bán (BT) → chia số hàng đã bán cho từng lô, ghi rõ mua đứt hay ký gửi (PB) → phiếu bán hàng (BH/KG) → hoá đơn GTGT. Chia hàng phải làm TRƯỚC khi xuất hoá đơn, và mỗi số lượng chỉ xuất hoá đơn đúng một lần."
       />
       {!configured && <NotConfigured />}

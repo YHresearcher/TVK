@@ -44,7 +44,7 @@ export default async function ReturnsPage({
     <>
       <PageHeader
         title="Trả hàng & bảo hành (TH)"
-        description="Hàng trả luôn quay về đúng lô GỐC của nó, để nhà cung cấp và giá vốn vẫn truy vết được. Nếu một lô ký gửi bị trả đã bán nhưng khoản phải trả chưa thanh toán, Kế toán huỷ khoản phải trả đó; nếu đã thanh toán, sẽ trừ vào đợt đối soát tiếp theo."
+        description="Hàng trả về luôn quay về đúng lô ban đầu của nó, để còn biết hàng của nhà cung cấp nào và giá vốn bao nhiêu. Nếu lô ký gửi đã bán mà bị trả lại: khoản phải trả chưa trả thì Kế toán huỷ đi; đã trả rồi thì trừ vào lần đối chiếu sau."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
@@ -67,7 +67,7 @@ export default async function ReturnsPage({
               { name: "qty", label: "Số lượng", type: "number" },
               { name: "reason", label: "Lý do", type: "select", options: RETURN_REASONS.map((r) => ({ value: r, label: RETURN_REASON_LABELS[r] ?? r })) },
             ]} initialRows={1} />
-            <p className="text-xs text-slate-500">Vị trí được tự động xác định: khách trả vào kho TVK đầu tiên, đối tác trả di chuyển từ kho ảo của đối tác về Kho TVK, trả nhà cung cấp xuất khỏi hệ thống từ Kho TVK.</p>
+            <p className="text-xs text-slate-500">Vị trí được tự động xác định: khách trả vào kho TVK đầu tiên, đối tác trả thì hàng chuyển từ kho của đối tác về Kho TVK, trả nhà cung cấp xuất khỏi hệ thống từ Kho TVK.</p>
             <SubmitButton className={btnCls}>Tạo phiếu trả nháp</SubmitButton>
           </form>
         </Card>

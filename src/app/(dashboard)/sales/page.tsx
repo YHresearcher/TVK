@@ -118,7 +118,7 @@ export default async function SalesPage({
     <>
       <PageHeader
         title="Bán hàng"
-        description="Ghi nhận đơn bán qua file Excel và xem lại đơn hàng, chứng từ BH/KG. Bán lẻ tại quầy đang tạm dừng — việc bán hàng diễn ra ở hệ thống khác, TVK chỉ lưu trữ thông tin để đối soát."
+        description="Ghi nhận đơn bán qua file Excel và xem lại đơn hàng, chứng từ BH/KG. Bán lẻ tại quầy đang tạm dừng — việc bán hàng diễn ra ở hệ thống khác, TVK chỉ lưu trữ thông tin để đối chiếu."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã ghi nhận đơn bán xong — chứng từ đã xác nhận, tồn kho và công nợ đã cập nhật.</p>}
@@ -129,7 +129,7 @@ export default async function SalesPage({
             <p className="mt-1 leading-relaxed">
               Quầy bán trực tiếp (chọn hàng, quét mã, bấm bán) đã tắt tạm thời theo quyết định ngày 30/10/2026.
               Muốn ghi nhận một đơn bán, dùng thẻ “Nhập từ Excel (Bán hàng)” bên dưới — một file là một đơn, hệ thống
-              tự phân bổ theo lô và tách chứng từ BH/KG như trước. Mở lại quầy: chỉ cần gắn lại form bán tại quầy,
+              tự chia theo lô và tách phiếu bán BH/KG như trước. Mở lại quầy: chỉ cần gắn lại form bán tại quầy,
               không cần viết lại — code quầy vẫn giữ nguyên trong hệ thống.
             </p>
           </div>
@@ -140,8 +140,8 @@ export default async function SalesPage({
               Một file là một đơn bán hàng sỉ hoặc lẻ (chọn đối tác hoặc
               khách lẻ ở form), vào đúng ngày bán đã chọn. Nhập theo tên
               phụ tùng + dòng xe (cột Mã hàng tùy chọn, chỉ cần khi tên
-              trùng nhau để phân biệt); hệ thống phân bổ theo lô cũ nhất
-              còn hàng (FIFO). Đơn giá để trống thì lấy giá theo loại khách
+              trùng nhau để phân biệt); hệ thống chia theo lô cũ nhất
+              còn hàng (nhớt thì ưu tiên lô sắp hết hạn trước; linh kiện thì nhập trước xuất trước). Đơn giá để trống thì lấy giá theo loại khách
               đã chọn. Đơn tạo xong xác nhận ngay như nhập tay — lô của
               mình vào BH, lô ký gửi vào KG.
             </p>
@@ -179,7 +179,7 @@ export default async function SalesPage({
           </div>
           <div>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-800">Chứng từ quản lý (BH / KG)</h2>
+              <h2 className="text-sm font-semibold text-slate-800">Phiếu bán (BH / KG)</h2>
               {documents.data.length > 0 && <ExportExcelButton filename="chung-tu-ban-hang.xlsx" rows={documentRows} />}
             </div>
             {documents.data.length === 0 ? <EmptyState message="Chưa có chứng từ." /> : (

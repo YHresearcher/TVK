@@ -113,7 +113,7 @@ export default async function PayablesPage({
           </form>
         </Card>
 
-        <Card title="Tạo đợt đối soát (DS) cho một nhà cung cấp">
+        <Card title="Tạo đợt chốt sổ (DS) cho một nhà cung cấp">
           <form action={createSettlementAction} className="space-y-3">
             <input type="hidden" name="party_kind" value="SUPPLIER" />
             <div><label className={labelCls}>Nhà cung cấp *</label>
@@ -126,7 +126,7 @@ export default async function PayablesPage({
               <div><label className={labelCls}>Đến ngày</label><input name="period_to" type="date" className={inputCls} /></div>
             </div>
             <div className="space-y-1">
-              <p className={labelCls}>Các khoản phải trả đang mở đưa vào đối soát (của nhà cung cấp ở trên)</p>
+              <p className={labelCls}>Các khoản phải trả chưa trả hết đưa vào đợt chốt sổ (của nhà cung cấp ở trên)</p>
               {open.map((p) => (
                 <label key={p.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="payable_id" value={p.id} className="h-4 w-4" />
@@ -134,7 +134,7 @@ export default async function PayablesPage({
                 </label>
               ))}
             </div>
-            <SubmitButton className={`${btnCls} w-full`}>Tạo đối soát</SubmitButton>
+            <SubmitButton className={`${btnCls} w-full`}>Tạo đợt chốt sổ</SubmitButton>
           </form>
         </Card>
       </div>
@@ -142,7 +142,7 @@ export default async function PayablesPage({
 
       {supplierSettlements.length > 0 && (
         <div className="mt-6">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800">Các đợt đối soát</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-800">Các đợt chốt sổ</h2>
           <TableWrap>
             <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Kỳ</th><th className={`${thCls} text-right`}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
             <tbody>

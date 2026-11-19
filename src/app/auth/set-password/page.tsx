@@ -111,7 +111,7 @@ export default function SetPasswordPage() {
           <div className="mt-6 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
             {configured
               ? "Liên kết này không hợp lệ hoặc đã hết hạn. Hãy nhờ chủ cửa hàng gửi lời mời mới, hoặc dùng “Quên mật khẩu” ở trang đăng nhập."
-              : "Supabase chưa được cấu hình."}{" "}
+              : "Hệ thống chưa cài đặt xong."}{" "}
             <Link href="/login" className="font-medium underline">
               Đi tới đăng nhập
             </Link>

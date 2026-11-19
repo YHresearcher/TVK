@@ -80,7 +80,7 @@ export function Card({
 export function NotConfigured() {
   return (
     <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
-      <p className="font-semibold">Supabase chưa được cấu hình.</p>
+      <p className="font-semibold">Hệ thống chưa cài đặt xong.</p>
       <p className="mt-1">
         Hãy tạo một project Supabase, chạy các file SQL trong{" "}
         <code className="rounded bg-amber-100 px-1">supabase/migrations/</code> (theo

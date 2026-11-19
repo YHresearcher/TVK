@@ -29,9 +29,9 @@ Kết hợp thành 4 ô:
 | **Hàng hoá của TVK (OWN)** | A — Hàng mình, kho mình | B — Hàng mình gửi đối tác ký gửi |
 | **Hàng được ký gửi (CONS)** | C — Hàng NCC gửi tại kho mình | D — Hàng của NCC đang ở đối tác (**khoá mặc định** — chỉ mở khi nhà cung cấp cho phép ký gửi tiếp) |
 
-### A2. Sổ cái biến động không thể sửa/xoá
+### A2. Lịch sử kho không thể sửa/xoá
 
-Tồn kho **không bao giờ được sửa trực tiếp**. Mọi thay đổi (nhập, xuất, bán, trả, chuyển nơi giữ) đều đi qua một **chứng từ**, và khi chứng từ được **xác nhận**, hệ thống ghi vào sổ cái biến động (stock ledger) — các dòng sổ cái **không sửa, không xoá được**, chứng từ sai chỉ được xử lý bằng cách **huỷ chứng từ** (giữ nguyên mã, chuyển trạng thái "Đã huỷ") hoặc lập chứng từ đối ứng (trả hàng). Nhờ vậy mọi con số đều truy vết được: lô nào, từ phiếu nào, ai tạo, khi nào.
+Tồn kho **không bao giờ được sửa trực tiếp**. Mọi thay đổi (nhập, xuất, bán, trả, chuyển nơi giữ) đều đi qua một **phiếu**, và khi phiếu được **xác nhận**, hệ thống ghi lại vào lịch sử kho — các dòng đã ghi **không sửa, không xoá được**, phiếu sai chỉ được xử lý bằng cách **huỷ phiếu** (giữ nguyên mã, chuyển trạng thái "Đã huỷ") hoặc lập phiếu đối ứng (trả hàng). Nhờ vậy mọi con số đều tra lại được: lô nào, từ phiếu nào, ai tạo, khi nào.
 
 ### A3. Hệ thống chứng từ & mã chứng từ
 
@@ -43,11 +43,11 @@ Mỗi loại chứng từ có tiền tố riêng và số chạy liên tục, **
 | **NK** | Phiếu nhận ký gửi | Nhận hàng ký gửi từ nhà cung cấp → tạo lô CONS |
 | **GK** | Phiếu gửi ký gửi | Gửi hàng của mình cho đối tác giữ bán hộ |
 | **BT** | Báo cáo tiêu thụ | Đối tác báo đã tiêu thụ (bán được) bao nhiêu hàng đang giữ |
-| **PB** | Phân bổ tiêu thụ | Hệ thống phân bổ số tiêu thụ vào từng lô (của mình / ký gửi) |
+| **PB** | Chia hàng đã bán | Hệ thống chia số đã bán vào từng lô (của mình / ký gửi) |
 | **BH** | Chứng từ bán hàng (nội bộ) | Phần hàng **của mình** trong một lần bán/tiêu thụ — **nơi duy nhất có giảm giá** |
 | **KG** | Chứng từ ký gửi (nội bộ) | Phần hàng **ký gửi** trong một lần bán/tiêu thụ — sinh khoản **phải trả nhà cung cấp** theo đúng giá ký gửi của lô |
 | **TH** | Phiếu trả hàng | Trả hàng: khách trả, trả đối tác, hoặc trả hàng ký gửi về nhà cung cấp |
-| **DS** | Đợt đối soát | Gom các khoản phải thu/phải trả với một nhà cung cấp hoặc một đối tác theo kỳ (có từ ngày–đến ngày) để hai bên chốt số liệu trước khi thanh toán |
+| **DS** | Đợt chốt sổ | Gom các khoản phải thu/phải trả với một nhà cung cấp hoặc một đối tác theo kỳ (có từ ngày–đến ngày) để hai bên chốt số trước khi thanh toán |
 | **PT** | Phiếu thu | Ghi nhận tiền thu vào (từ đối tác/khách trả nợ) — mỗi lần thu sinh một mã PT riêng, không tái sử dụng |
 | **PC** | Phiếu chi | Ghi nhận tiền chi ra (trả nợ nhà cung cấp) — mỗi lần chi sinh một mã PC riêng, không tái sử dụng |
 
@@ -55,7 +55,7 @@ Mỗi loại chứng từ có tiền tố riêng và số chạy liên tục, **
 
 1. **Giảm giá chỉ áp dụng trên phần tồn kho (BH).** Giảm giá cho khách không bao giờ làm thay đổi số tiền phải trả nhà cung cấp cho hàng ký gửi.
 2. **Khoản phải trả nhà cung cấp sinh ra theo 2 cách:** (a) khi hàng ký gửi BÁN ĐƯỢC, tính theo **giá ký gửi đã thoả thuận của đúng lô đó** — không sinh khi nhận hàng, không sinh khi gửi đi; (b) khi xác nhận phiếu nhập mua hàng (PN), bằng **tổng tiền phiếu**, hạn trả = ngày nhập + số ngày trả khi mua hàng của nhà cung cấp đó.
-3. **Phân bổ trước, hoá đơn sau.** Một lần tiêu thụ có thể gồm cả hàng mình và hàng ký gửi; hệ thống luôn phân bổ rõ từng dòng thuộc lô nào/tính chất nào trước, rồi mới xuất hoá đơn GTGT từ các dòng đã phân bổ. Một hoá đơn GTGT có thể chứa cả hai tính chất (mỗi tính chất một dòng), nhưng chứng từ nội bộ BH/KG luôn tách riêng và liên kết với hoá đơn ở cấp độ từng dòng — tiền hai phía không bao giờ trộn lẫn.
+3. **Chia hàng trước, hoá đơn sau.** Một lần tiêu thụ có thể gồm cả hàng mình và hàng ký gửi; hệ thống luôn chia rõ từng dòng thuộc lô nào/loại nào trước, rồi mới xuất hoá đơn GTGT từ các dòng đã chia. Một hoá đơn GTGT có thể chứa cả hai loại (mỗi loại một dòng), nhưng phiếu bán nội bộ BH/KG luôn tách riêng và liên kết với hoá đơn ở cấp độ từng dòng — tiền hai phía không bao giờ trộn lẫn.
 
 ### A5. Sơ đồ luồng vận hành tổng quát
 
@@ -72,7 +72,7 @@ NHÀ CUNG CẤP ──PN (mua đứt)──► LÔ OWN (nhãn trắng) ─┐
               │                  ▼
               │            ĐỐI TÁC GIỮ HÀNG ──BT──► báo tiêu thụ
               │                  │                    │
-              └──────────────────┴────── PB phân bổ vào từng lô
+              └──────────────────┴────── PB chia vào từng lô
                                        │
                               ┌────────┴────────┐
                               ▼                 ▼
@@ -84,9 +84,9 @@ NHÀ CUNG CẤP ──PN (mua đứt)──► LÔ OWN (nhãn trắng) ─┐
                        (đối tác/khách)
 ```
 
-**Ví dụ kiểm chứng mô hình (đối tác vừa mua vừa ký gửi):** một công ty vận tải trong tháng lấy sản phẩm A: mua thẳng 5 cái + ký gửi 10 cái = tiêu thụ 15 cái. Xuất 3 hoá đơn: HĐ1 = 4 của mình + 3 ký gửi; HĐ2 = 4 ký gửi; HĐ3 = 1 của mình + 3 ký gửi. Hệ thống phân bổ từng hoá đơn về đúng lô; cuối kỳ lô OWN hết 5, lô CONS hết 10, sổ sách khớp tuyệt đối.
+**Ví dụ kiểm chứng mô hình (đối tác vừa mua vừa ký gửi):** một công ty vận tải trong tháng lấy sản phẩm A: mua thẳng 5 cái + ký gửi 10 cái = tiêu thụ 15 cái. Xuất 3 hoá đơn: HĐ1 = 4 của mình + 3 ký gửi; HĐ2 = 4 ký gửi; HĐ3 = 1 của mình + 3 ký gửi. Hệ thống chia từng hoá đơn về đúng lô; cuối kỳ lô OWN hết 5, lô CONS hết 10, sổ sách khớp tuyệt đối.
 
-**Trường hợp bán chưa hết:** đối tác nhận 10 cái, mới bán 7 → chỉ 7 cái đi tiếp vào BT → phân bổ → hoá đơn; 3 cái còn lại vẫn nằm ở kho của đối tác trên hệ thống, **không phát sinh tiền** (không phải thu, không phải trả) cho đến khi bán được hoặc được trả lại bằng phiếu TH. Công thức kiểm soát tự động: **đã gửi = đã tiêu thụ + đã trả + còn tại đối tác**.
+**Trường hợp bán chưa hết:** đối tác nhận 10 cái, mới bán 7 → chỉ 7 cái đi tiếp vào BT → chia hàng → hoá đơn; 3 cái còn lại vẫn nằm ở kho của đối tác trên hệ thống, **không phát sinh tiền** (không phải thu, không phải trả) cho đến khi bán được hoặc được trả lại bằng phiếu TH. Công thức kiểm soát tự động: **đã gửi = đã tiêu thụ + đã trả + còn tại đối tác**.
 
 ---
 
@@ -96,21 +96,21 @@ Menu bên trái gộp theo nhóm công việc, bấm tên nhóm để mở (mở
 
 | Nhóm | Mục | Dùng để |
 |---|---|---|
-| — | **Tổng quan** | 5 tầng: (1) **Tổng quan điều hành** — chỉ Chủ cửa hàng, Kế toán và CEO thấy (Bán hàng và Thủ kho không thấy tầng này): doanh thu thuần lũy kế, lợi nhuận gộp (Chủ + Kế toán + CEO), phải thu/phải trả còn nợ, giá trị hàng sở hữu theo giá trị thật, kèm ghi chú doanh thu chưa tách thuế GTGT; (2) **Hàng hoá và quyền sở hữu** — số lượng tồn kho/được ký gửi/ở đối tác, thẻ **Theo sổ kế toán** chỉ Chủ cửa hàng, Kế toán và CEO xem được (tồn kho theo **giá vốn**, hàng được ký gửi tách riêng, không phải tài sản), thẻ **Cơ cấu tồn kho**: biểu đồ 3 vòng đồng tâm ở giữa là **Tổng giá trị hàng đang quản lý** theo giá vốn, kèm dòng tách hàng TVK sở hữu với hàng được ký gửi (không phải tài sản) — ba vòng độc lập cùng phạm vi hàng đang quản lý và cùng tính theo giá vốn lô: sở hữu (hàng hoá của TVK / hàng được ký gửi), vị trí (kho TVK / kho đối tác), trạng thái (bán được / giữ cho chứng từ nháp); bấm một đoạn trên vòng hoặc một chip chú giải thì hiện giá trị, tỷ trọng và số lô kèm link mở tồn kho đã lọc, 3 thẻ KPI giá vốn/giá sỉ/giá lẻ của hàng TVK trong kho kèm chênh lệch so với giá vốn và biên lợi nhuận gộp tiềm năng theo giá lẻ (chỉ Chủ cửa hàng, Kế toán và CEO xem được), giải thích cách tính thu gọn trong biểu tượng ⓘ, link xem chi tiết tồn kho; thẻ **Hiệu suất ký gửi** (đang gửi / giá trị chuyển giao / đã tiêu thụ / tỷ lệ tiêu thụ + thanh tiến độ đã tiêu thụ–còn tại đối tác; 'Đã bán' trực tiếp tách ra, số lượng bán lũy kế chỉ còn ở mục Phân tích đơn hàng), biểu đồ **Tiêu thụ ký gửi theo đối tác** (đã tiêu thụ / còn tại đối tác / chờ đối soát theo từng đối tác; chờ đối soát là lượng hàng trên phiếu phân bổ nháp chưa xác nhận; bấm tên đối tác thì mở trang chi tiết đối tác; chỉ Chủ cửa hàng, Kế toán và CEO xem được), thẻ **Thống kê đối tác**: bấm tên đối tác là mở cửa sổ bật lên xem nhanh 5 số liệu, cuối cửa sổ có link mở trang chi tiết, không tải lại trang; mọi vai trò đều xem được, kể cả CEO; (3) **Hiệu quả kinh doanh** — biểu đồ kết hợp **Doanh thu – Giá vốn – Biên lợi nhuận** theo kỳ đã chọn (7/14/30/90 ngày, tháng này, quý này, tất cả, hoặc khoảng ngày tùy chọn; kỳ mặc định 90 ngày; chỉ Chủ cửa hàng, Kế toán và CEO xem được), **Giá trị tồn kho theo nhóm** theo giá vốn lô, chỉ hàng TVK sở hữu (bấm một nhóm thì mở trang Sản phẩm đã lọc theo nhóm đó; chỉ Chủ cửa hàng, Kế toán và CEO xem được), doanh thu theo nhóm hàng (bấm một nhóm thì mở trang Sản phẩm đã lọc), mục **Phân tích đơn hàng** chỉ Chủ cửa hàng, Kế toán và CEO xem được (đoạn tóm tắt doanh thu thuần – giá vốn (lô thực tế, FIFO) – lợi nhuận gộp kèm Gross Margin (lãi gộp trên doanh thu thuần) và Markup on Cost (lãi gộp trên giá vốn hàng đã bán) + biểu đồ cột đôi doanh thu/giá vốn từng chứng từ, không còn bảng chi tiết), top 5 bán chạy 30 ngày; (4) **Cảnh báo vận hành** — công nợ theo trạng thái kèm quá hạn, biểu đồ **Tuổi nợ phải thu** theo 5 nhóm tuổi nợ của kế toán (chỉ Chủ cửa hàng, Kế toán và CEO xem được), **hàng chậm luân chuyển** (còn tồn mà 90 ngày không xuất/bán/trả; hàng mới nhập trong 90 ngày không tính), hàng sắp hết, lô ký gửi phải trả trong 30 ngày, chênh lệch ký gửi tại đối tác; (5) **Hoạt động gần đây** — 8 bút toán kho mới nhất kèm link sang trang Sổ cái kho. Thứ tự tầng xếp theo vai trò: bán hàng thấy hiệu quả trước, thủ kho thấy hàng hoá và cảnh báo trước. Trên màn hình nhỏ (dưới lg) đầu trang có hàng **Lối tắt** theo vai trò (Chủ: Bán hàng/Nhập kho/Gửi ký gửi/Phải thu/Báo cáo/Sổ cái; Bán hàng: Tạo đơn hàng/Tìm sản phẩm/Kiểm tra tồn kho/Đối tác; Thủ kho: Nhập kho/Tồn kho theo lô/Gửi ký gửi/Sản phẩm; Kế toán: Phải thu/Phải trả/Hoá đơn/Báo cáo; CEO: Báo cáo/Sổ cái/Phải thu/Phải trả) — chỉ là đường dẫn vào trang đã có, không mở thêm quyền. Trên thiết bị cảm ứng, nút bấm/ô nhập/link điều hướng có vùng chạm tối thiểu 44px (media query hover:none + pointer:coarse). |
+| — | **Tổng quan** | 5 tầng: (1) **Tổng quan điều hành** — chỉ Chủ cửa hàng, Kế toán và CEO thấy (Bán hàng và Thủ kho không thấy tầng này): doanh thu từ trước tới nay, lợi nhuận gộp (Chủ + Kế toán + CEO), phải thu/phải trả còn nợ, giá trị hàng sở hữu theo giá trị thật, kèm ghi chú doanh thu chưa tách thuế GTGT; (2) **Hàng hoá và quyền sở hữu** — số lượng tồn kho/được ký gửi/ở đối tác, thẻ **Tính theo giá vốn (tiền nhập hàng)** chỉ Chủ cửa hàng, Kế toán và CEO xem được (tồn kho theo **giá vốn**, hàng được ký gửi tách riêng, không phải tài sản), thẻ **Cơ cấu tồn kho**: biểu đồ 3 vòng ở giữa là **Tổng giá trị hàng đang quản lý** theo giá vốn, kèm dòng tách hàng TVK sở hữu với hàng được ký gửi (không phải tài sản) — ba vòng độc lập cùng phạm vi hàng đang quản lý và cùng tính theo giá vốn lô: sở hữu (hàng hoá của TVK / hàng được ký gửi), vị trí (kho TVK / kho đối tác), trạng thái (bán được / giữ cho chứng từ nháp); bấm một đoạn trên vòng hoặc một chip chú giải thì hiện giá trị, tỷ trọng và số lô kèm link mở tồn kho đã lọc, 3 thẻ KPI giá vốn/giá sỉ/giá lẻ của hàng TVK trong kho kèm chênh lệch so với giá vốn và lãi gộp tiềm năng theo giá lẻ (chỉ Chủ cửa hàng, Kế toán và CEO xem được), giải thích cách tính thu gọn trong biểu tượng ⓘ, link xem chi tiết tồn kho; thẻ **Hàng ký gửi bán được bao nhiêu** (đang gửi / giá trị chuyển giao / đã bán / tỷ lệ đã bán + thanh tiến độ đã bán–còn tại đối tác; 'Đã bán' trực tiếp tách ra, số lượng bán từ trước tới nay chỉ còn ở mục Phân tích đơn hàng), biểu đồ **Đối tác đã bán được bao nhiêu hàng ký gửi** (đã bán / còn tại đối tác / đang chờ xác nhận đã bán theo từng đối tác; đang chờ xác nhận đã bán là lượng hàng trên phiếu chia hàng nháp chưa xác nhận; bấm tên đối tác thì mở trang chi tiết đối tác; chỉ Chủ cửa hàng, Kế toán và CEO xem được), thẻ **Thống kê đối tác**: bấm tên đối tác là mở cửa sổ bật lên xem nhanh 5 số liệu, cuối cửa sổ có link mở trang chi tiết, không tải lại trang; mọi vai trò đều xem được, kể cả CEO; (3) **Hiệu quả kinh doanh** — biểu đồ kết hợp **Doanh thu – Giá vốn – Lãi** theo kỳ đã chọn (7/14/30/90 ngày, tháng này, quý này, tất cả, hoặc khoảng ngày tùy chọn; kỳ mặc định 90 ngày; chỉ Chủ cửa hàng, Kế toán và CEO xem được), **Giá trị tồn kho theo nhóm** theo giá vốn lô, chỉ hàng TVK sở hữu (bấm một nhóm thì mở trang Sản phẩm đã lọc theo nhóm đó; chỉ Chủ cửa hàng, Kế toán và CEO xem được), doanh thu theo nhóm hàng (bấm một nhóm thì mở trang Sản phẩm đã lọc), mục **Phân tích đơn hàng** chỉ Chủ cửa hàng, Kế toán và CEO xem được (đoạn tóm tắt doanh thu – giá vốn (lô thực tế, nhập trước xuất trước) – lợi nhuận gộp kèm lãi % trên doanh thu và lãi % trên giá vốn + biểu đồ cột đôi doanh thu/giá vốn từng chứng từ, không còn bảng chi tiết), top 5 bán chạy 30 ngày; (4) **Những việc cần xem** — tiền nợ theo tình hình trả kèm quá hạn, biểu đồ **Tiền phải thu theo thời gian quá hạn** theo 5 nhóm của kế toán (chỉ Chủ cửa hàng, Kế toán và CEO xem được), **hàng để 90 ngày không bán được** (còn tồn mà 90 ngày không xuất/bán/trả; hàng mới nhập trong 90 ngày không tính), hàng sắp hết, lô ký gửi phải trả trong 30 ngày, hàng gửi đối tác bị lệch số; (5) **Hoạt động gần đây** — 8 lần nhập – xuất mới nhất kèm link sang trang Lịch sử kho. Thứ tự tầng xếp theo vai trò: bán hàng thấy hiệu quả trước, thủ kho thấy hàng hoá và cảnh báo trước. Trên màn hình nhỏ (dưới lg) đầu trang có hàng **Lối tắt** theo vai trò (Chủ: Bán hàng/Nhập kho/Gửi ký gửi/Phải thu/Báo cáo/Lịch sử kho; Bán hàng: Nhập đơn bán/Tìm sản phẩm/Kiểm tra tồn kho/Đối tác; Thủ kho: Nhập kho/Tồn kho theo lô/Gửi ký gửi/Sản phẩm; Kế toán: Phải thu/Phải trả/Hoá đơn/Báo cáo; CEO: Báo cáo/Lịch sử kho/Phải thu/Phải trả) — chỉ là đường dẫn vào trang đã có, không mở thêm quyền. Trên thiết bị cảm ứng, nút bấm/ô nhập/link điều hướng có vùng chạm tối thiểu 44px (media query hover:none + pointer:coarse). |
 | **Hàng hoá & Kho** | Sản phẩm | Danh mục sản phẩm, mã OEM/mã tương đương, xe tương thích, giá lẻ + giá đại lý; trang chi tiết sửa được tên/thương hiệu/đơn vị/tồn tối thiểu và bảng giá (Chủ cửa hàng + Thủ kho; mã SKU không sửa được) |
-| | Tồn kho theo lô | Xem tồn theo từng lô OWN/CONS, vị trí giữ hàng, kiểm kê & điều chỉnh |
+| | Tồn kho theo lô | Xem tồn theo từng lô (hàng TVK / hàng được ký gửi), vị trí giữ hàng, kiểm kho & điều chỉnh |
 | | Nhập kho | Tạo phiếu PN / NK thủ công, hoặc **Nhập từ Excel** (nút thứ ba trong trang) |
-| | Sổ cái kho | 200 bút toán kho mới nhất: lô, kho nguồn → kho đích, chứng từ, người làm; sổ cái chỉ ghi thêm, không sửa, không xoá; có lọc theo loại bút toán và tìm kiếm không dấu |
+| | Lịch sử kho | 200 lần nhập – xuất mới nhất: lô, kho nguồn → kho đích, phiếu, người làm; đã ghi thì không sửa, không xoá; có lọc theo loại thay đổi và tìm kiếm không dấu |
 | **Ký gửi** | Gửi ký gửi | Lập phiếu GK gửi hàng cho đối tác (có nhập từ Excel) |
-| | Tiêu thụ của đối tác | Nhập báo cáo tiêu thụ BT, xem phân bổ PB → BH/KG (BT và PB đều có nhập từ Excel) |
+| | Tiêu thụ của đối tác | Nhập báo cáo đối tác đã bán BT, xem chia hàng PB → BH/KG (BT và PB đều có nhập từ Excel) |
 | **Bán hàng & Hoá đơn** | Bán hàng | Bán lẻ tại quầy TẠM DỪNG từ 30/10/2026 — chỉ ghi nhận đơn bán qua file Excel; bảng đơn hàng và chứng từ BH/KG có nút Xuất Excel; bảng chứng từ BH/KG có thêm cột Giá vốn và Lãi gộp, chỉ Chủ cửa hàng, Kế toán và CEO xem được (giá vốn theo lô thực tế đã xuất, chứng từ nháp chưa có giá vốn) |
 | | Hoá đơn GTGT (theo dõi nội bộ) | Ghi nhận/huỷ ghi nhận hoá đơn đã xuất từ hệ thống hoá đơn chính thức, theo các dòng BH/KG đã xác nhận; bảng hoá đơn có nút Xuất Excel |
 | | Trả hàng & bảo hành | Lập phiếu trả hàng TH; bảng phiếu trả có nút Xuất Excel |
 | **Công nợ & Báo cáo** | Phải trả nhà cung cấp | Khoản phải trả phát sinh từ hàng ký gửi bán được và từ phiếu nhập mua hàng đã xác nhận; ghi thanh toán; bảng **Tuổi nợ phải trả** gom theo nhà cung cấp, 3 nhóm quá hạn 1–6 tháng |
 | | Phải thu đối tác | Khoản đối tác/khách còn nợ; ghi thu tiền; bảng **Tuổi nợ phải thu** gom theo đối tác, 3 nhóm quá hạn 1–6 tháng |
 | | Báo cáo | Đối soát nhà cung cấp/đối tác, xuất CSV |
-| **Danh mục** | Nhà cung cấp | Hồ sơ NCC, hạn trả mặc định, cho phép ký gửi tiếp (ô D) hay không |
-| | Đối tác | Hồ sơ đối tác (gara/cửa hàng/công ty), hạn mức ký gửi; bấm tên đối tác để mở trang chi tiết: số dư phải thu, đã thanh toán, số hoá đơn đã xuất + giá trị, hàng còn ở đối tác, đối soát ký gửi, bảng hàng hoá đang ký gửi theo lô kèm trạng thái bán (chưa bán / đã bán một phần / đã bán hết / đã trả lại) — phía trên bảng chỉ hiện một dòng tóm tắt mỗi phiếu gửi (mã + ngày, bấm để xem chi tiết), bảng không còn cột phiếu; các khoản phải thu — phía trên bảng chỉ hiện một dòng tóm tắt mỗi chứng từ (mã + ngày, bấm để xem chi tiết) và hoá đơn (số + ngày, hoặc 'chưa xuất'), bảng không còn cột chứng từ/hoá đơn; và hoá đơn; bấm mã chứng từ / mã phiếu gửi / số hoá đơn thì mở cửa sổ bật lên hiện danh sách hàng hoá, số tiền bán (phiếu gửi tách tiền đã bán thật và tiền dự kiến còn giữ theo giá chuyển giao) và tổng lợi nhuận (phiếu gửi tách lãi đã bán và lãi dự kiến) — giá vốn và lãi chỉ Chủ cửa hàng, Kế toán và CEO thấy, các vai trò khác thấy bản đã lược |
+| **Danh mục** | Nhà cung cấp | Hồ sơ NCC, hạn trả mặc định, cho phép gửi tiếp hàng ký gửi của họ cho đối tác khác hay không |
+| | Đối tác | Hồ sơ đối tác (gara/cửa hàng/công ty), hạn mức ký gửi; bấm tên đối tác để mở trang chi tiết: số dư phải thu, đã thanh toán, số hoá đơn đã xuất + giá trị, hàng còn ở đối tác, đối chiếu hàng gửi đối tác, bảng hàng hoá đang ký gửi theo lô kèm trạng thái bán (chưa bán / đã bán một phần / đã bán hết / đã trả lại) — phía trên bảng chỉ hiện một dòng tóm tắt mỗi phiếu gửi (mã + ngày, bấm để xem chi tiết), bảng không còn cột phiếu; các khoản phải thu — phía trên bảng chỉ hiện một dòng tóm tắt mỗi chứng từ (mã + ngày, bấm để xem chi tiết) và hoá đơn (số + ngày, hoặc 'chưa xuất'), bảng không còn cột chứng từ/hoá đơn; và hoá đơn; bấm mã chứng từ / mã phiếu gửi / số hoá đơn thì mở cửa sổ bật lên hiện danh sách hàng hoá, số tiền bán (phiếu gửi tách tiền đã bán thật và tiền dự kiến còn giữ theo giá chuyển giao) và tổng lợi nhuận (phiếu gửi tách lãi đã bán và lãi dự kiến) — giá vốn và lãi chỉ Chủ cửa hàng, Kế toán và CEO thấy, các vai trò khác thấy bản đã lược |
 | | Sửa hồ sơ | Ở bảng mỗi trang bấm **Sửa** — form bên phải chuyển sang chế độ sửa, điền lại rồi **Lưu thay đổi** (Chủ + Kế toán sửa được NCC; Chủ + Kế toán + Bán hàng sửa được đối tác; CEO chỉ xem) |
 | — | **Cài đặt** | Chế độ hoá đơn GTGT mặc định, kho, quản lý tài khoản & vai trò |
 
@@ -126,9 +126,9 @@ Trang **Nhập kho** có 3 nút: **Phiếu nhập mua (PN)** · **Phiếu nhận
 
 | Mục | Ý nghĩa |
 |---|---|
-| **Nhà cung cấp \*** | Bên bán hàng cho mình. Hàng về từ ai thì chọn đúng người đó — công nợ mua hàng và đối soát đi theo nhà cung cấp này. |
+| **Nhà cung cấp \*** | Bên bán hàng cho mình. Hàng về từ ai thì chọn đúng người đó — tiền nợ mua hàng và đối chiếu đi theo nhà cung cấp này. |
 | **Kho \*** | Kho vật lý nhận hàng (Kho TVK). Hàng nhập vào kho nào thì tồn và vị trí lô ghi theo kho đó. |
-| **Ngày nhập** | Ngày hàng thực tế về kho — dùng cho báo cáo và truy vết lô theo thời gian. |
+| **Ngày nhập** | Ngày hàng thực tế về kho — dùng cho báo cáo và tra lại lô theo thời gian. |
 | **Số hoá đơn của nhà cung cấp** | Số hoá đơn GTGT mà nhà cung cấp xuất cho mình khi mua đứt — lưu để kế toán đối chiếu chứng từ mua vào. (Chỉ PN mới có ô này.) |
 
 **Các cột trong bảng dòng hàng:**
@@ -138,7 +138,7 @@ Trang **Nhập kho** có 3 nút: **Phiếu nhập mua (PN)** · **Phiếu nhận
 | **Sản phẩm** | Chọn từ danh mục (hiển thị dạng "Mã SKU — Tên hàng"). Có ô **quét mã vạch**: quét/nhập bất kỳ mã nào đã đăng ký của sản phẩm (mã OEM hoặc mã tương đương) rồi Enter, hệ thống tự chọn đúng sản phẩm; quét lại cùng mã sẽ cộng thêm 1 số lượng. |
 | **Số lượng** | Số lượng thực nhập của dòng này. |
 | **Đơn giá vốn (₫)** | Giá mình mua vào của 1 đơn vị — là cơ sở tính giá trị tồn kho và lãi gộp sau này. Nhập đúng giá theo hoá đơn mua (đã gồm các chi phí theo chính sách của cửa hàng). |
-| **Hạn dùng (chỉ nhớt)** | Hạn dùng của lô hàng — chỉ nhập cho nhớt, để trống với linh kiện. Hạn dùng ghi vào lô khi xác nhận phiếu; nhớt xuất theo hạn gần nhất trước (FEFO). |
+| **Hạn dùng (chỉ nhớt)** | Hạn dùng của lô hàng — chỉ nhập cho nhớt, để trống với linh kiện. Hạn dùng ghi vào lô khi xác nhận phiếu; nhớt xuất theo hạn gần nhất trước. |
 
 Kết quả khi xác nhận PN: tạo **lô OWN (nhãn trắng)** cho từng dòng, giá vốn của lô = đơn giá vốn đã nhập.
 
@@ -150,7 +150,7 @@ Các ô **Nhà cung cấp \***, **Kho \***, **Ngày nhập** giống PN. Khác b
 |---|---|
 | **Hạn trả** | Hạn cuối được giữ hàng ký gửi chưa bán được (quá hạn thì trả lại nhà cung cấp hoặc xử lý theo thoả thuận). **Để trống = dùng hạn mặc định đã khai trong hồ sơ nhà cung cấp.** Hệ thống dùng hạn này để cảnh báo hàng ký gửi sắp hết hạn giữ. |
 | **Giá ký gửi (₫)** *(cột trong bảng dòng hàng)* | Giá thoả thuận sẽ **trả cho nhà cung cấp cho mỗi đơn vị khi hàng bán được**. Đây là con số quyết định khoản phải trả sau này — nhập đúng theo thoả thuận/bảng giá ký gửi của từng nhà cung cấp, từng lô có thể khác nhau. |
-| **Hạn dùng (chỉ nhớt)** *(cột trong bảng dòng hàng)* | Hạn dùng của lô hàng — chỉ nhập cho nhớt, để trống với linh kiện. Hạn dùng ghi vào lô khi xác nhận phiếu; nhớt xuất theo hạn gần nhất trước (FEFO). |
+| **Hạn dùng (chỉ nhớt)** *(cột trong bảng dòng hàng)* | Hạn dùng của lô hàng — chỉ nhập cho nhớt, để trống với linh kiện. Hạn dùng ghi vào lô khi xác nhận phiếu; nhớt xuất theo hạn gần nhất trước. |
 | *(không có)* Số hoá đơn NCC | Nhận ký gửi chưa phải mua hàng nên chưa có hoá đơn mua vào — ô này không xuất hiện ở NK. |
 
 Kết quả khi xác nhận NK: tạo **lô CONS (nhãn vàng)**. **Chưa phát sinh khoản phải trả nào** — tiền chỉ phát sinh khi hàng bán được (xem A4).
@@ -193,7 +193,7 @@ Dùng khi nhà cung cấp giao cả một danh mục (ví dụ file bảng hàng
 | **DonViTinh** (ĐVT) | | Đơn vị tính (cái, bộ, chiếc…). |
 | **SoLuong** (Số lượng) | ✔ | Số lượng nhập, phải lớn hơn 0. |
 | **GiaUSD** (Đơn giá USD) | ✔ | Đơn giá bằng USD của một đơn vị — đầu vào duy nhất để tính giá nhập. |
-| **HanDung** (Hạn dùng) | | Hạn dùng của lô (chỉ nhớt) — ghi dạng ngày 01/05/2027 hoặc 2027-05-01; để trống nếu không có. Hạn dùng ghi vào từng lô khi xác nhận phiếu; nhớt xuất theo hạn gần nhất trước (FEFO), linh kiện xuất theo nhập trước (FIFO). |
+| **HanDung** (Hạn dùng) | | Hạn dùng của lô (chỉ nhớt) — ghi dạng ngày 01/05/2027 hoặc 2027-05-01; để trống nếu không có. Hạn dùng ghi vào từng lô khi xác nhận phiếu; nhớt xuất theo hạn gần nhất trước, linh kiện xuất theo nhập trước. |
 
 **Bảng xem trước (preview) — đọc trạng thái từng dòng trước khi nhập:**
 
@@ -208,30 +208,30 @@ Ngoài trạng thái, bảng xem trước còn cho thấy **kết quả tính to
 
 **Công thức áp dụng cho mọi dòng (Tỷ giá, VAT, % lợi nhuận, % giá bán lẻ trên form áp chung cho cả file):** Đơn giá VND + VAT = GiaUSD × Tỷ giá × (1 + VAT%), giữ chính xác tới 4 số lẻ, không làm tròn (migration 0014 — quyết định của chủ cửa hàng: tính đúng từng xu, để số lẻ). Thành tiền = Số lượng × Đơn giá VND + VAT (chính xác). Tổng phiếu = tổng chính xác các dòng. Giá đại lý = Đơn giá VND + VAT × (1 + % lợi nhuận); Giá lẻ = Đơn giá VND + VAT × (1 + % giá bán lẻ) — hai giá bán này vẫn làm tròn về đồng chẵn, chỉ giá vốn là tính chính xác — với hàng mới, hai giá này thành giá đại lý và giá lẻ ban đầu của sản phẩm (mặc định: lợi nhuận 35%, giá lẻ 50%, đổi được ngay trên form). Ví dụ: GiaUSD 100, Tỷ giá 27.000, VAT 8%, Lợi nhuận 35% → Đơn giá VND + VAT 2.916.000; Giá đại lý 3.936.600; Giá lẻ (50%) 4.374.000; nhập 15 cái → Thành tiền 43.740.000.
 
-**Tính chính xác, không làm tròn đơn giá (migration 0014, từ 28/10):** đơn giá vốn giữ chính xác tới 4 số lẻ nên tổng các dòng bằng đúng tổng chính xác — không còn chênh lệch làm tròn. Hiển thị tiền làm tròn về đồng chẵn, không hiện số lẻ sau dấu phẩy (chỉ làm tròn lúc hiển thị; giá trị lưu trong database giữ chính xác). **Total giá nhập VND** ở cuối bảng = tổng chính xác các dòng. Cột `rounding_adjustment` ở phiếu nhập giữ lại làm chốt lịch sử (phiếu cũ vẫn giữ giá trị đã lưu, phiếu mới luôn ghi 0).
+**Tính chính xác, không làm tròn đơn giá (migration 0014, từ 28/10):** đơn giá vốn giữ chính xác tới 4 số lẻ nên tổng các dòng bằng đúng tổng chính xác — không còn chênh lệch làm tròn. Hiển thị tiền làm tròn về đồng chẵn, không hiện số lẻ sau dấu phẩy (chỉ làm tròn lúc hiển thị; số liệu đã ghi vẫn giữ chính xác). **Total giá nhập VND** ở cuối bảng = tổng chính xác các dòng. Cột chênh lệch làm tròn ở phiếu nhập giữ lại làm chốt lịch sử (phiếu cũ vẫn giữ giá trị đã lưu, phiếu mới luôn ghi 0).
 
 Sau khi bấm **Xác nhận nhập**: hệ thống kiểm tra lại toàn bộ ở máy chủ rồi mới ghi — phiếu tạo thành công sẽ **tự chuyển về đúng danh sách phiếu PN/NK ngay trong trang Nhập kho** để kiểm tra/xác nhận.
 
 ### C4. Luật kiểm soát định dạng file (từ chối khi nào?)
 
-File bị **từ chối ngay, không xem trước**, kèm lý do cụ thể, khi: thiếu cột bắt buộc (MaHang / TenHang / SoLuong / GiaUSD); trùng tên cột; file trống hoặc không đọc được. Các cột cũ về giá theo dòng (GiaVonVND, TyGiaUSD, VAT, GiaBanDeXuat) không còn dùng — nếu còn trong file thì hệ thống bỏ qua. Dòng dữ liệu lỗi thì **chặn toàn bộ lần nhập** (không nhập một phần) — theo nguyên tắc: một phiếu nhập phải đúng 100% mới được vào kho, tránh kho sách lệch khó truy vết.
+File bị **từ chối ngay, không xem trước**, kèm lý do cụ thể, khi: thiếu cột bắt buộc (MaHang / TenHang / SoLuong / GiaUSD); trùng tên cột; file trống hoặc không đọc được. Các cột cũ về giá theo dòng (GiaVonVND, TyGiaUSD, VAT, GiaBanDeXuat) không còn dùng — nếu còn trong file thì hệ thống bỏ qua. Dòng dữ liệu lỗi thì **chặn toàn bộ lần nhập** (không nhập một phần) — theo nguyên tắc: một phiếu nhập phải đúng 100% mới được vào kho, tránh kho sách lệch khó tra lại.
 
 ---
 
 ## PHẦN D — CÁC LUỒNG THAO TÁC CÒN LẠI
 
 ### D1. Gửi ký gửi cho đối tác (GK)
-Vào **Ký gửi → Gửi ký gửi**: chọn đối tác, kho xuất, và **chọn theo lô** (bắt buộc chọn đúng lô — vì cùng sản phẩm có thể có nhiều lô khác chủ sở hữu). Hệ thống chặn gửi tiếp lô CONS của nhà cung cấp (ô D) trừ khi nhà cung cấp đó đã bật "Cho phép ký gửi tiếp" trong hồ sơ. Kiểm tra hạn mức ký gửi của đối tác trước khi xác nhận. Phiếu tạo ra ở trạng thái **Nháp**; hàng chỉ chuyển đi khi bấm **Xác nhận**. Phiếu nháp hiện trong thẻ vàng **"Phiếu gửi nháp chờ xác nhận"** ngay đầu trang, với nút Xác nhận rõ ràng — bảng bên dưới chỉ còn phiếu đã xác nhận.
+Vào **Ký gửi → Gửi ký gửi**: chọn đối tác, kho xuất, và **chọn theo lô** (bắt buộc chọn đúng lô — vì cùng sản phẩm có thể có nhiều lô khác chủ sở hữu). Hệ thống chặn gửi tiếp lô CONS của nhà cung cấp trừ khi nhà cung cấp đó đã bật "Cho phép gửi tiếp hàng ký gửi của nhà cung cấp này cho đối tác khác" trong hồ sơ. Kiểm tra hạn mức ký gửi của đối tác trước khi xác nhận. Phiếu tạo ra ở trạng thái **Nháp**; hàng chỉ chuyển đi khi bấm **Xác nhận**. Phiếu nháp hiện trong thẻ vàng **"Phiếu gửi nháp chờ xác nhận"** ngay đầu trang, với nút Xác nhận rõ ràng — bảng bên dưới chỉ còn phiếu đã xác nhận.
 
-**Nhập GK từ Excel:** cuối trang có mục **Nhập từ Excel (GK)** với nút **Tải file mẫu (.xlsx)**. Một file là một phiếu GK cho một đối tác — 6 cột `STT · Mã hàng · Dòng xe · Tên phụ tùng* · Số lượng* · Giá chuyển giao VND` (STT chỉ để đếm; hệ thống tìm hàng theo **tên phụ tùng + dòng xe** như form bán hàng, cột Mã hàng tùy chọn — chỉ cần khi tên trùng nhau để phân biệt; giá chuyển giao VNĐ, để trống = 0, dùng để kiểm tra hạn mức ký gửi khi xác nhận). Phiếu GK chỉ còn một bản chất là ký gửi — không còn cột Điều khoản, “mua đứt” thì làm ở mục Bán hàng. Không nhập mã lô — hệ thống tự phân bổ theo lô cũ nhất còn hàng tại Kho TVK (FIFO), một dòng có thể tách ra nhiều lô, trừ lô ký gửi của nhà cung cấp chưa cho ký gửi tiếp (khoá ô D). Hệ thống xem trước (kèm cảnh báo tên trùng mã như import nhập kho/bán hàng), kiểm tra tồn + khoá ô D + hạn mức, rồi mới tạo phiếu (tick “Xác nhận ngay” thì chuyển hàng luôn như phiếu tay, không tick thì tạo phiếu nháp). Dòng lỗi nào cũng chặn cả file — không nhập một phần.
+**Nhập GK từ Excel:** cuối trang có mục **Nhập từ Excel (GK)** với nút **Tải file mẫu (.xlsx)**. Một file là một phiếu GK cho một đối tác — 6 cột `STT · Mã hàng · Dòng xe · Tên phụ tùng* · Số lượng* · Giá chuyển giao VND` (STT chỉ để đếm; hệ thống tìm hàng theo **tên phụ tùng + dòng xe** như form bán hàng, cột Mã hàng tùy chọn — chỉ cần khi tên trùng nhau để phân biệt; giá chuyển giao VNĐ, để trống = 0, dùng để kiểm tra hạn mức ký gửi khi xác nhận). Phiếu GK chỉ còn một bản chất là ký gửi — không còn cột Điều khoản, “mua đứt” thì làm ở mục Bán hàng. Không nhập mã lô — hệ thống tự phân bổ theo lô cũ nhất còn hàng tại Kho TVK (nhớt thì ưu tiên lô sắp hết hạn trước; linh kiện thì nhập trước xuất trước), một dòng có thể tách ra nhiều lô, trừ lô ký gửi của nhà cung cấp chưa cho gửi tiếp. Hệ thống xem trước (kèm cảnh báo tên trùng mã như import nhập kho/bán hàng), kiểm tra tồn + chặn gửi tiếp + hạn mức, rồi mới tạo phiếu (tick “Xác nhận ngay” thì chuyển hàng luôn như phiếu tay, không tick thì tạo phiếu nháp). Dòng lỗi nào cũng chặn cả file — không nhập một phần.
 
 ### D2. Ghi nhận đơn bán (bán lẻ tại quầy TẠM DỪNG từ 30/10/2026)
-Quầy bán lẻ trực tiếp (tìm hàng, quét mã, bấm bán) đã tắt tạm thời — việc bán hàng diễn ra ở hệ thống khác, TVK chỉ lưu trữ thông tin để đối soát. Ghi nhận đơn bán bằng thẻ **"Nhập từ Excel (Bán hàng)"** ở trang Bán hàng: một file là một đơn bán sỉ hoặc lẻ (chọn đối tác hoặc khách lẻ ở form) vào đúng **ngày bán** chọn ở form — 6 cột `STT · Mã hàng · Dòng xe · Tên phụ tùng* · Số lượng* · Đơn giá` (STT chỉ để đếm; hệ thống tìm hàng theo **tên phụ tùng + dòng xe** vì tên đã tách biệt, cột Mã hàng tùy chọn — chỉ cần ghi khi tên trùng nhau để phân biệt, khi đó mã mới là chìa khoá; dòng nào thiếu cả tên lẫn mã thì bị từ chối; giá để trống = giá theo loại khách đã chọn: khách lẻ giá lẻ, Gara giá gara, đối tác khác giá đại lý; ghi số = bán đúng giá đó), có nút tải file mẫu; không nhập mã lô — hệ thống tự phân bổ theo lô cũ nhất còn hàng tại Kho TVK (FIFO; nhớt thì ưu tiên lô sắp hết hạn trước — FEFO), một dòng có thể tách ra nhiều lô; mọi dòng lỗi đều chặn cả file, đơn tạo xong xác nhận ngay như nhập tay. Lô của mình vào chứng từ **BH** (được áp giảm giá ở đây), lô được ký gửi vào chứng từ **KG** và tự tạo khoản phải trả cho nhà cung cấp theo giá ký gửi. Tick **Ghi nợ (tạo phải thu)** nếu bán nợ. Bên dưới form là hai bảng **"Đơn hàng gần đây"** và **"Chứng từ quản lý (BH / KG)"** để xem lại lịch sử. Mở lại quầy: chỉ cần gắn lại form bán tại quầy (code vẫn giữ nguyên) và mở lại server action — không cần viết lại.
+Quầy bán lẻ trực tiếp (tìm hàng, quét mã, bấm bán) đã tắt tạm thời — việc bán hàng diễn ra ở hệ thống khác, TVK chỉ lưu trữ thông tin để đối chiếu. Ghi nhận đơn bán bằng thẻ **"Nhập từ Excel (Bán hàng)"** ở trang Bán hàng: một file là một đơn bán sỉ hoặc lẻ (chọn đối tác hoặc khách lẻ ở form) vào đúng **ngày bán** chọn ở form — 6 cột `STT · Mã hàng · Dòng xe · Tên phụ tùng* · Số lượng* · Đơn giá` (STT chỉ để đếm; hệ thống tìm hàng theo **tên phụ tùng + dòng xe** vì tên đã tách biệt, cột Mã hàng tùy chọn — chỉ cần ghi khi tên trùng nhau để phân biệt, khi đó mã mới là chìa khoá; dòng nào thiếu cả tên lẫn mã thì bị từ chối; giá để trống = giá theo loại khách đã chọn: khách lẻ giá lẻ, Gara giá gara, đối tác khác giá đại lý; ghi số = bán đúng giá đó), có nút tải file mẫu; không nhập mã lô — hệ thống tự phân bổ theo lô cũ nhất còn hàng tại Kho TVK (nhớt thì ưu tiên lô sắp hết hạn trước; linh kiện thì nhập trước xuất trước), một dòng có thể tách ra nhiều lô; mọi dòng lỗi đều chặn cả file, đơn tạo xong xác nhận ngay như nhập tay. Lô của mình vào chứng từ **BH** (được áp giảm giá ở đây), lô được ký gửi vào chứng từ **KG** và tự tạo khoản phải trả cho nhà cung cấp theo giá ký gửi. Tick **Ghi nợ (tạo phải thu)** nếu bán nợ. Bên dưới form là hai bảng **"Đơn hàng gần đây"** và **"Phiếu bán (BH / KG)"** để xem lại lịch sử. Mở lại quầy: chỉ cần gắn lại form bán tại quầy (code vẫn giữ nguyên) và mở lại server action — không cần viết lại.
 
-### D3. Tiêu thụ của đối tác & phân bổ
-Khi đối tác báo đã bán được hàng họ đang giữ: vào **Ký gửi → Tiêu thụ của đối tác**, lập **BT** theo từng sản phẩm/số lượng đối tác báo. Hệ thống **phân bổ (PB)** số tiêu thụ vào các lô đối tác đang giữ (mặc định lô cũ trước — FIFO), sinh chứng từ BH/KG tương ứng và các khoản phải thu/phải trả liên quan. Đối tác bán chưa hết: phần còn lại vẫn nằm ở đối tác, không phát sinh tiền (xem A5).
+### D3. Tiêu thụ của đối tác & chia hàng
+Khi đối tác báo đã bán được hàng họ đang giữ: vào **Ký gửi → Tiêu thụ của đối tác**, lập **BT** theo từng sản phẩm/số lượng đối tác báo. Hệ thống **chia hàng (PB)** số đã bán vào các lô đối tác đang giữ (mặc định lô cũ trước — nhập trước xuất trước), sinh phiếu bán BH/KG tương ứng và các khoản phải thu/phải trả liên quan. Đối tác bán chưa hết: phần còn lại vẫn nằm ở đối tác, không phát sinh tiền (xem A5).
 
-**Nhập BT/PB từ Excel:** mỗi mục đều có **Nhập từ Excel** với nút **Tải file mẫu (.xlsx)**. BT: một file là một báo cáo cho một đối tác trong một kỳ, cột `MaHang*` · `SoLuongTieuThu*` (báo cáo chỉ ghi số lượng, không có giá). PB: một file là một phiếu phân bổ cho một đối tác, cột `MaHang*` · `MaLo*` (lô đang ở kho đối tác đó, phải thuộc đúng sản phẩm) · `NguonHang` (“Mua đứt”/“Ký gửi”, để trống = Ký gửi) · `SoLuong*` · `DonGiaVND` (VNĐ, để trống = 0). PB kiểm tra trước cả 3 chốt xác nhận (lượng đã báo, hạn mức theo tính chất, tồn tại kho đối tác). Cả hai đều có tick “Xác nhận ngay”; dòng lỗi nào cũng chặn cả file.
+**Nhập BT/PB từ Excel:** mỗi mục đều có **Nhập từ Excel** với nút **Tải file mẫu (.xlsx)**. BT: một file là một báo cáo cho một đối tác trong một kỳ, cột `MaHang*` · `SoLuongTieuThu*` (báo cáo chỉ ghi số lượng, không có giá). PB: một file là một phiếu chia hàng cho một đối tác, cột `MaHang*` · `MaLo*` (lô đang ở kho đối tác đó, phải thuộc đúng sản phẩm) · `NguonHang` (“Mua đứt”/“Ký gửi”, để trống = Ký gửi) · `SoLuong*` · `DonGiaVND` (VNĐ, để trống = 0). PB kiểm tra trước cả 3 điều xác nhận (số đã báo bán, số hàng đã giao theo loại, còn đủ hàng ở kho đối tác). Cả hai đều có tick “Xác nhận ngay”; dòng lỗi nào cũng chặn cả file.
 
 ### D4. Hoá đơn GTGT (theo dõi nội bộ)
 
@@ -241,19 +241,19 @@ Hoá đơn GTGT chính thức được xuất từ hệ thống hoá đơn riên
 - **Phải trả nhà cung cấp**: tự sinh theo 2 cách — từ chứng từ KG khi hàng ký gửi bán được, theo đúng giá ký gửi của lô; và từ phiếu nhập mua hàng (PN) khi xác nhận, bằng tổng tiền phiếu, hạn trả theo số ngày trả của nhà cung cấp đó. Ghi thanh toán từng phần/toàn bộ; trạng thái Chưa trả / Trả một phần / Đã trả theo số còn lại.
 - **Phải thu đối tác**: sinh từ phần bán cho đối tác/khách mua chịu. Ghi thu tiền tương tự; hoá đơn quá hạn được đánh dấu để đôn đốc.
 - **Quỹ tiền**: ở Cài đặt → Quỹ tiền — két tiền mặt + tài khoản ngân hàng, mỗi quỹ có số dư đầu kỳ do chủ/kế toán nhập một lần (số tiền thực tế trong quỹ tại thời điểm nhập, đã bao gồm ảnh hưởng của các phiếu thu/chi cũ). Số dư hiện tại của từng quỹ xem ở Tổng quan (Tầng 1) hoặc ở Cài đặt; số dư = số dư đầu kỳ + tiền thu − tiền chi đã ghi qua phiếu PT/PC. Quỹ không xoá, chỉ tắt để giữ nguyên lịch sử.
-- **Đối soát theo kỳ (DS):** ở trang Phải thu đối tác có nút "Tạo đợt đối soát (DS) cho một đối tác" — gom toàn bộ các khoản chưa chốt với một đối tác (hoặc một nhà cung cấp ở phía phải trả) trong một kỳ thành một đợt để hai bên xác nhận số liệu. **Phiếu thu/chi (PT/PC):** mỗi lần ghi nhận tiền thực tế (thu tiền mặt/chuyển khoản từ đối tác, hoặc chi trả cho nhà cung cấp) hệ thống sinh một phiếu PT hoặc PC có mã riêng, ghi rõ phương thức (tiền mặt/ngân hàng) và quỹ tiền (két tiền mặt hoặc tài khoản ngân hàng) — số dư quỹ tự cập nhật theo từng phiếu; phiếu cũng có thể gắn vào đợt đối soát DS tương ứng — đây là chứng từ tiền đối ứng với công nợ, giúp truy vết "khoản nợ này đã thu/chi bằng phiếu nào".
+- **Đối chiếu theo kỳ (DS):** ở trang Phải thu đối tác có nút "Tạo đợt chốt sổ (DS) cho một đối tác" — gom toàn bộ các khoản chưa chốt với một đối tác (hoặc một nhà cung cấp ở phía phải trả) trong một kỳ thành một đợt để hai bên xác nhận số liệu. **Phiếu thu/chi (PT/PC):** mỗi lần ghi nhận tiền thực tế (thu tiền mặt/chuyển khoản từ đối tác, hoặc chi trả cho nhà cung cấp) hệ thống sinh một phiếu PT hoặc PC có mã riêng, ghi rõ phương thức (tiền mặt/ngân hàng) và quỹ tiền (két tiền mặt hoặc tài khoản ngân hàng) — số dư quỹ tự cập nhật theo từng phiếu; phiếu cũng có thể gắn vào đợt chốt sổ DS tương ứng — đây là phiếu tiền đối ứng với tiền nợ, giúp tra lại "khoản nợ này đã thu/chi bằng phiếu nào".
 
 ### D6. Trả hàng & bảo hành (TH)
 Vào **Bán hàng & Hoá đơn → Trả hàng & bảo hành**: chọn loại trả (khách trả lại / trả hàng về đối tác / trả hàng ký gửi về nhà cung cấp), chọn dòng hàng theo lô. Hàng quay về đúng lô & vị trí tương ứng; các khoản tiền liên quan được đối ứng theo chứng từ gốc.
 
 ### D7. Kiểm kê & điều chỉnh tồn
-Ở **Tồn kho theo lô**: đối chiếu số hệ thống với số đếm thực tế theo từng lô. Chênh lệch được ghi bằng **phiếu điều chỉnh qua sổ cái** (kèm lý do) — không sửa thẳng số tồn, để mọi chênh lệch đều có dấu vết kiểm kê.
+Ở **Tồn kho theo lô**: đối chiếu số hệ thống với số đếm thực tế theo từng lô. Chênh lệch được ghi bằng **phiếu điều chỉnh** (kèm lý do) — không sửa thẳng số tồn, để mọi chênh lệch đều có dấu vết kiểm kê.
 
 ### D8. In tem mã vạch (trang Sản phẩm)
 Nút **In tem mã vạch** ở trang **Sản phẩm**: tick chọn các mã cần in (mặc định tick các mã còn hàng), số lượng mỗi mã mặc định bằng **tồn kho (Tổng)** — sửa tay được; chọn khổ tem (50×30, 40×30, 100×50 mm) và có thể tick **In giá lẻ lên tem**. Mỗi tem gồm mã vạch **Code128** của SKU, tên hàng, mã hàng (và giá lẻ nếu chọn). Hệ thống không điều khiển trực tiếp máy in: bấm **In** sẽ mở hộp thoại in của hệ điều hành — chọn đúng **máy in tem** đã cài driver và khổ tem trùng khổ đã chọn; mỗi tem là một trang. Tối đa 500 tem mỗi lần in (chia nhỏ nếu nhiều hơn).
 
 ### D9. Báo cáo
-**Công nợ & Báo cáo → Báo cáo**: báo cáo tồn kho, bán hàng, đối soát với từng nhà cung cấp (hàng ký gửi: đã nhận / đã bán / còn giữ / phải trả) và từng đối tác (đã gửi / đã tiêu thụ / còn giữ / phải thu); xuất **CSV** để mở bằng Excel khi cần gửi đối tác/kế toán.
+**Công nợ & Báo cáo → Báo cáo**: báo cáo tồn kho, bán hàng, đối chiếu với từng nhà cung cấp (hàng ký gửi: đã nhận / đã bán / còn giữ / phải trả) và từng đối tác (đã gửi / đã bán / còn giữ / phải thu); xuất **CSV** để mở bằng Excel khi cần gửi đối tác/kế toán.
 
 ---
 
@@ -261,7 +261,7 @@ Nút **In tem mã vạch** ở trang **Sản phẩm**: tick chọn các mã cầ
 
 Quyền được thực thi ở tầng dữ liệu (không chỉ ẩn nút): vai trò không có quyền thì dù biết đường dẫn cũng không đọc/ghi được dữ liệu ngoài phạm vi.
 
-Từ migration 0018, mọi thao tác xác nhận (phiếu nhập, gửi ký gửi, phân bổ, chứng từ bán hàng, hoá đơn GTGT, trả hàng, điều chỉnh kho) đều kiểm tra vai trò NGAY TRONG hàm database — CEO và mọi vai trò ngoài danh sách đều bị chặn kể cả khi gọi API trực tiếp, kể cả tài khoản chưa có hồ sơ; các hàm cũng chỉ cho tài khoản đã đăng nhập gọi (thu hồi quyền chạy khỏi public). Bán hàng không đọc được giá vốn: bảng lô chỉ cho Chủ/Thủ kho/Kế toán/CEO đọc trực tiếp, Bán hàng chỉ đọc qua view an toàn (không có giá vốn); trang Tồn kho theo lô ẩn cột Giá vốn và tổng giá trị tồn với Bán hàng; trang Báo cáo ẩn phần đối soát nhà cung cấp với Bán hàng/Thủ kho, ẩn cột ước tính theo giá chuyển giao với Bán hàng/Thủ kho và ẩn cột phải thu với Thủ kho.
+Từ migration 0018, mọi thao tác xác nhận (phiếu nhập, gửi ký gửi, chia hàng, phiếu bán hàng, hoá đơn GTGT, trả hàng, điều chỉnh kho) đều kiểm tra vai trò NGAY TRONG hàm database — CEO và mọi vai trò ngoài danh sách đều bị chặn kể cả khi gọi API trực tiếp, kể cả tài khoản chưa có hồ sơ; các hàm cũng chỉ cho tài khoản đã đăng nhập gọi (thu hồi quyền chạy khỏi public). Bán hàng không đọc được giá vốn: bảng lô chỉ cho Chủ/Thủ kho/Kế toán/CEO đọc trực tiếp, Bán hàng chỉ đọc qua view an toàn (không có giá vốn); trang Tồn kho theo lô ẩn cột Giá vốn và tổng giá trị tồn với Bán hàng; trang Báo cáo ẩn phần đối chiếu nhà cung cấp với Bán hàng/Thủ kho, ẩn cột ước tính theo giá chuyển giao với Bán hàng/Thủ kho và ẩn cột phải thu với Thủ kho.
 
 | Vai trò | Thấy & làm được | Giới hạn chính |
 |---|---|---|
@@ -269,7 +269,7 @@ Từ migration 0018, mọi thao tác xác nhận (phiếu nhập, gửi ký gử
 | **CEO** | **Chỉ xem** toàn bộ: tổng quan tiền, kho, công nợ, báo cáo | Không tạo/sửa/xoá/xác nhận bất cứ thứ gì |
 | **Kế toán (ACCOUNTING)** | Công nợ, hoá đơn GTGT, báo cáo, danh mục nhà cung cấp/đối tác | Không sửa kho, không xác nhận chứng từ kho |
 | **Bán hàng (SALES)** | Ghi nhận đơn bán (Excel), tiêu thụ/hoá đơn (xem), đối tác | **Không thấy giá vốn, giá ký gửi, công nợ và lãi** |
-| **Kho (WAREHOUSE)** | Nhập kho (PN/NK/Excel), tồn kho, gửi ký gửi, trả hàng, kiểm kê | Không thấy dữ liệu tiền (giá vốn hiển thị theo nhu cầu nhập liệu; không xem công nợ/báo cáo tài chính) |
+| **Kho (WAREHOUSE)** | Nhập kho (PN/NK/Excel), tồn kho, gửi ký gửi, trả hàng, kiểm kho | Không thấy dữ liệu tiền (giá vốn hiển thị theo nhu cầu nhập liệu; không xem tiền nợ/báo cáo tài chính) |
 
 ### Tài khoản & mật khẩu
 - Chỉ **Chủ cửa hàng** tạo/sửa/khoá/xoá tài khoản và gán vai trò (Cài đặt → Quản lý tài khoản). Sửa được họ tên và tên đăng nhập của từng tài khoản (kể cả tài khoản của chính mình); email không sửa được vì là danh tính đăng nhập. Đăng nhập bằng **tên đăng nhập hoặc email**. Quên mật khẩu: bấm **Quên mật khẩu?** ở trang đăng nhập để nhận email đặt lại, hoặc Chủ cửa hàng bấm **Đặt lại mật khẩu** trong Quản lý tài khoản.
@@ -291,7 +291,7 @@ Từ migration 0018, mọi thao tác xác nhận (phiếu nhập, gửi ký gử
 | Gửi hàng cho gara/đối tác | Lập GK theo lô; in/ghi lại số phiếu cho đối tác ký nhận |
 | Cuối ngày | Nhập BT theo báo cáo bán của đối tác trong ngày; rà cảnh báo ở Tổng quan |
 | Khi đối tác yêu cầu hoá đơn | Phân bổ xong → xuất hoá đơn GTGT (chọn gộp/tách theo đối tác) |
-| Cuối tháng | Đối soát: Báo cáo theo NCC (ký gửi đã bán → phải trả) & theo đối tác (phải thu); thanh toán/đòi nợ theo hạn; kiểm kê quay vòng các lô giá trị cao |
+| Cuối tháng | Đối chiếu: Báo cáo theo NCC (ký gửi đã bán → phải trả) & theo đối tác (phải thu); thanh toán/đòi nợ theo hạn; kiểm kê quay vòng các lô giá trị cao |
 | Định kỳ | Kiểm kê toàn kho theo lô; xử lý hàng ký gửi sắp hết hạn trả |
 
 ---
@@ -319,6 +319,6 @@ Từ migration 0018, mọi thao tác xác nhận (phiếu nhập, gửi ký gử
 | **Ô D** | Hàng của nhà cung cấp đang nằm ở đối tác — trường hợp nhạy cảm, khoá mặc định. |
 | **Phân bổ** | Chia số lượng tiêu thụ/bán vào từng lô cụ thể để xác định phần của mình (BH) và phần ký gửi (KG). |
 | **Đối soát** | Đối chiếu số liệu hệ thống với nhà cung cấp/đối tác theo kỳ (đã nhận, đã bán, còn giữ, còn nợ). |
-| **Sổ cái biến động** | Nhật ký mọi lần nhập/xuất theo lô — bất biến, là căn cứ truy vết duy nhất của tồn kho. |
+| **Lịch sử kho** | Nhật ký mọi lần nhập/xuất theo lô — đã ghi thì không sửa, không xoá, là căn cứ tra lại duy nhất của tồn kho. |
 
 *Tài liệu được cập nhật theo phiên bản hệ thống hiện tại. Khi quy trình thay đổi, cập nhật file này tại thư mục gốc của repo (HUONG-DAN-VAN-HANH.md).*

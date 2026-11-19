@@ -294,7 +294,7 @@ export default async function DashboardPage({
             />
             <p className="mt-3 text-right text-xs">
               <Link href="/reports" className="text-blue-700 hover:underline">
-                Xem báo cáo đối soát →
+                Xem báo cáo đối chiếu →
               </Link>
             </p>
           </Card>
@@ -314,7 +314,7 @@ export default async function DashboardPage({
       <LayerHeading n={3} title="Hiệu quả kinh doanh" desc="Doanh thu, lợi nhuận và sức bán theo nhóm hàng." />
       <div className="grid gap-6 lg:grid-cols-3">
         {canSeeCost && (
-          <Card title="Doanh thu – Giá vốn – Biên lợi nhuận" className="lg:col-span-2" tone="blue">
+          <Card title="Doanh thu – Giá vốn – Lãi" className="lg:col-span-2" tone="blue">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               {PERIODS.map((p) => (
                 <Link
@@ -530,7 +530,7 @@ export default async function DashboardPage({
         <div className="mt-6">
           <Card title="Hàng gửi đối tác bị lệch số (số đã gửi không khớp với số đã bán + đã trả lại + còn giữ)" tone="rose">
             <TableWrap>
-              <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã tiêu thụ</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th></tr></thead>
+              <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th></tr></thead>
               <tbody>
                 {d.discrepancies.map((r) => (
                   <tr key={r.partner_id} className="border-t border-slate-100">

@@ -34,7 +34,7 @@ export default async function ReceivablesPage({
 
   return (
     <>
-      <PageHeader title="Phải thu đối tác" description="Được tạo tự động khi xác nhận một giao dịch ghi nợ hoặc một chứng từ tiêu thụ của đối tác (BH/KG). Số tiền BH là sau giảm giá; số tiền KG dùng giá chuyển giao đã thoả thuận." />
+      <PageHeader title="Phải thu đối tác" description="Được tạo tự động khi xác nhận một giao dịch ghi nợ hoặc một đơn bán hàng hoặc hàng ký gửi đã bán (BH/KG). Số tiền BH là sau giảm giá; số tiền KG dùng giá chuyển giao đã thoả thuận." />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <p className="mb-4 text-sm text-slate-600">Tổng còn phải thu: <strong>{formatVND(totalOutstanding)}</strong></p>
@@ -105,7 +105,7 @@ export default async function ReceivablesPage({
           </form>
         </Card>
 
-        <Card title="Tạo đợt đối soát (DS) cho một đối tác">
+        <Card title="Tạo đợt chốt sổ (DS) cho một đối tác">
           <form action={createSettlementAction} className="space-y-3">
             <input type="hidden" name="party_kind" value="PARTNER" />
             <div><label className={labelCls}>Đối tác *</label>
@@ -118,7 +118,7 @@ export default async function ReceivablesPage({
               <div><label className={labelCls}>Đến ngày</label><input name="period_to" type="date" className={inputCls} /></div>
             </div>
             <div className="space-y-1">
-              <p className={labelCls}>Các khoản phải thu đang mở đưa vào đối soát (của đối tác ở trên)</p>
+              <p className={labelCls}>Các khoản phải thu chưa trả hết đưa vào đợt chốt sổ (của đối tác ở trên)</p>
               {open.map((r) => (
                 <label key={r.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="receivable_id" value={r.id} className="h-4 w-4" />
@@ -126,7 +126,7 @@ export default async function ReceivablesPage({
                 </label>
               ))}
             </div>
-            <SubmitButton className={`${btnCls} w-full`}>Tạo đối soát</SubmitButton>
+            <SubmitButton className={`${btnCls} w-full`}>Tạo đợt chốt sổ</SubmitButton>
           </form>
         </Card>
       </div>
@@ -134,7 +134,7 @@ export default async function ReceivablesPage({
 
       {partnerSettlements.length > 0 && (
         <div className="mt-6">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800">Các đợt đối soát</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-800">Các đợt chốt sổ</h2>
           <TableWrap>
             <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Kỳ</th><th className={`${thCls} text-right`}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
             <tbody>

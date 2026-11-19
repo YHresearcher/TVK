@@ -26,7 +26,7 @@ async function verifyReconciliationRole(
   actionDescription: string
 ): Promise<{ uid: string; role: string }> {
   const supabase = await createClient();
-  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  if (!supabase) throw new Error("Hệ thống chưa cài đặt xong — hãy báo chủ cửa hàng.");
 
   const {
     data: { user },
@@ -91,7 +91,7 @@ export async function syncReconciliationAction(periodId: string) {
     );
 
     const supabase = await createClient();
-    if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+    if (!supabase) throw new Error("Hệ thống chưa cài đặt xong — hãy báo chủ cửa hàng.");
 
     const { data: period, error: pErr } = await supabase
       .from("reconciliation_periods")
@@ -189,7 +189,7 @@ export async function updateReconciliationEntryAction(params: {
     );
 
     const supabase = await createClient();
-    if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+    if (!supabase) throw new Error("Hệ thống chưa cài đặt xong — hãy báo chủ cửa hàng.");
 
     const { entryId, accountingAmount, discrepancyStatus, explanationNote } = params;
     if (!entryId) throw new Error("Thiếu entryId.");
@@ -259,7 +259,7 @@ export async function importReconciliationEntriesAction(
     );
 
     const supabase = await createClient();
-    if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+    if (!supabase) throw new Error("Hệ thống chưa cài đặt xong — hãy báo chủ cửa hàng.");
 
     if (!periodId) throw new Error("Thiếu ID kỳ đối chiếu.");
     if (!entries || entries.length === 0) throw new Error("Danh sách dữ liệu import trống.");
@@ -341,7 +341,7 @@ export async function createReconciliationSnapshotAction(
     );
 
     const supabase = await createClient();
-    if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+    if (!supabase) throw new Error("Hệ thống chưa cài đặt xong — hãy báo chủ cửa hàng.");
 
     if (!periodId) throw new Error("Thiếu ID kỳ đối chiếu.");
 
@@ -442,7 +442,7 @@ export async function deleteReconciliationSnapshotAction(snapshotId: string) {
     );
 
     const supabase = await createClient();
-    if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+    if (!supabase) throw new Error("Hệ thống chưa cài đặt xong — hãy báo chủ cửa hàng.");
 
     const { error } = await supabase
       .from("reconciliation_snapshots")
