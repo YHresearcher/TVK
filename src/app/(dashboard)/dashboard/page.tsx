@@ -552,7 +552,7 @@ export default async function DashboardPage({
   // Tầng 5 — Hoạt động gần đây: 8 bút toán kho mới nhất, xem đủ ở sổ cái.
   const layer5 = (
     <section className="mt-10">
-      <LayerHeading n={5} title="Hoạt động gần đây" desc="Nhập, xuất, bán hàng, gửi ký gửi và điều chỉnh mới nhất trong sổ cái kho." />
+      <LayerHeading n={5} title="Hoạt động gần đây" desc="Nhập, xuất, bán hàng, gửi ký gửi và điều chỉnh mới nhất trong lịch sử kho." />
       <Card>
         {recent.data.length === 0 ? (
           <EmptyState message="Chưa có hoạt động nào." />
@@ -578,7 +578,7 @@ export default async function DashboardPage({
         )}
         <p className="mt-3 text-sm">
           <Link href="/ledger" className="font-medium text-blue-700 hover:underline">
-            Xem sổ cái đầy đủ →
+            Xem lịch sử kho đầy đủ →
           </Link>
         </p>
       </Card>

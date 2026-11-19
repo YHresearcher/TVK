@@ -183,7 +183,7 @@ function GkDraftsCard({
         Phiếu gửi nháp chờ xác nhận ({rows.length})
       </p>
       <p className="mt-1 text-sm leading-relaxed text-amber-800">
-        Hàng chưa chuyển đi. Bấm Xác nhận để chuyển hàng tới kho đối tác và ghi sổ cái.
+        Hàng chưa chuyển đi. Bấm Xác nhận để chuyển hàng tới kho đối tác và ghi lại vào lịch sử kho.
       </p>
       <div className="mt-3 space-y-2">
         {rows.map((r) => (

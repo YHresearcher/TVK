@@ -136,7 +136,7 @@ export default async function ReportsPage() {
         <Card title="Ghi chú">
           <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
             <li>Doanh thu & lợi nhuận theo nguồn (của mình vs ký gửi) chỉ vai trò Chủ cửa hàng mới xem được, theo quy tắc vai trò trong tài liệu đặc tả.</li>
-            <li>Mọi lô đều truy vết được đầu-cuối trong sổ cái di chuyển (Tồn kho theo lô → lô → các di chuyển được ghi trong <code>stock_movements</code>).</li>
+            <li>Mọi lô đều tra lại được đầu-cuối trong lịch sử di chuyển (Tồn kho theo lô → lô → các lần di chuyển đã ghi).</li>
             <li>Số lệch nghĩa là: số đã gửi không bằng số đã bán + đã trả lại + còn giữ — cần hỏi lại đối tác trước lần đối chiếu sau.</li>
           </ul>
         </Card>

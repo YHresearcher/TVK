@@ -219,7 +219,7 @@ function DraftsCard({
   return (
     <Card title={`Phiếu nháp chờ xác nhận (${rows.length})`}>
       <p className="mb-4 text-sm leading-relaxed text-slate-600">
-        Hàng chưa vào kho. Bấm Xác nhận để tạo lô và ghi sổ cái.
+        Hàng chưa vào kho. Bấm Xác nhận để tạo lô và ghi lại vào lịch sử kho.
       </p>
       <div className="space-y-3">
         {rows.map((r) => (
