@@ -153,7 +153,7 @@ export default function CashflowMonthlyReport({
               <th className="px-3.5 py-3">Tháng</th>
               <th className="px-3.5 py-3 text-right text-emerald-800 bg-emerald-50/50">Thực thu (1)</th>
               <th className="px-3.5 py-3 text-right text-rose-800 bg-rose-50/50">Thực chi (2)</th>
-              <th className="px-3.5 py-3 text-right font-bold">Dòng tiền ròng (1-2)</th>
+              <th className="px-3.5 py-3 text-right font-bold">Tiền còn lại (1-2)</th>
               <th className="px-3.5 py-3 text-right text-slate-700">Doanh thu bán</th>
               <th className="px-3.5 py-3 text-right text-slate-700">Giá vốn (COGS)</th>
               <th className="px-3.5 py-3 text-right text-slate-800 font-semibold">Lãi gộp</th>

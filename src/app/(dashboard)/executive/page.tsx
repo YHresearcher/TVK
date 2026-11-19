@@ -132,9 +132,9 @@ export default async function ExecutivePage({
   }[cashflow.safetyStatus14];
 
   const safetyBadgeText = {
-    SAFE: "An toàn thanh khoản",
-    WARNING: "Cân bằng mong manh",
-    DANGER: "Nguy cơ thâm hụt",
+    SAFE: "Đủ tiền",
+    WARNING: "Vừa đủ, cần theo dõi",
+    DANGER: "Thiếu tiền (chi nhiều hơn thu)",
   }[cashflow.safetyStatus14];
 
   return (
@@ -281,7 +281,7 @@ export default async function ExecutivePage({
                 />
               </span>
               <h2 className="text-base font-bold text-slate-900">
-                Dự báo Dòng tiền 14–30 ngày tới (Cash Flow Runway)
+                Tiền vào – tiền ra 14–30 ngày tới
               </h2>
             </div>
             <p className="mt-0.5 text-xs text-slate-500">
@@ -331,7 +331,7 @@ export default async function ExecutivePage({
                 <span className="font-bold">-{formatVND(cashflow.fixedCost14)} đ</span>
               </div>
               <div className="border-t border-slate-100 pt-2 flex justify-between font-bold text-sm">
-                <span className="text-slate-800">Dòng tiền ròng:</span>
+                <span className="text-slate-800">Tiền còn lại (thu trừ chi):</span>
                 <span className={cashflow.net14 >= 0 ? "text-emerald-700" : "text-rose-700"}>
                   {cashflow.net14 >= 0 ? "+" : ""}
                   {formatVND(cashflow.net14)} đ
@@ -340,7 +340,7 @@ export default async function ExecutivePage({
             </div>
 
             <div className="mt-3 border-t border-slate-100 pt-2 text-[11px] text-slate-500 flex justify-between">
-              <span>Độ phủ ngân quỹ:</span>
+              <span>Mức đủ tiền:</span>
               <span className="font-semibold text-slate-800">
                 {Math.round(cashflow.safetyRatio14 * 100)}%
               </span>
@@ -374,7 +374,7 @@ export default async function ExecutivePage({
                 <span className="font-bold">-{formatVND(cashflow.fixedCost30)} đ</span>
               </div>
               <div className="border-t border-slate-100 pt-2 flex justify-between font-bold text-sm">
-                <span className="text-slate-800">Dòng tiền ròng:</span>
+                <span className="text-slate-800">Tiền còn lại (thu trừ chi):</span>
                 <span className={cashflow.net30 >= 0 ? "text-emerald-700" : "text-rose-700"}>
                   {cashflow.net30 >= 0 ? "+" : ""}
                   {formatVND(cashflow.net30)} đ
@@ -383,7 +383,7 @@ export default async function ExecutivePage({
             </div>
 
             <div className="mt-3 border-t border-slate-100 pt-2 text-[11px] text-slate-500 flex justify-between">
-              <span>Độ phủ ngân quỹ:</span>
+              <span>Mức đủ tiền:</span>
               <span className="font-semibold text-slate-800">
                 {Math.round(cashflow.safetyRatio30 * 100)}%
               </span>
@@ -402,7 +402,7 @@ export default async function ExecutivePage({
               Xu hướng kinh doanh (Financial Trends)
             </h2>
             <p className="text-xs text-slate-500">
-              Doanh thu thuần ({range.label}: {formatVND(periodRevenue)}) · Giá vốn ({formatVND(periodCogs)}) · Biên lợi nhuận gộp ({grossMarginPct})
+              Doanh thu thuần ({range.label}: {formatVND(periodRevenue)}) · Giá vốn ({formatVND(periodCogs)}) · Lãi gộp ({grossMarginPct})
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs text-slate-500">

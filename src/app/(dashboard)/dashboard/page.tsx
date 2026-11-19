@@ -168,9 +168,9 @@ export default async function DashboardPage({
     <section>
       <LayerHeading n={1} title="Tổng quan điều hành" desc="Doanh thu, lợi nhuận, công nợ và giá trị hàng sở hữu." />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="Doanh thu thuần (lũy kế)" value={formatVND(d.revenueAll)} sub={`${formatNumber(d.orderCountAll)} đơn đã xác nhận`} tone="blue" />
+        <StatCard label="Doanh thu từ trước tới nay" value={formatVND(d.revenueAll)} sub={`${formatNumber(d.orderCountAll)} đơn đã xác nhận`} tone="blue" />
         {canSeeCost && (
-          <StatCard label="Lợi nhuận gộp (lũy kế)" value={formatVND(d.grossProfitAll)} sub={`Gross Margin ${grossMargin}% · Markup on Cost ${roiAll}%`} tone="emerald" />
+          <StatCard label="Lợi nhuận gộp (lũy kế)" value={formatVND(d.grossProfitAll)} sub={`Lãi ${grossMargin}% trên doanh thu · Lãi ${roiAll}% trên giá vốn`} tone="emerald" />
         )}
         <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ TVK" tone="violet" />
         <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp (hàng ký gửi đã bán + hàng mua chưa trả)" tone="rose" />
@@ -217,14 +217,14 @@ export default async function DashboardPage({
       </div>
       {canSeeCost && (
         <div className="mt-6">
-          <Card title="Theo sổ kế toán (giá vốn)" tone="slate">
+          <Card title="Tính theo giá vốn (tiền nhập hàng)" tone="slate">
             <p className="mb-3 text-sm leading-relaxed text-slate-600">
               Theo giá vốn; hàng được ký gửi không phải tài sản, không gộp vào tổng.
             </p>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <StatCard label="Tổng tiền hàng trong kho (giá vốn)" value={formatVND(d.bookOwnedOwnValue)} sub={bookShare(d.bookOwnedOwnValue)} />
-              <StatCard label="Hàng của TVK ký gởi" value={formatVND(d.bookAtPartnersOwnedValue)} sub={bookShare(d.bookAtPartnersOwnedValue)} />
-              <StatCard label="Tổng hàng tồn kho của TVK (kho + ký gởi)" value={formatVND(d.bookInventoryValue)} />
+              <StatCard label="Hàng TVK đang gửi ở đối tác" value={formatVND(d.bookAtPartnersOwnedValue)} sub={bookShare(d.bookAtPartnersOwnedValue)} />
+              <StatCard label="Tổng hàng tồn kho của TVK (kho + ký gửi)" value={formatVND(d.bookInventoryValue)} />
               <StatCard label="Hàng được ký gửi (không phải tài sản)" value={formatVND(d.bookConsignedCustodyValue)} sub="Chỉ theo dõi, không ghi vào tài sản" />
             </div>
           </Card>
@@ -243,7 +243,7 @@ export default async function DashboardPage({
           canSeeCost={canSeeCost}
         />
         {canSeeMoney && (
-          <Card title="Hiệu suất ký gửi" tone="amber">
+          <Card title="Hàng ký gửi bán được bao nhiêu" tone="amber">
             <div className="grid grid-cols-2 gap-3">
               <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Đang gửi đối tác</p>
@@ -254,11 +254,11 @@ export default async function DashboardPage({
                 <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatCompactVND(d.flows.sentValue)}</p>
               </div>
               <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Đã tiêu thụ</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Đã bán</p>
                 <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{formatNumber(consumedQty)} đơn vị</p>
               </div>
               <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tỷ lệ tiêu thụ</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tỷ lệ đã bán</p>
                 <p className="mt-1 text-lg font-bold leading-tight text-slate-900">{consumeRate}%</p>
               </div>
             </div>
@@ -267,7 +267,7 @@ export default async function DashboardPage({
                 <div className="h-full rounded-full bg-emerald-500" style={{ width: `${consumeRate}%` }} />
               </div>
               <div className="mt-1.5 flex justify-between gap-3 text-xs text-slate-500">
-                <span>Đã tiêu thụ {formatNumber(consumedQty)} đơn vị</span>
+                <span>Đã bán {formatNumber(consumedQty)} đơn vị</span>
                 <span>Còn tại đối tác {formatNumber(d.flows.stillQty)} đơn vị</span>
               </div>
             </div>
@@ -279,7 +279,7 @@ export default async function DashboardPage({
       </div>
       {canSeeMoney && (
         <div className="mt-6">
-          <Card title="Tiêu thụ ký gửi theo đối tác" tone="amber">
+          <Card title="Đối tác đã bán được bao nhiêu hàng ký gửi" tone="amber">
             <StackedBarList
               rows={consBars.map((r) => ({
                 name: r.partnerName,
@@ -342,7 +342,7 @@ export default async function DashboardPage({
             <p className="mb-2 text-xs text-slate-500">
               <span className="text-blue-600">■</span> Doanh thu thuần{" "}
               <span className="text-amber-500">■</span> Giá vốn{" "}
-              <span className="text-emerald-500">—</span> Biên lợi nhuận
+              <span className="text-emerald-500">—</span> Lãi
             </p>
             {perf.reduce((a, p) => a + p.revenue, 0) === 0 ? (
               <EmptyState message="Chưa có dữ liệu kinh doanh trong khoảng thời gian đã chọn." />
@@ -380,7 +380,7 @@ export default async function DashboardPage({
               Doanh thu thuần <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
               {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
               {" · "}Lợi nhuận gộp <strong className="text-slate-900">{formatVND(d.grossProfitAll)}</strong>
-              {` (Gross Margin ${grossMargin}% · Markup on Cost ${roiAll}%)`}.
+              {` (Lãi ${grossMargin}% trên doanh thu · Lãi ${roiAll}% trên giá vốn)`}.
               Giá vốn tính theo lô thực tế đã xuất; giảm giá đã trừ vào doanh thu thuần.
               {" "}30 ngày gần nhất: doanh thu thuần {formatVND(d.revenue30)}, lợi nhuận {formatVND(d.grossProfit30)}, {formatNumber(d.orderCount30)} đơn. Tổng số lượng đã bán (lũy kế): {formatNumber(d.flows.soldQty)} đơn vị.
             </p>
@@ -432,10 +432,10 @@ export default async function DashboardPage({
   // Tầng 4 — Cảnh báo vận hành: tồn thấp, chậm luân chuyển, quá hạn.
   const layer4 = (
     <section className="mt-10">
-      <LayerHeading n={4} title="Cảnh báo vận hành" desc="Tồn thấp, hàng chậm luân chuyển, công nợ quá hạn và chênh lệch ký gửi." />
+      <LayerHeading n={4} title="Những việc cần xem" desc="Hàng sắp hết, hàng để lâu không bán được, tiền nợ quá hạn, và hàng gửi đối tác bị lệch số." />
       <div className="grid gap-6 lg:grid-cols-2">
         {canSeeMoney && (
-          <Card title="Công nợ theo trạng thái" tone="rose">
+          <Card title="Tiền nợ theo tình hình trả" tone="rose">
             <HBarList
               data={[
                 { label: "Phải thu — quá hạn", value: d.overdueReceivables, color: "#e11d48" },
@@ -449,7 +449,7 @@ export default async function DashboardPage({
           </Card>
         )}
         {canSeeMoney && (
-          <Card title="Tuổi nợ phải thu" tone="rose">
+          <Card title="Tiền phải thu theo thời gian quá hạn" tone="rose">
             <HBarList data={agingBars} />
             <p className="mt-3 text-right text-xs">
               <Link href="/receivables" className="text-blue-700 hover:underline">
@@ -458,7 +458,7 @@ export default async function DashboardPage({
             </p>
           </Card>
         )}
-        <Card title="Hàng chậm luân chuyển (90 ngày)" tone="amber">
+        <Card title="Hàng để 90 ngày không bán được" tone="amber">
           {slow.rows.length === 0 ? (
             <EmptyState message="Không có sản phẩm chậm luân chuyển trong 90 ngày qua." />
           ) : (
@@ -528,7 +528,7 @@ export default async function DashboardPage({
       </div>
       {d.discrepancies.length > 0 && (
         <div className="mt-6">
-          <Card title="Chênh lệch ký gửi tại đối tác (đã gửi ≠ đã tiêu thụ + đã trả + còn giữ)" tone="rose">
+          <Card title="Hàng gửi đối tác bị lệch số (số đã gửi không khớp với số đã bán + đã trả lại + còn giữ)" tone="rose">
             <TableWrap>
               <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã tiêu thụ</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th></tr></thead>
               <tbody>

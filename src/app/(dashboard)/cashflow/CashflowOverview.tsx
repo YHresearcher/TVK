@@ -32,10 +32,10 @@ export default function CashflowOverview({
 
   const safetyBadgeText =
     cashflow.safetyStatus14 === "DANGER"
-      ? "Báo động thâm hụt"
+      ? "Thiếu tiền"
       : cashflow.safetyStatus14 === "WARNING"
-      ? "Cảnh báo thanh khoản"
-      : "Ngân quỹ an toàn";
+      ? "Vừa đủ, cần theo dõi"
+      : "Đủ tiền";
 
   return (
     <div className="space-y-6">
@@ -240,7 +240,7 @@ export default function CashflowOverview({
                   />
                 </span>
                 <h2 className="text-base font-bold text-slate-900">
-                  Dự Báo Dòng Tiền (Cash Flow Runway)
+                  Tiền vào – tiền ra 14–30 ngày tới
                 </h2>
               </div>
               <p className="mt-0.5 text-xs text-slate-500">
@@ -288,7 +288,7 @@ export default function CashflowOverview({
                   <span className="font-bold">-{formatVND(cashflow.fixedCost14)} đ</span>
                 </div>
                 <div className="border-t border-slate-200 pt-1.5 flex justify-between font-bold text-sm">
-                  <span className="text-slate-900">Dòng tiền ròng dự báo:</span>
+                  <span className="text-slate-900">Tiền còn lại dự báo (thu trừ chi):</span>
                   <span className={cashflow.net14 >= 0 ? "text-emerald-700" : "text-rose-700"}>
                     {cashflow.net14 >= 0 ? "+" : ""}
                     {formatVND(cashflow.net14)} đ
@@ -297,7 +297,7 @@ export default function CashflowOverview({
               </div>
 
               <div className="mt-2.5 border-t border-slate-200 pt-1.5 text-[11px] text-slate-500 flex justify-between">
-                <span>Độ phủ ngân quỹ:</span>
+                <span>Mức đủ tiền:</span>
                 <span className="font-bold text-slate-900">
                   {Math.round(cashflow.safetyRatio14 * 100)}%
                 </span>
@@ -331,7 +331,7 @@ export default function CashflowOverview({
                   <span className="font-bold">-{formatVND(cashflow.fixedCost30)} đ</span>
                 </div>
                 <div className="border-t border-slate-200 pt-1.5 flex justify-between font-bold text-sm">
-                  <span className="text-slate-900">Dòng tiền ròng dự báo:</span>
+                  <span className="text-slate-900">Tiền còn lại dự báo (thu trừ chi):</span>
                   <span className={cashflow.net30 >= 0 ? "text-emerald-700" : "text-rose-700"}>
                     {cashflow.net30 >= 0 ? "+" : ""}
                     {formatVND(cashflow.net30)} đ
@@ -340,7 +340,7 @@ export default function CashflowOverview({
               </div>
 
               <div className="mt-2.5 border-t border-slate-200 pt-1.5 text-[11px] text-slate-500 flex justify-between">
-                <span>Độ phủ ngân quỹ:</span>
+                <span>Mức đủ tiền:</span>
                 <span className="font-bold text-slate-900">
                   {Math.round(cashflow.safetyRatio30 * 100)}%
                 </span>

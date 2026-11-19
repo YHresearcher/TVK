@@ -6,7 +6,7 @@ import { formatDate, todayISO } from "@/lib/format";
 
 export default function DownloadAlertsExcelButton({
   alerts,
-  label = "📥 Tải danh sách lệch (.xlsx)",
+  label = "📥 Tải danh sách cần xử lý (.xlsx)",
   className,
   variant = "danger",
 }: {

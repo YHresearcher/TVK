@@ -24,13 +24,13 @@ export default async function AuditCenterPage({
     return (
       <div className="space-y-4">
         <PageHeader
-          title="Trung tâm Kiểm soát & Đối soát"
-          description="Kiểm soát chéo 3 chiều: Thực tế kho ↔ Doanh số nội bộ ↔ Hoá đơn GTGT & Công nợ."
+          title="Đối chiếu kho – bán hàng – hoá đơn"
+          description="So 3 thứ với nhau: hàng trong kho, số bán hàng trong hệ thống, và hoá đơn + tiền nợ."
         />
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900 shadow-sm">
           <h3 className="font-semibold text-base">Khu vực kiểm soát điều hành giới hạn</h3>
           <p className="mt-1.5 leading-relaxed">
-            Màn hình <strong>Trung tâm Kiểm soát & Đối soát (Audit Center)</strong> chỉ dành riêng cho Ban điều hành (Chủ doanh nghiệp, CEO, Trợ lý Shadow Controller) và Kế toán để độc lập kiểm soát tính toàn vẹn dữ liệu.
+            Màn hình <strong>Đối chiếu kho – bán hàng – hoá đơn</strong> chỉ dành riêng cho Ban điều hành (Chủ doanh nghiệp, CEO) và Kế toán, để kiểm tra số liệu có khớp nhau không.
           </p>
           <div className="mt-4">
             <Link
@@ -88,20 +88,18 @@ export default async function AuditCenterPage({
         <div>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center rounded-md bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
-              Shadow Controller & CEO
+              Ban điều hành
             </span>
             <span className="text-xs text-slate-400">·</span>
             <span className="text-xs font-medium text-slate-500">
-              Kiểm soát chéo độc lập (Không thao tác kế toán)
+              Chỉ xem, không sửa số liệu
             </span>
           </div>
           <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900">
-            Trung tâm Kiểm soát & Đối soát 3 Bên
+            Đối chiếu kho – bán hàng – hoá đơn
           </h1>
           <p className="mt-1 text-sm text-slate-600 max-w-4xl leading-relaxed">
-            Ma trận so khớp 3 chiều: <strong>Phiếu giao nhận / Kho thực tế</strong> ↔{" "}
-            <strong>Doanh số & Giá vốn nội bộ</strong> ↔{" "}
-            <strong>Hoá đơn GTGT & Thu hồi công nợ</strong>. Phát hiện tức thì chậm xuất hoá đơn quá 5 ngày, công nợ quá hạn và bán lỗ dưới giá vốn.
+            So 3 thứ với nhau: <strong>hàng trong kho</strong>, <strong>số bán hàng trong hệ thống</strong>, và <strong>hoá đơn + tiền nợ</strong>. Phát hiện ngay hoá đơn xuất chậm quá 5 ngày, tiền nợ quá hạn và bán lỗ dưới giá vốn.
           </p>
         </div>
 

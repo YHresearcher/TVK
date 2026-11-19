@@ -498,10 +498,10 @@ export function StackedBarList({
           <span className="flex h-5 w-full overflow-hidden rounded bg-slate-100">
             {seg(r.consumed, "#10b981", `Đã tiêu thụ ${r.formatQty(r.consumed)}`)}
             {seg(r.remaining, "#2563eb", `Còn tại đối tác ${r.formatQty(r.remaining)}`)}
-            {seg(r.pending, "#f59e0b", `Chờ đối soát ${r.formatQty(r.pending)}`)}
+            {seg(r.pending, "#f59e0b", `Đang chờ xác nhận đã bán ${r.formatQty(r.pending)}`)}
           </span>
           <span className="text-xs text-slate-500">
-            Đã tiêu thụ {r.formatQty(r.consumed)} · Còn tại đối tác {r.formatQty(r.remaining)} · Chờ đối soát{" "}
+            Đã bán {r.formatQty(r.consumed)} · Còn tại đối tác {r.formatQty(r.remaining)} · Đang chờ xác nhận đã bán{" "}
             {r.formatQty(r.pending)}
           </span>
         </li>

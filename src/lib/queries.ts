@@ -805,8 +805,8 @@ export async function getDashboard() {
       orderCount30++;
     }
   }
-  // Luồng hàng đã bán / đã gửi ký gởi (chỉ chứng từ/phiếu đã xác nhận).
-  // Đã bán chỉ tính chứng từ BH; đã gửi ký gởi tính theo phiếu GK đã xác
+  // Luồng hàng đã bán / đã gửi ký gửi (chỉ chứng từ/phiếu đã xác nhận).
+  // Đã bán chỉ tính chứng từ BH; đã gửi ký gửi tính theo phiếu GK đã xác
   // nhận (số lượng + giá chuyển giao); đã tiêu thụ/còn ở đối tác lấy từ
   // đối soát ký gửi theo đối tác.
   let soldQty = 0;

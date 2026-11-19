@@ -285,13 +285,13 @@ export async function getCashFlowRunway(): Promise<CashFlowRunway> {
   // Khuyến nghị điều hành
   let recommendation = "";
   if (safetyStatus14 === "DANGER") {
-    recommendation = `⚠️ BÁO ĐỘNG NGÂN QUỸ 14 NGÀY: Dự kiến thâm hụt ròng ${formatVND(Math.abs(net14))} đ (chi trả và chi cố định vượt tiền sẵn có + thu). Cần ưu tiên đôn đốc thu ${formatVND(overdueReceivables)} đ công nợ quá hạn từ các gara ngay trong tuần này.`;
+    recommendation = `⚠️ THIẾU TIỀN 14 NGÀY TỚI: Dự kiến chi nhiều hơn thu ${formatVND(Math.abs(net14))} đ (chi trả và chi cố định vượt tiền sẵn có + thu). Cần ưu tiên đôn đốc thu ${formatVND(overdueReceivables)} đ tiền nợ quá hạn từ các gara ngay trong tuần này.`;
   } else if (safetyStatus30 === "DANGER") {
-    recommendation = `⚠️ ÁP LỰC THANH KHOẢN 30 NGÀY: Dự kiến thâm hụt ròng ${formatVND(Math.abs(net30))} đ do đến hạn trả NCC và chi phí vận hành. Cần kế hoạch thu nợ đối tác và giãn hạn thanh toán các lô ký gửi.`;
+    recommendation = `⚠️ CĂNG TIỀN 30 NGÀY TỚI: Dự kiến chi nhiều hơn thu ${formatVND(Math.abs(net30))} đ do đến hạn trả NCC và chi phí vận hành. Cần kế hoạch thu nợ đối tác và giãn hạn thanh toán các lô ký gửi.`;
   } else if (safetyStatus14 === "WARNING") {
-    recommendation = `⚡ NGÂN QUỸ CÂN BẰNG TẠM THỜI: Dòng tiền ròng 14 ngày dự kiến +${formatVND(net14)} đ, tỷ lệ độ phủ ${Math.round(safetyRatio14 * 100)}%. Cần bám sát lịch thu tiền gara để không trễ hẹn NCC.`;
+    recommendation = `⚡ TIỀN VỪA ĐỦ (TẠM THỜI): Tiền còn lại 14 ngày tới dự kiến +${formatVND(net14)} đ, mức đủ tiền ${Math.round(safetyRatio14 * 100)}%. Cần bám sát lịch thu tiền gara để không trễ hẹn NCC.`;
   } else {
-    recommendation = `✅ DÒNG TIỀN AN TOÀN: Dòng tiền ròng 30 ngày dự kiến thặng dư +${formatVND(net30)} đ (độ phủ ngân quỹ đạt ${Math.round(safetyRatio30 * 100)}%). Ngân quỹ ổn định.`;
+    recommendation = `✅ ĐỦ TIỀN: Tiền còn lại 30 ngày tới dự kiến dư +${formatVND(net30)} đ (mức đủ tiền đạt ${Math.round(safetyRatio30 * 100)}%). Tiền trong quỹ ổn định.`;
   }
 
   return {

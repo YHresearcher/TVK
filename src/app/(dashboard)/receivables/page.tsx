@@ -42,7 +42,7 @@ export default async function ReceivablesPage({
       {open.length > 0 && (
         <div className="mb-4">
           <AgingTable
-            title="Tuổi nợ phải thu"
+            title="Tiền phải thu theo thời gian quá hạn"
             partyLabel="Đối tác"
             rows={buildAging(
               open.map((r) => ({ partyId: r.partner_id, due_date: r.due_date, amount: r.amount, amount_paid: r.amount_paid })),

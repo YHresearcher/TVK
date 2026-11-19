@@ -121,7 +121,7 @@ export default function CashflowLedger({
                 ? "bg-slate-100 text-slate-900 border-slate-300"
                 : "bg-rose-100 text-rose-900 border-rose-300"
             }`}>
-              Dòng tiền ròng: {netFiltered >= 0 ? "+" : ""}{formatVND(netFiltered)} đ
+              Tiền còn lại (thu trừ chi): {netFiltered >= 0 ? "+" : ""}{formatVND(netFiltered)} đ
             </span>
           </div>
         </div>
@@ -380,7 +380,7 @@ export default function CashflowLedger({
             </div>
 
             <div className="mt-4 rounded-lg bg-amber-50 p-3.5 text-xs text-amber-800 border border-amber-200 leading-relaxed">
-              <strong>Cơ chế bảo toàn dấu vết:</strong> Phiếu gốc sẽ KHÔNG bị xoá khỏi cơ sở dữ liệu. Hệ thống sẽ ghi nhận cờ đảo huỷ và sinh một bút toán đảo đối ứng để đưa biến động số dư về 0 chính xác.
+              <strong>Cơ chế bảo toàn dấu vết:</strong> Phiếu gốc sẽ KHÔNG bị xoá khỏi cơ sở dữ liệu. Hệ thống sẽ đánh dấu là đã huỷ và ghi thêm một lần đảo để đưa số dư về 0 chính xác.
             </div>
 
             {/* Thông tin phiếu sắp huỷ */}
@@ -460,7 +460,7 @@ export default function CashflowLedger({
                   disabled={isPending || !cancelReason.trim()}
                   className="inline-flex items-center justify-center rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
                 >
-                  {isPending ? "Đang xử lý đảo huỷ..." : "Xác nhận tạo bút toán đảo"}
+                  {isPending ? "Đang xử lý đảo huỷ..." : "Xác nhận tạo lần ghi đảo"}
                 </button>
               </div>
             </form>

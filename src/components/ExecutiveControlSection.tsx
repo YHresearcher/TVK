@@ -20,9 +20,9 @@ export default function ExecutiveControlSection({
   };
 
   const safetyLabelMap = {
-    SAFE: "An toàn (Đủ độ phủ)",
-    WARNING: "Cảnh báo (Cân bằng mong manh)",
-    DANGER: "Nguy cơ thâm hụt (Chi vượt thu)",
+    SAFE: "Đủ tiền",
+    WARNING: "Vừa đủ, cần theo dõi",
+    DANGER: "Thiếu tiền (chi nhiều hơn thu)",
   };
 
   return (
@@ -42,10 +42,10 @@ export default function ExecutiveControlSection({
               />
             </span>
             <h2 className="text-base font-bold text-slate-900">
-              Kiểm soát Dòng tiền & Cảnh báo Sai lệch
+              Tiền vào – tiền ra & những việc cần xem
             </h2>
             <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-              CEO & Trợ lý
+              Ban điều hành
             </span>
           </div>
           <p className="mt-0.5 text-xs text-slate-500">
@@ -58,7 +58,7 @@ export default function ExecutiveControlSection({
             href="/audit-center"
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-blue-700"
           >
-            <span>Mở Trung tâm Đối soát 3 Bên</span>
+            <span>Mở trang kiểm tra chéo (kho – bán hàng – hoá đơn)</span>
             <span aria-hidden="true">→</span>
           </Link>
           <DownloadAlertsExcelButton alerts={alerts} />
@@ -73,7 +73,7 @@ export default function ExecutiveControlSection({
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
               <h3 className="text-sm font-bold text-slate-900">
-                Dự báo Dòng tiền (Cash Flow Runway)
+                Tiền vào – tiền ra 14–30 ngày tới
               </h3>
               <p className="text-xs text-slate-500">
                 So sánh Dòng tiền vào dự kiến vs Dòng tiền ra trả NCC ký gửi
@@ -114,7 +114,7 @@ export default function ExecutiveControlSection({
                   <span className="font-bold">-{formatVND(cashflow.outflow14)} đ</span>
                 </div>
                 <div className="border-t border-slate-200 pt-1.5 flex items-center justify-between font-bold">
-                  <span className="text-slate-800">Dòng tiền ròng (Net):</span>
+                  <span className="text-slate-800">Tiền còn lại (thu trừ chi):</span>
                   <span
                     className={
                       cashflow.net14 >= 0 ? "text-emerald-700 text-sm" : "text-rose-700 text-sm"
@@ -158,7 +158,7 @@ export default function ExecutiveControlSection({
                   <span className="font-bold">-{formatVND(cashflow.outflow30)} đ</span>
                 </div>
                 <div className="border-t border-slate-200 pt-1.5 flex items-center justify-between font-bold">
-                  <span className="text-slate-800">Dòng tiền ròng (Net):</span>
+                  <span className="text-slate-800">Tiền còn lại (thu trừ chi):</span>
                   <span
                     className={
                       cashflow.net30 >= 0 ? "text-emerald-700 text-sm" : "text-rose-700 text-sm"
@@ -173,7 +173,7 @@ export default function ExecutiveControlSection({
               {/* Độ phủ ngân quỹ 30d */}
               <div className="mt-3 border-t border-slate-200/80 pt-2 text-[11px] text-slate-500">
                 <div className="flex justify-between items-center mb-1">
-                  <span>Chỉ số an toàn (Độ phủ):</span>
+                  <span>Mức đủ tiền:</span>
                   <span className="font-bold text-slate-800">
                     {cashflow.outflow30 > 0 ? `${Math.round(cashflow.safetyRatio30 * 100)}%` : "100%"}
                   </span>
@@ -210,10 +210,10 @@ export default function ExecutiveControlSection({
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
               <h3 className="text-sm font-bold text-slate-900">
-                Trung tâm Báo động Đèn tín hiệu
+                Những cảnh báo cần xử lý
               </h3>
               <p className="text-xs text-slate-500">
-                Gom cảnh báo lệch ký gửi, công nợ quá hạn và hạn trả lô
+                Hàng gửi đối tác bị lệch số, tiền nợ quá hạn, và hàng ký gửi sắp tới hạn trả
               </p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -271,11 +271,11 @@ export default function ExecutiveControlSection({
           {/* Footer widget kèm nút xuất Excel */}
           <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-slate-500">
-              Xuất danh sách để chuyển tiếp Zalo giải trình:
+              Tải danh sách để gửi Zalo cho người phụ trách giải thích:
             </span>
             <DownloadAlertsExcelButton
               alerts={alerts}
-              label="Tải danh sách lệch (.xlsx)"
+              label="Tải danh sách cần xử lý (.xlsx)"
               variant="danger"
             />
           </div>
