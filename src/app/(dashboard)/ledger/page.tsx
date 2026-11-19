@@ -30,8 +30,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: { q?:
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Sổ cái kho"
-        description="Mọi lần hàng vào, ra, chuyển kho, gửi ký gửi hay bán hàng đều để lại một bút toán. Sổ cái chỉ ghi thêm, không sửa, không xoá."
+        title="Lịch sử kho"
+        description="Mỗi lần hàng vào, ra, chuyển kho hay bán hàng đều ghi lại một dòng ở đây. Đã ghi thì không sửa, không xoá."
       />
       <Card>
         <form key={`${q}|${searchParams.kind ?? ""}`} method="get" className="flex flex-wrap items-end gap-3">
@@ -43,7 +43,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: { q?:
           </div>
           <div>
             <label className={labelCls} htmlFor="kind">
-              Loại bút toán
+              Loại thay đổi
             </label>
             <select id="kind" name="kind" defaultValue={searchParams.kind ?? ""} className={inputCls}>
               <option value="">Tất cả loại</option>
@@ -64,9 +64,9 @@ export default async function LedgerPage({ searchParams }: { searchParams: { q?:
           )}
         </form>
       </Card>
-      <Card title={`200 bút toán mới nhất${rows.length < 200 ? ` — đang hiện ${rows.length}` : ""}`}>
+      <Card title={`200 lần nhập – xuất mới nhất${rows.length < 200 ? ` — đang hiện ${rows.length}` : ""}`}>
         {rows.length === 0 ? (
-          <EmptyState message="Chưa có bút toán nào. Bút toán xuất hiện khi một chứng từ được xác nhận." />
+          <EmptyState message="Chưa có lần nhập – xuất nào. Dòng mới xuất hiện khi một phiếu được xác nhận." />
         ) : (
           <TableWrap>
             <table className="w-full text-sm">
@@ -97,7 +97,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: { q?:
                     </td>
                     <td className={tdCls}>
                       {MOVEMENT_KIND_LABELS[r.movement_kind] ?? r.movement_kind}
-                      {r.reversal_of_id && <div className="text-xs text-slate-500">Đảo bút toán trước</div>}
+                      {r.reversal_of_id && <div className="text-xs text-slate-500">Huỷ lần ghi trước</div>}
                     </td>
                     <td className={tdCls}>
                       <div className="font-medium">{r.product_name}</div>

@@ -15,7 +15,7 @@ export default async function AllocationDetailPage({
   searchParams: { ok?: string };
 }) {
   const [detail, products, profile] = await Promise.all([getAllocationDetail(params.id), listProducts(), getCurrentProfile()]);
-  if (!detail.configured) return (<><PageHeader title="Phân bổ" /><NotConfigured /></>);
+  if (!detail.configured) return (<><PageHeader title="Chia hàng đã bán cho từng lô" /><NotConfigured /></>);
   if (!detail.slip) return (<><BackLink href="/partner-consumption" label="Quay lại" /><EmptyState message="Không tìm thấy phiếu phân bổ." /></>);
   const slip = detail.slip;
   const readOnly = isReadOnlyRole(profile.data?.role);
@@ -28,7 +28,7 @@ export default async function AllocationDetailPage({
     <>
       <BackLink href="/partner-consumption" label="Quay lại Tiêu thụ của đối tác" />
       <PageHeader
-        title={`Phân bổ ${slip.doc_code}`}
+        title={`Chia hàng đã bán ${slip.doc_code}`}
         description="Mỗi dòng gán một lượng đã tiêu thụ vào đúng một lô và một tính chất nguồn. Chứng từ (BH/KG) được tạo từ các dòng này — không bao giờ nhập lại trên hoá đơn."
         action={<StatusBadge status={slip.status} />}
       />
@@ -74,7 +74,7 @@ export default async function AllocationDetailPage({
           {!readOnly && slip.status === "DRAFT" && (
             <form action={confirmAllocationAction}>
               <input type="hidden" name="id" value={slip.id} />
-              <SubmitButton className={btnCls}>Xác nhận phân bổ (kiểm tra 3 chốt)</SubmitButton>
+              <SubmitButton className={btnCls}>Xác nhận chia hàng (kiểm tra 3 điều)</SubmitButton>
             </form>
           )}
           {!readOnly && slip.status === "CONFIRMED" && pendingCount > 0 && (

@@ -120,7 +120,7 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
           {partner.notes && <p className="mt-3 text-sm text-slate-600">Ghi chú: {partner.notes}</p>}
         </Card>
 
-        <Card title="Đối soát ký gửi — đã gửi = đã tiêu thụ + đã trả + còn giữ">
+        <Card title="Đối chiếu hàng gửi đối tác (số đã gửi phải bằng số đã bán + đã trả lại + còn giữ)">
           <TableWrap>
             <thead><tr><th className={thCls}>Đã gửi</th><th className={thCls}>Đã tiêu thụ</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th><th className={thCls}>Kiểm tra</th></tr></thead>
             <tbody>

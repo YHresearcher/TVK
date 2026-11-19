@@ -292,7 +292,7 @@ export default function ImportAllocation({
       </div>
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={confirmNow} onChange={(e) => setConfirmNow(e.target.checked)} />
-        Xác nhận phân bổ ngay sau khi tạo phiếu (hệ thống kiểm tra 3 chốt: lượng đã báo, hạn mức theo tính chất, tồn tại kho đối tác)
+        Xác nhận chia hàng ngay sau khi tạo phiếu (hệ thống kiểm tra 3 điều: số đã báo bán, số hàng đã giao theo loại, còn đủ hàng ở kho đối tác)
       </label>
 
       {(formatProblems.length > 0 || parseError) && (

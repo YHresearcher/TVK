@@ -21,7 +21,7 @@ export default async function SuppliersPage({
   const editing = canEdit ? suppliers.data.find((s) => s.id === searchParams.edit) : undefined;
   return (
     <>
-      <PageHeader title="Nhà cung cấp" description="Nhà cung cấp là người cung cấp hàng cho cửa hàng, hoặc ký gửi hàng cho cửa hàng bán hộ — khác với đối tác là người nhận ký gửi từ cửa hàng. Điều khoản ký gửi nằm ở đây: sau khi bán phải thanh toán trong bao nhiêu ngày, hàng ký gửi chưa bán được giữ bao lâu, và nhà cung cấp này có cho phép ký gửi tiếp (ô D) hay không. Hạn trả tiền mua hàng cũng nằm ở đây: tính từ ngày nhập kho, theo số ngày riêng của từng nhà cung cấp." />
+      <PageHeader title="Nhà cung cấp" description="Nhà cung cấp là người cung cấp hàng cho cửa hàng, hoặc ký gửi hàng cho cửa hàng bán hộ — khác với đối tác là người nhận ký gửi từ cửa hàng. Điều khoản ký gửi nằm ở đây: sau khi bán phải thanh toán trong bao nhiêu ngày, hàng ký gửi chưa bán được giữ bao lâu, và nhà cung cấp này có cho phép gửi tiếp hàng ký gửi của họ cho đối tác khác hay không. Hạn trả tiền mua hàng cũng nằm ở đây: tính từ ngày nhập kho, theo số ngày riêng của từng nhà cung cấp." />
       {!suppliers.configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <div className="grid gap-6 lg:grid-cols-3">
@@ -73,7 +73,7 @@ export default async function SuppliersPage({
             <div><label className={labelCls}>Hạn trả tiền mua hàng (ngày)</label><input name="purchase_pay_days" type="number" defaultValue={editing?.purchase_pay_days ?? 30} className={inputCls} /></div>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" name="allow_sub_consignment" defaultChecked={editing?.allow_sub_consignment ?? false} className="h-4 w-4" />
-              Cho phép ký gửi tiếp hàng của nhà cung cấp này (ô D)
+              Cho phép gửi tiếp hàng ký gửi của nhà cung cấp này cho đối tác khác
             </label>
             <div><label className={labelCls}>Ghi chú</label><textarea name="notes" rows={2} defaultValue={editing?.notes ?? ""} className={inputCls} /></div>
             <SubmitButton className={`${btnCls} w-full`}>{editing ? "Lưu thay đổi" : "Tạo nhà cung cấp"}</SubmitButton>

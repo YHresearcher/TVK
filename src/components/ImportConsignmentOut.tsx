@@ -310,7 +310,7 @@ export default function ImportConsignmentOut({
           <input type="date" value={slipDate} onChange={(e) => setSlipDate(e.target.value)} className={inputCls} />
         </div>
         <div>
-          <label className={labelCls}>Hạn đối soát</label>
+          <label className={labelCls}>Hạn trả hàng</label>
           <input type="date" value={settlementDueDate} onChange={(e) => setSettlementDueDate(e.target.value)} className={inputCls} />
         </div>
         <div>

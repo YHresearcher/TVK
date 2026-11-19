@@ -102,7 +102,7 @@ export default async function ConsignmentOutPage({
     <>
       <PageHeader
         title="Gửi ký gửi (GK)"
-        description="Gửi hàng cho đối tác chỉ thay đổi nơi giữ hàng — hàng vẫn là của TVK, chưa ghi doanh thu và chưa ghi phải thu cho tới khi đối tác báo tiêu thụ. Gửi tiếp lô hàng được ký gửi (ô D) bị chặn trừ khi nhà cung cấp đó cho phép."
+        description="Gửi hàng cho đối tác chỉ thay đổi nơi giữ hàng — hàng vẫn là của TVK, chưa ghi doanh thu và chưa ghi phải thu cho tới khi đối tác báo tiêu thụ. Gửi tiếp hàng ký gửi của nhà cung cấp cho đối tác khác bị chặn, trừ khi nhà cung cấp đó cho phép."
       />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
@@ -116,7 +116,7 @@ export default async function ConsignmentOutPage({
               <div><label className={labelCls}>Đối tác *</label>
                 <select name="partner_id" required className={inputCls}><option value="">— Chọn —</option>{partnerOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
               <div><label className={labelCls}>Ngày phiếu</label><input name="slip_date" type="date" className={inputCls} /></div>
-              <div><label className={labelCls}>Hạn đối soát</label><input name="settlement_due_date" type="date" className={inputCls} /></div>
+              <div><label className={labelCls}>Hạn trả hàng</label><input name="settlement_due_date" type="date" className={inputCls} /></div>
               <div><label className={labelCls}>Hạn trả</label><input name="return_by_date" type="date" className={inputCls} /></div>
             </div>
             <ItemsRows fields={[
@@ -147,7 +147,7 @@ export default async function ConsignmentOutPage({
           draftSlips.length === 0 && <EmptyState message="Chưa có phiếu gửi." />
         ) : (
           <TableWrap>
-            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Hạn đối soát</th><th className={thCls}>Trạng thái</th></tr></thead>
+            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Hạn trả hàng</th><th className={thCls}>Trạng thái</th></tr></thead>
             <tbody>
               {confirmedSlips.map((s) => (
                 <tr key={s.id} className="border-t border-slate-100">

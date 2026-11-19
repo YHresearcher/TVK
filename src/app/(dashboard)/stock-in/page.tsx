@@ -80,7 +80,7 @@ export default async function StockInPage({
             </Card>
           ) : (
             <>
-              <Card title="Import phiếu nhập kho">
+              <Card title="Nhập phiếu nhập kho từ Excel">
                 <ImportExcel
                   suppliers={suppliers.data}
                   warehouses={warehouses}

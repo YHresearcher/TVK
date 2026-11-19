@@ -14,7 +14,7 @@ const SHORTCUTS: Record<string, { label: string; href: string }[]> = {
     { label: "Gửi ký gửi", href: "/consignment-out" },
     { label: "Phải thu", href: "/receivables" },
     { label: "Báo cáo", href: "/reports" },
-    { label: "Sổ cái kho", href: "/ledger" },
+    { label: "Lịch sử kho", href: "/ledger" },
   ],
   SALES: [
     { label: "Nhập đơn bán", href: "/sales" },
@@ -36,7 +36,7 @@ const SHORTCUTS: Record<string, { label: string; href: string }[]> = {
   ],
   CEO: [
     { label: "Báo cáo", href: "/reports" },
-    { label: "Sổ cái kho", href: "/ledger" },
+    { label: "Lịch sử kho", href: "/ledger" },
     { label: "Phải thu", href: "/receivables" },
     { label: "Phải trả", href: "/payables" },
   ],

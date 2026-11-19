@@ -24,12 +24,12 @@ export default async function ReportsPage() {
 
   return (
     <>
-      <PageHeader title="Báo cáo" description="Các báo cáo đối soát lấy thẳng từ cơ sở dữ liệu. Liên kết xuất CSV ở đầu mỗi phần." />
+      <PageHeader title="Báo cáo" description="Các bảng này lấy thẳng từ số liệu đã ghi. Bấm xuất CSV ở đầu mỗi phần." />
       {!configured && <NotConfigured />}
       <div className="space-y-8">
         {canSeePayables && (<section>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-800">Đối soát ký gửi nhà cung cấp (đã nhận – đã bán – đã trả – còn trên kệ – còn nợ)</h2>
+            <h2 className="text-sm font-semibold text-slate-800">Đối chiếu hàng ký gửi với nhà cung cấp (đã nhận – đã bán – đã trả – còn giữ – còn nợ)</h2>
             <a href="/api/export?view=v_supplier_consignment" className="text-sm text-blue-600 hover:underline">Xuất CSV</a>
           </div>
           {suppliers.data.length === 0 ? <EmptyState message="Chưa có dữ liệu." /> : (
@@ -53,7 +53,7 @@ export default async function ReportsPage() {
 
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-800">Đối soát ký gửi đối tác — kiểm soát: đã gửi = đã tiêu thụ + đã trả + còn giữ</h2>
+            <h2 className="text-sm font-semibold text-slate-800">Đối chiếu hàng gửi đối tác (số đã gửi phải bằng số đã bán + đã trả lại + còn giữ)</h2>
             {canSeeReceivables && (<a href="/api/export?view=v_partner_consignment" className="text-sm text-blue-600 hover:underline">Xuất CSV</a>)}
           </div>
           {canSeeEstimates && (<p className="mb-3 text-sm leading-relaxed text-slate-600">
@@ -137,7 +137,7 @@ export default async function ReportsPage() {
           <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">
             <li>Doanh thu & lợi nhuận theo nguồn (của mình vs ký gửi) chỉ vai trò Chủ cửa hàng mới xem được, theo quy tắc vai trò trong tài liệu đặc tả.</li>
             <li>Mọi lô đều truy vết được đầu-cuối trong sổ cái di chuyển (Tồn kho theo lô → lô → các di chuyển được ghi trong <code>stock_movements</code>).</li>
-            <li>LỆCH trong kiểm tra đối tác nghĩa là: đã gửi ≠ đã tiêu thụ + đã trả + còn giữ — cần làm rõ với đối tác trước đợt đối soát tiếp theo.</li>
+            <li>Số lệch nghĩa là: số đã gửi không bằng số đã bán + đã trả lại + còn giữ — cần hỏi lại đối tác trước lần đối chiếu sau.</li>
           </ul>
         </Card>
       </div>

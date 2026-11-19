@@ -31,7 +31,7 @@ export default async function InventoryPage({
 
   return (
     <>
-      <PageHeader title="Tồn kho theo lô" description="Tồn kho không bao giờ sửa trực tiếp — mọi thay đổi đều qua sổ cái biến động. Điều chỉnh bên dưới cũng ghi vào sổ cái." />
+      <PageHeader title="Tồn kho theo lô" description="Số tồn kho không sửa tay được — muốn đổi số thì làm phiếu nhập/xuất, hệ thống tự ghi lại. Kiểm kho bên dưới cũng được ghi lại." />
       {!configured && <NotConfigured />}
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <form method="get" className="mb-4 flex flex-wrap gap-2">
@@ -77,7 +77,7 @@ export default async function InventoryPage({
 
       {!readOnly && (
       <div className="mt-6 max-w-xl">
-        <Card title="Điều chỉnh kiểm kê (ghi vào sổ cái)">
+        <Card title="Kiểm kho và sửa số tồn (hệ thống tự ghi lại)">
           <form action={createStockAdjustmentAction} className="space-y-3">
             <div>
               <label className={labelCls}>Lô *</label>
