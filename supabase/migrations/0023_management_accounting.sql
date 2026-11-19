@@ -117,7 +117,8 @@ CREATE POLICY pol_cash_movements_upd ON public.cash_movements FOR UPDATE TO auth
   USING (current_app_role() = 'OWNER')
   WITH CHECK (current_app_role() = 'OWNER');
 
--- Cập nhật view v_cash_fund_balances
+-- Cập nhật view v_cash_fund_balances (DROP trước để đổi thứ tự cột an toàn trong Postgres)
+DROP VIEW IF EXISTS public.v_cash_fund_balances CASCADE;
 CREATE OR REPLACE VIEW public.v_cash_fund_balances AS
 SELECT f.id AS fund_id, f.name AS fund_name, f.kind, f.opening_balance, f.opening_balance_date, f.is_active,
   coalesce(sum(m.amount) FILTER (WHERE m.amount > 0 AND (NOT m.is_cancelled OR m.is_cancelled IS NULL) AND coalesce(m.movement_kind, 'DEBT_PAYMENT') <> 'REVERSAL'), 0) AS total_in,
