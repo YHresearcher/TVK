@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { todayISO } from "@/lib/format";
 import { compareLotOrder, isOilGroup, matchByNameVehicle, tierPriceOf } from "@/lib/product-match";
+import { canChangeProductBusinessLine } from "@/lib/business-lines";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { AnyRow } from "@/lib/types";
@@ -3150,3 +3151,66 @@ export async function createReconciliationSnapshotAction(
   return { ok: true, snapshot_id: data };
 }
 
+
+// ------------------------------------------------------------- TVK V2.0 P1 — ngành hàng
+// Gán/thu hồi phân quyền ngành + đổi ngành sản phẩm (chỉ OWNER).
+// RLS ở database là cửa chặn chính; requireRole là phòng thủ thêm ở tầng action.
+// UI quản lý phân quyền thuộc P2 — các action này là nền tảng server-side.
+
+/** Gán một user vào một ngành hàng (OWNER duy nhất). */
+export async function assignUserBusinessLineAction(userId: string, businessLineId: string) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được gán ngành hàng cho tài khoản.");
+  if (!userId || !businessLineId) throw new Error("Thiếu tài khoản hoặc ngành hàng.");
+  done(
+    await supabase
+      .from("user_business_lines")
+      .insert({ user_id: userId, business_line_id: businessLineId }),
+    "Gán ngành hàng",
+  );
+  revalidatePath("/settings");
+}
+
+/** Thu hồi một ngành hàng của một user (OWNER duy nhất). */
+export async function revokeUserBusinessLineAction(userId: string, businessLineId: string) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được thu hồi ngành hàng của tài khoản.");
+  if (!userId || !businessLineId) throw new Error("Thiếu tài khoản hoặc ngành hàng.");
+  done(
+    await supabase
+      .from("user_business_lines")
+      .delete()
+      .eq("user_id", userId)
+      .eq("business_line_id", businessLineId),
+    "Thu hồi ngành hàng",
+  );
+  revalidatePath("/settings");
+}
+
+/**
+ * Đổi ngành hàng của một sản phẩm (OWNER duy nhất).
+ * - Sản phẩm chưa phân loại: phân loại lần đầu luôn được.
+ * - Sản phẩm đã có giao dịch/tồn kho: bị chặn (kiểm tra sớm ở đây để báo lỗi
+ *   thân thiện; trigger trg_products_business_line_guard ở database chặn lại
+ *   lần nữa và ghi dòng kiểm toán cho mọi thay đổi được phép).
+ * - businessLineId = null: xoá phân loại (chỉ khi sản phẩm chưa có giao dịch).
+ */
+export async function updateProductBusinessLineAction(
+  productId: string,
+  businessLineId: string | null,
+) {
+  const supabase = await db();
+  await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được đổi ngành hàng của sản phẩm.");
+  if (!productId) throw new Error("Thiếu sản phẩm.");
+  const check = await canChangeProductBusinessLine(productId);
+  if (!check.ok) throw new Error(check.reason ?? "Không được đổi ngành hàng của sản phẩm này.");
+  done(
+    await supabase
+      .from("products")
+      .update({ business_line_id: businessLineId })
+      .eq("id", productId),
+    "Đổi ngành hàng",
+  );
+  revalidatePath(`/products/${productId}`);
+  revalidatePath("/products");
+}

@@ -271,6 +271,12 @@ Từ migration 0018, mọi thao tác xác nhận (phiếu nhập, gửi ký gử
 | **Bán hàng (SALES)** | Ghi nhận đơn bán (Excel), tiêu thụ/hoá đơn (xem), đối tác | **Không thấy giá vốn, giá ký gửi, công nợ và lãi** |
 | **Kho (WAREHOUSE)** | Nhập kho (PN/NK/Excel), tồn kho, gửi ký gửi, trả hàng, kiểm kho | Không thấy dữ liệu tiền (giá vốn hiển thị theo nhu cầu nhập liệu; không xem tiền nợ/báo cáo tài chính) |
 
+### Ngành hàng (từ V2.0 P1 — Dầu nhớt / Phụ tùng)
+- Hệ thống có 2 ngành hàng: **Dầu nhớt (OIL)** và **Phụ tùng (AUTO_PARTS)**. Mỗi sản phẩm thuộc đúng một ngành; mỗi chứng từ (nhập, gửi ký gửi, tiêu thụ, phân bổ, bán, trả hàng) chỉ thuộc một ngành — không trộn 2 ngành trong một chứng từ.
+- **Phân loại sản phẩm theo nhóm hàng, không theo tên**: "Lọc dầu" và "Lọc nhớt" là **phụ tùng** (lọc), không phải dầu. Nhóm hàng lạ hoặc chưa có nhóm sẽ nằm trong hàng đợi chờ phân loại thủ công — hệ thống không tự gán.
+- **Không đổi được ngành của sản phẩm đã có giao dịch hoặc tồn kho** (đổi ngành lịch sử phải dùng quy trình điều chỉnh đã phê duyệt). Chỉ **Chủ cửa hàng** được đổi ngành sản phẩm chưa có giao dịch, và mọi lần đổi đều được ghi lại để kiểm toán.
+- **Phân quyền theo ngành**: Chủ cửa hàng gán mỗi tài khoản vào một hoặc cả hai ngành. Tài khoản chỉ được gán Dầu nhớt thì không thấy chứng từ/lô hàng Phụ tùng (kể cả khi biết đường dẫn). Tài khoản chưa được gán ngành nào tạm thời vẫn thấy toàn bộ (sẽ siết lại ở giai đoạn sau khi Chủ cửa hàng gán xong).
+
 ### Tài khoản & mật khẩu
 - Chỉ **Chủ cửa hàng** tạo/sửa/khoá/xoá tài khoản và gán vai trò (Cài đặt → Quản lý tài khoản). Sửa được họ tên và tên đăng nhập của từng tài khoản (kể cả tài khoản của chính mình); email không sửa được vì là danh tính đăng nhập. Đăng nhập bằng **tên đăng nhập hoặc email**. Quên mật khẩu: bấm **Quên mật khẩu?** ở trang đăng nhập để nhận email đặt lại, hoặc Chủ cửa hàng bấm **Đặt lại mật khẩu** trong Quản lý tài khoản.
 - Chốt an toàn ở database: tài khoản thường tự sửa chỉ được đổi họ tên, tên đăng nhập và gỡ cờ bắt đổi mật khẩu — không tự nâng vai trò, tự mở khoá hay đổi email được, kể cả gọi API trực tiếp (migration 0013, trigger `trg_profiles_privilege_guard`).
@@ -314,6 +320,8 @@ Từ migration 0018, mọi thao tác xác nhận (phiếu nhập, gửi ký gử
 | Thuật ngữ | Nghĩa |
 |---|---|
 | **Lô (batch)** | Đơn vị quản lý tồn kho: một lượng hàng về cùng một phiếu, cùng chủ sở hữu, cùng giá. |
+| **Ngành hàng** | Dầu nhớt (OIL) hoặc Phụ tùng (AUTO_PARTS). Mỗi sản phẩm và mỗi chứng từ chỉ thuộc một ngành. |
+| **Hàng đợi phân loại** | Sản phẩm có nhóm hàng lạ hoặc chưa có nhóm — chờ phân loại thủ công, hệ thống không tự gán. |
 | **OWN / CONS** | Tồn kho / hàng ký gửi của nhà cung cấp. |
 | **Nhãn trắng / nhãn vàng** | Quy ước dán nhãn vật lý: trắng = hàng mình (OWN), vàng = ký gửi (CONS). |
 | **Ô D** | Hàng của nhà cung cấp đang nằm ở đối tác — trường hợp nhạy cảm, khoá mặc định. |
