@@ -42,18 +42,27 @@ async function main() {
     totalTests += t3.total;
     console.log(` Tier 3 Passed: ${t3.passed}/${t3.total} tests in ${t3Duration}s\n`);
 
-    // TIER 4
+    // TIER 4 (SKIP nếu không có file mẫu — xem tier4-real-sample.test.ts)
     console.log("━━━ TIER 4: REAL ENTERPRISE WORKLOAD REPLAY (376-Row HOWO Dataset) ━━━");
     const t4Start = performance.now();
     const t4 = await runTier4Tests();
     const t4Duration = ((performance.now() - t4Start) / 1000).toFixed(2);
-    totalPassed += t4.passed;
-    totalTests += t4.total;
-    console.log(` Tier 4 Passed: ${t4.passed}/${t4.total} tests in ${t4Duration}s\n`);
+    if (t4.skipped) {
+      console.log(` Tier 4 SKIPPED in ${t4Duration}s — ${t4.skipReason}\n`);
+    } else {
+      totalPassed += t4.passed;
+      totalTests += t4.total;
+      console.log(` Tier 4 Passed: ${t4.passed}/${t4.total} tests in ${t4Duration}s\n`);
+    }
 
     const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
     console.log("================================================================================");
-    console.log(` ALL ${totalPassed}/${totalTests} E2E TESTS COMPLETED SUCCESSFULLY! (${totalDuration}s)`);
+    if (t4.skipped) {
+      console.log(` TIER 1–3: ${totalPassed}/${totalTests} E2E TESTS COMPLETED SUCCESSFULLY! (${totalDuration}s)`);
+      console.log(" Tier 4 SKIPPED: enterprise sample file not available (see above).");
+    } else {
+      console.log(` ALL ${totalPassed}/${totalTests} E2E TESTS COMPLETED SUCCESSFULLY! (${totalDuration}s)`);
+    }
     console.log(" Zero regressions, 100% database schema & business contract compliance.");
     console.log("================================================================================");
     process.exit(0);
