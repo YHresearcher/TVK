@@ -1,35 +1,41 @@
-# TVK V2.0 P3 — Đảo bút toán thanh toán (Payment Reversal)
+# TVK V2.0 P3 + P4 — Đảo bút toán thanh toán (Payment Reversal)
 
 Tài liệu thiết kế + vận hành cho cơ chế đảo phiếu thu/chi sau P3
-(migration 0027). Đọc cùng `SETTLEMENT-AND-PAYMENTS.md`.
+(migration 0027), cập nhật ở P4 (migration 0029: BL-015 + quyền OWNER
++ nhật ký đảo). Đọc cùng `SETTLEMENT-AND-PAYMENTS.md`.
 
-## 1. Nguyên tắc (theo quyết định kế toán 28/10/2026)
+## 1. Nguyên tắc
 
-- **Chỉ Kế toán mới được đảo bút toán thanh toán.** Chủ cửa hàng cũng
-  không tự đảo được — nếu cần đảo, nhờ Kế toán thực hiện. (Quyết định
-  này đã khóa; muốn đổi thì chủ cửa hàng phải quyết lại trước P4.)
+- **OWNER và Kế toán đều được đảo bút toán thanh toán.** Quyết của
+  chủ 23/11 21:48 — bãi bỏ quy tắc chỉ-Kế-toán (quyết định kế toán
+  28/10/2026). SALES / WAREHOUSE / CEO vẫn bị chặn (RPC + server
+  action đều chặn).
 - **Không sửa, không xoá phiếu gốc.** Sửa sai chỉ bằng **phiếu đảo mới**
   ngược chiều. Phiếu gốc, dòng phân bổ gốc, đợt chốt sổ và các dòng DS
   giữ nguyên.
 - **Lý do bắt buộc** — mỗi lần đảo phải ghi rõ lý do (lưu vào ghi chú
-  phiếu đảo: "Đảo bút toán <mã phiếu gốc> (Lý do: …)").
+  phiếu đảo: "Đảo của <mã phiếu gốc>: <lý do>" — định dạng từ 0029;
+  phiếu đảo thời P3 (0027) ghi "Đảo bút toán <mã> (Lý do: …)" —
+  nhật ký đảo hiểu cả hai định dạng).
 - Phiếu đã đảo **không đảo lại được**; phiếu đảo **không đảo được nữa**
   (không có đảo của đảo).
 
 ## 2. Cơ chế — RPC `reverse_payment(p_payment_id, p_reason)`
 
-Hàm SECURITY DEFINER, kiểm tra role = ACCOUNTING ngay đầu (fail-closed:
-role khác, kể cả OWNER, đều bị từ chối).
+Hàm SECURITY DEFINER, kiểm tra role = OWNER hoặc ACCOUNTING ngay đầu
+(fail-closed: SALES / WAREHOUSE / CEO đều bị từ chối).
 
 1. Khóa phiếu gốc `FOR UPDATE` (chống đảo đồng thời — xem §5).
 2. Kiểm tra: phiếu tồn tại; không phải phiếu đảo; chưa bị đảo (cả kiểm
    tra trong hàm lẫn unique index `uq_payments_one_reversal`).
-3. Chặn đảo khi: phiếu gốc đã gắn dòng hoá đơn GTGT đang hoạt động, hoặc
-   phiếu gốc đã được dùng để ghi nhận tạm ứng/đặt cọc (khi 2 cơ chế này
-   có ở P4 — hiện chưa có nên kiểm tra này đang ở dạng giữ chỗ, luôn
-   cho qua; xem §6).
+3. **BL-015 (P4, 0029): chặn đảo khi chứng từ gốc của phiếu đã có hoá
+   đơn GTGT còn hiệu lực** — phải huỷ bản ghi hoá đơn GTGT trước rồi
+   mới đảo. Phải trả mua hàng (không có chứng từ bán) không bao giờ bị
+   chặn ở bước này.
 4. Tạo **phiếu đảo**: cùng phương thức, cùng quỹ, cùng tham chiếu công
-   nợ/DS, cùng số tiền, chiều ngược lại (IN ↔ OUT), ngày = hôm nay,
+   nợ/DS, cùng số tiền, chiều ngược lại (IN ↔ OUT — mã phiếu do trigger
+   `trg_payments_code` cấp theo chiều đã đảo: đảo phiếu thu PT thành
+   phiếu chi PC và ngược lại), ngày = hôm nay,
    `reversal_of_id` = phiếu gốc.
 5. Hai trigger tự chạy trên phiếu đảo:
    - `apply_payment_to_balance` (nhánh đảo): với mỗi dòng phân bổ gốc
@@ -83,14 +89,23 @@ trong khi cột đó UNIQUE. Thiết kế lại trong 0027:
   transaction mở → phiên B gọi đảo cùng phiếu **bị khóa đợi** → sau khi
   A commit, B fail với "đã được đảo trước đó". Không có đảo trùng.
 
-## 6. Hạn chế đã biết (P3)
+## 6. Hạn chế đã biết (P3 → P4)
 
-- **Chặn đảo khi đã xuất hoá đơn / đã thu tiền** (§12.5): hiện mới chặn
-  ở mức "đã được đảo" và "phiếu đảo". Chặn đảo khi phiếu gốc đã gắn
-  dòng hoá đơn GTGT đang hoạt động **chưa kiểm tra được** vì P4 chưa
-  có cột ngành trên hoá đơn và chưa có liên kết phiếu ↔ hoá đơn ở tầng
-  này — cần bổ sung ở P4 (BL-015) trước khi chạy live, hoặc chấp nhận
-  rủi ro và ghi rõ trong biên bản chạy staging.
+- **BL-015 đã làm xong ở P4 (0029):** đảo bị chặn khi chứng từ gốc đã
+  có hoá đơn GTGT còn hiệu lực; kiểm chứng REV-03 (OWNER cũng bị chặn
+  khi đã có hoá đơn). Chặn đảo khi phiếu gốc đã được dùng để ghi nhận
+  tạm ứng/đặt cọc thì chưa có cơ chế tạm ứng/đặt cọc nên không kiểm tra.
+- **Lệch bản sao 0029 (đã sửa trong P4):** bản `reverse_payment` đầu
+  tiên của 0029 giữ nguyên `payment_kind` của phiếu gốc và không đánh
+  dấu dòng tiền gốc `is_cancelled` — lệch 0027. Giữ nguyên kind làm
+  phiếu đảo hiện 2 lần trong lịch sử app (vừa là dòng cùng kind gốc,
+  vừa được lấy thêm qua `reversal_of_id`) và cộng trùng vào tiền đã
+  trả của đợt chốt sổ; đồng thời view `v_cash_flow_by_line` lúc đầu
+  cũng phân loại theo kind phiếu đảo nên sai ngăn thu/chi. Đã khôi phục
+  đúng 0027 trong 0029 (phiếu đảo đảo chiều IN↔OUT, mã theo chiều đã
+  đảo, đánh dấu dòng tiền gốc `is_cancelled`) và sửa view phân loại
+  theo kind của phiếu gốc (`coalesce(orig.payment_kind, ...)`) — kiểm
+  chứng lại toàn bộ P4 trên scratch: ALL PASS.
 - Đảo chỉ làm việc với phiếu có tham chiếu công nợ/DS. Phiếu không có
   tham chiếu (phiếu lịch sử cũ, nếu có) không có phân bổ để gương —
   `reverse_payment` từ chối (thông báo "không có dòng phân bổ").
@@ -99,15 +114,35 @@ trong khi cột đó UNIQUE. Thiết kế lại trong 0027:
 - `payments` bất biến: UPDATE/DELETE trực tiếp bị trigger chặn với mọi
   role, kể cả superuser (sửa sai chỉ bằng phiếu đảo).
 
-## 7. Vận hành (cho Kế toán)
+## 7. Vận hành (cho Chủ cửa hàng + Kế toán)
 
 1. Mở trang **Phải thu đối tác** (thu tiền) hoặc **Phải trả nhà cung
    cấp** (chi tiền).
-2. Thẻ **"Đảo bút toán thanh toán"** (chỉ Kế toán thấy): chọn phiếu cần
-   đảo trong danh sách (chỉ hiện phiếu chưa bị đảo), nhập lý do, bấm
-   "Đảo bút toán".
+2. Thẻ **"Đảo bút toán thanh toán"** (Chủ cửa hàng và Kế toán đều thấy
+   và làm được): chọn phiếu cần đảo trong danh sách (chỉ hiện phiếu
+   chưa bị đảo), nhập lý do, bấm "Đảo bút toán".
 3. Kiểm tra bảng **"Lịch sử thu/chi tiền + phân bổ theo ngành"**: phiếu
    gốc hiện "Đã đảo (mã phiếu đảo)", phiếu đảo mới hiện "Bút toán đảo"
    với số tiền âm; công nợ và số dư quỹ đã về lại.
 4. **Không** hủy dòng tiền của phiếu thanh toán ở sổ dòng tiền — hệ
    thống từ chối; đảo ở trang công nợ như trên.
+
+## 8. Nhật ký đảo bút toán (P4 — chủ yêu cầu 23/11 21:48)
+
+- **Xem ở đâu:** cùng trang **Phải thu đối tác** / **Phải trả nhà cung
+  cấp**, mục **"Nhật ký đảo bút toán"** ngay dưới bảng lịch sử thanh
+  toán (component `PaymentHistory`, hàm thuần `getReversalLog` trong
+  `src/lib/payment-allocations.ts`).
+- **Ai xem được:** Chủ cửa hàng (OWNER) và Kế toán (ACCOUNTING) — cùng
+  quyền xem như toàn bộ thẻ lịch sử thanh toán (RLS bảng `payments`
+  chỉ cho 2 role này xem; SALES / WAREHOUSE / CEO không thấy mục này).
+- **Mỗi dòng log ghi rõ:** phiếu đảo, phiếu gốc, số tiền, lý do đảo
+  (bắt buộc, tách từ ghi chú phiếu đảo bằng `reversalReasonFromNote`
+  — hiểu cả hai định dạng ghi chú 0027/0029), người đảo (tên hiển thị
+  tra từ `profiles` qua `created_by`), thời gian đảo (`created_at`).
+  Mới nhất xếp trước. Phiếu đảo không bao giờ bị sửa hay xoá (bảng
+  `payments` bất biến) nên log là đầy đủ và không mất dòng.
+- **Kiểm chứng:** test DB REV-01/04 (`docs/tests/p4_finance_vat_local.sql`)
+  — phiếu đảo của OWNER ghi đúng phiếu gốc, ghi chú chứa lý do,
+  `created_by` = OWNER, `created_at` có giá trị, tên tra ra "Thanh Phan";
+  test Tier 5 cho `reversalReasonFromNote` + `getReversalLog`.

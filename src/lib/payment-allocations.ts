@@ -41,6 +41,10 @@ export interface PaymentWithAllocations {
   receivable_id: string | null;
   reversal_of_id: string | null;
   created_at: string;
+  /** Người tạo phiếu (auth uid). */
+  created_by: string | null;
+  /** Tên hiển thị của người tạo (tra từ profiles). */
+  createdByName: string | null;
   /** Mô tả khoản công nợ được thanh toán (đối tác/NCC + chứng từ gốc). */
   obligationLabel: string;
   allocations: PaymentAllocationRow[];
@@ -99,6 +103,57 @@ export function paymentReversalLabel(
 }
 
 /**
+ * Tách lý do đảo ra khỏi ghi chú phiếu đảo (hàm thuần).
+ * - Định dạng 0029 (hiện hành): "Đảo của <mã phiếu gốc>: <lý do>".
+ * - Định dạng 0027 (cũ, P3): "Đảo bút toán <mã phiếu gốc> (Lý do: <lý do>)".
+ * Trả "" khi ghi chú không theo mẫu nào (phiếu thường, phiếu đảo ghi tay).
+ */
+export function reversalReasonFromNote(note: string | null | undefined): string {
+  if (!note) return "";
+  const m29 = note.match(/^Đảo của \S+: (.*)$/);
+  if (m29) return m29[1].trim();
+  const m27 = note.match(/^Đảo bút toán \S+ \(Lý do: (.*)\)$/);
+  if (m27) return m27[1].trim();
+  return "";
+}
+
+/** Một dòng trong nhật ký đảo bút toán (OWNER + Kế toán xem được). */
+export interface ReversalLogRow {
+  reversalId: string;
+  reversalCode: string;
+  originalId: string;
+  originalCode: string;
+  amount: number;
+  reason: string;
+  createdByName: string | null;
+  createdAt: string;
+  paymentDate: string;
+}
+
+/**
+ * Nhật ký đảo bút toán từ danh sách phiếu (hàm thuần): chỉ các phiếu
+ * đảo (reversal_of_id khác null), kèm phiếu gốc, số tiền, lý do, người
+ * đảo, thời gian — mới nhất trước.
+ */
+export function getReversalLog(payments: PaymentWithAllocations[]): ReversalLogRow[] {
+  const codeById = new Map(payments.map((p) => [p.id, p.doc_code]));
+  return payments
+    .filter((p) => p.reversal_of_id)
+    .map((p) => ({
+      reversalId: p.id,
+      reversalCode: p.doc_code,
+      originalId: p.reversal_of_id as string,
+      originalCode: codeById.get(p.reversal_of_id as string) ?? "",
+      amount: p.amount,
+      reason: reversalReasonFromNote(p.note),
+      createdByName: p.createdByName,
+      createdAt: p.created_at,
+      paymentDate: p.payment_date,
+    }))
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+}
+
+/**
  * Liệt kê phiếu thu (IN) hoặc chi (OUT) kèm phân bổ theo ngành.
  * lineId: undefined = không lọc (ALL); null (chưa gán ngành) = rỗng
  * (fail-closed, như list()). Phiếu không có phân bổ (phiếu cũ chưa có
@@ -132,6 +187,19 @@ export async function listPaymentsWithAllocations(
     String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")),
   );
   const paymentIds = allRows.map((p) => String(p.id));
+  // Tên người tạo phiếu (cho nhật ký đảo: ai đảo, lúc nào) — mẫu
+  // tra profiles như trang lịch sử kho (queries.ts listLedgerMovements).
+  const creatorIds = Array.from(new Set(allRows.map((p) => String(p.created_by ?? "")).filter(Boolean)));
+  const creatorName = new Map<string, string>();
+  if (creatorIds.length > 0) {
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, full_name, username")
+      .in("id", creatorIds);
+    for (const pr of ((profs ?? []) as AnyRow[])) {
+      creatorName.set(String(pr.id), String(pr.full_name || pr.username || ""));
+    }
+  }
   const [allocRes, recvRes, payRes, dsRes, docsRes, rcptRes, partnersRes, suppliersRes] = await Promise.all([
     supabase.from("payment_allocations").select("*, business_lines(code)").in("payment_id", paymentIds).limit(5000),
     supabase.from("partner_receivables").select("id, partner_id, source_document_id").limit(5000),
@@ -220,6 +288,8 @@ export async function listPaymentsWithAllocations(
       receivable_id: p.receivable_id ? String(p.receivable_id) : null,
       reversal_of_id: p.reversal_of_id ? String(p.reversal_of_id) : null,
       created_at: String(p.created_at ?? ""),
+      created_by: p.created_by ? String(p.created_by) : null,
+      createdByName: p.created_by ? (creatorName.get(String(p.created_by)) ?? null) : null,
       obligationLabel: obligationLabel(p),
       allocations,
       allocationSummary: buildAllocationSummary(allocations),

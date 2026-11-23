@@ -126,44 +126,39 @@ export const listSalesOrders = () =>
   list("sales_orders", { column: "created_at" });
 export const listSalesDocuments = (lineId?: string | null) =>
   list("sales_documents", { column: "created_at" }, 500, lineId);
-export const listVatInvoices = () =>
-  list("vat_invoices", { column: "invoice_date" });
 /**
- * P2 — Phải trả / phải thu lọc theo ngành qua chứng từ gốc (§5.5: quy
- * chiếu qua sales_documents / purchase_receipts, không thêm cột ngành
- * lên bảng công nợ — đó là việc của P4). Hàng nào không quy chiếu được
- * (chứng từ gốc NULL ngành hoặc đã xoá) vẫn hiện — không giấu tiền;
- * chỉ ẩn hàng đã xác định thuộc ngành khác.
+ * P4b — Hoá đơn GTGT lọc theo ngành (cột business_line_id trên
+ * vat_invoices). Hoá đơn cũ chưa có ngành (NULL) vẫn hiện ở mọi ngữ
+ * cảnh — không giấu tiền; chỉ ẩn hoá đơn đã xác định thuộc ngành khác.
+ */
+export async function listVatInvoices(lineId?: string | null): Promise<QueryResult<AnyRow[]>> {
+  const res = await list<AnyRow>("vat_invoices", { column: "invoice_date" });
+  if (lineId === undefined || lineId === null || !res.data.length) {
+    return lineId === null ? { configured: true, data: [] } : res;
+  }
+  return {
+    configured: true,
+    data: (res.data as AnyRow[]).filter(
+      (r) => r.business_line_id === null || r.business_line_id === undefined || r.business_line_id === lineId,
+    ),
+  };
+}
+/**
+ * P4b — Phải trả lọc theo ngành (cột business_line_id trên
+ * supplier_payables, backfill từ chứng từ gốc ở 0029; trigger tự điền
+ * cho khoản mới). Hàng chưa quy chiếu được (NULL) vẫn hiện — không
+ * giấu tiền; chỉ ẩn hàng đã xác định thuộc ngành khác.
  */
 export async function listPayables(lineId?: string | null): Promise<QueryResult<AnyRow[]>> {
   const res = await list<AnyRow>("supplier_payables", { column: "created_at" });
   if (lineId === undefined || lineId === null || !res.data.length) {
     return lineId === null ? { configured: true, data: [] } : res;
   }
-  const supabase = await client();
-  if (!supabase) return res;
-  const rows = res.data as AnyRow[];
-  const docIds = Array.from(new Set(rows.map((r) => String(r.source_document_id ?? "")).filter(Boolean)));
-  const receiptIds = Array.from(new Set(rows.map((r) => String(r.purchase_receipt_id ?? "")).filter(Boolean)));
-  const [docs, receipts] = await Promise.all([
-    docIds.length
-      ? supabase.from("sales_documents").select("id, business_line_id").in("id", docIds)
-      : Promise.resolve({ data: [] as AnyRow[] }),
-    receiptIds.length
-      ? supabase.from("purchase_receipts").select("id, business_line_id").in("id", receiptIds)
-      : Promise.resolve({ data: [] as AnyRow[] }),
-  ]);
-  const lineOf = new Map<string, string | null>();
-  for (const d of (docs.data ?? []) as AnyRow[]) lineOf.set(`doc:${d.id}`, (d.business_line_id as string | null) ?? null);
-  for (const d of (receipts.data ?? []) as AnyRow[]) lineOf.set(`rcpt:${d.id}`, (d.business_line_id as string | null) ?? null);
   return {
     configured: true,
-    data: rows.filter((r) => {
-      const key = r.purchase_receipt_id ? `rcpt:${r.purchase_receipt_id}` : `doc:${r.source_document_id}`;
-      if (!lineOf.has(key)) return true; // Không quy chiếu được -> vẫn hiện.
-      const l = lineOf.get(key);
-      return l === null || l === lineId;
-    }),
+    data: (res.data as AnyRow[]).filter(
+      (r) => r.business_line_id === null || r.business_line_id === undefined || r.business_line_id === lineId,
+    ),
   };
 }
 export const listCashFunds = () =>
@@ -176,23 +171,11 @@ export async function listReceivables(lineId?: string | null): Promise<QueryResu
   if (lineId === undefined || lineId === null || !res.data.length) {
     return lineId === null ? { configured: true, data: [] } : res;
   }
-  const supabase = await client();
-  if (!supabase) return res;
-  const rows = res.data as AnyRow[];
-  const docIds = Array.from(new Set(rows.map((r) => String(r.source_document_id ?? "")).filter(Boolean)));
-  const { data: docs } = docIds.length
-    ? await supabase.from("sales_documents").select("id, business_line_id").in("id", docIds)
-    : { data: [] as AnyRow[] };
-  const lineOf = new Map(
-    ((docs ?? []) as AnyRow[]).map((d) => [String(d.id), (d.business_line_id as string | null) ?? null]),
-  );
   return {
     configured: true,
-    data: rows.filter((r) => {
-      if (!lineOf.has(String(r.source_document_id ?? ""))) return true; // Không quy chiếu được -> vẫn hiện.
-      const l = lineOf.get(String(r.source_document_id ?? ""));
-      return l === null || l === lineId;
-    }),
+    data: (res.data as AnyRow[]).filter(
+      (r) => r.business_line_id === null || r.business_line_id === undefined || r.business_line_id === lineId,
+    ),
   };
 }
 export const listReturnDocuments = (lineId?: string | null) =>
@@ -363,8 +346,13 @@ export async function getAllocationDetail(id: string) {
   };
 }
 
-/** Sales-document lines of CONFIRMED documents that are not on any active VAT invoice yet. */
-export async function listUninvoicedLines(): Promise<QueryResult<AnyRow[]>> {
+/**
+ * Sales-document lines of CONFIRMED documents that are not on any active VAT invoice yet.
+ * P4b — lọc theo ngành qua sản phẩm của dòng (một hoá đơn GTGT chỉ
+ * ghi cho một ngành). Dòng thuộc sản phẩm chưa phân loại vẫn hiện ở
+ * mọi ngữ cảnh (để thấy mà phân loại) — RPC sẽ chặn nếu chọn ghi.
+ */
+export async function listUninvoicedLines(lineId?: string | null): Promise<QueryResult<AnyRow[]>> {
   const supabase = await client();
   if (!supabase) return empty<AnyRow[]>([]);
   const { data: docs } = await supabase
@@ -375,7 +363,7 @@ export async function listUninvoicedLines(): Promise<QueryResult<AnyRow[]>> {
   if (!docMap.size) return { configured: true, data: [] };
   const { data: lines } = await supabase
     .from("sales_document_lines")
-    .select("*, products(name, sku)")
+    .select("*, products(name, sku, business_line_id)")
     .in("document_id", Array.from(docMap.keys()));
   const { data: activeVat } = await supabase
     .from("vat_invoice_lines")
@@ -384,6 +372,11 @@ export async function listUninvoicedLines(): Promise<QueryResult<AnyRow[]>> {
   const invoiced = new Set((activeVat ?? []).map((r: AnyRow) => r.sales_document_line_id));
   const data: AnyRow[] = (lines ?? [])
     .filter((l: AnyRow) => !invoiced.has(l.id))
+    .filter((l: AnyRow) => {
+      if (lineId === undefined || lineId === null) return true;
+      const pl = (l.products as AnyRow | null)?.business_line_id as string | null | undefined;
+      return pl === null || pl === undefined || pl === lineId;
+    })
     .map((l: AnyRow) => ({ ...l, document: docMap.get(l.document_id) }));
   return { configured: true, data };
 }
@@ -1789,8 +1782,11 @@ export interface DocumentDetail {
   kindLabel: string;
   code: string;
   date: string;
-  /** P2: ngành của chứng từ (null với hoá đơn GTGT — P4 mới tách hoá đơn theo ngành, BL-015). */
+  /** P2: ngành của chứng từ. P4b: hoá đơn GTGT cũng có ngành. */
   business_line_id?: string | null;
+  /** P4b: riêng hoá đơn GTGT — tổng trước thuế và tổng thuế GTGT (8%). */
+  totalBeforeTax?: number;
+  totalVat?: number;
   lines: DetailLine[];
   totalAmount: number;
   totalCost: number;
@@ -1912,7 +1908,7 @@ export async function getInvoiceDetail(invoiceId: string): Promise<DocumentDetai
   if (!supabase) return null;
   const { data: inv } = await supabase
     .from("vat_invoices")
-    .select("id, invoice_no, symbol, invoice_date, total_amount")
+    .select("id, invoice_no, symbol, invoice_date, total_amount, business_line_id, total_before_tax, total_vat")
     .eq("id", invoiceId)
     .maybeSingle();
   if (!inv) return null;
@@ -1931,6 +1927,9 @@ export async function getInvoiceDetail(invoiceId: string): Promise<DocumentDetai
       kindLabel: "Hoá đơn GTGT",
       code: `${String(v.invoice_no)} (${String(v.symbol)})`,
       date: String(v.invoice_date),
+      business_line_id: (v.business_line_id as string | null) ?? null,
+      totalBeforeTax: Number(v.total_before_tax ?? 0),
+      totalVat: Number(v.total_vat ?? 0),
       lines: [],
       totalAmount: Number(v.total_amount ?? 0),
       totalCost: 0,
@@ -1963,15 +1962,23 @@ export async function getInvoiceDetail(invoiceId: string): Promise<DocumentDetai
   detailLines.sort((a, b) => (order.get(a.sourceId ?? "") ?? 0) - (order.get(b.sourceId ?? "") ?? 0));
   const totalAmount = detailLines.reduce((a, l) => a + l.amount, 0);
   const totalCost = detailLines.reduce((a, l) => a + l.qty * l.unitCost, 0);
+  // P4b: tổng hoá đơn lấy theo số đã ghi (đã trừ giảm giá + tách VAT);
+  // tổng cộng từ dòng (gross, chưa trừ giảm giá) chỉ dùng khi hoá đơn
+  // cũ chưa có số tách (trước 0029).
+  const storedTotal = Number(v.total_amount ?? 0);
+  const finalTotal = storedTotal > 0 ? storedTotal : totalAmount;
   return {
     kind: "INV",
     kindLabel: "Hoá đơn GTGT",
     code: `${String(v.invoice_no)} (${String(v.symbol)})`,
     date: String(v.invoice_date),
+    business_line_id: (v.business_line_id as string | null) ?? null,
+    totalBeforeTax: Number(v.total_before_tax ?? 0),
+    totalVat: Number(v.total_vat ?? 0),
     lines: detailLines,
-    totalAmount,
+    totalAmount: finalTotal,
     totalCost,
-    totalProfit: totalAmount - totalCost,
+    totalProfit: finalTotal - totalCost,
   };
 }
 

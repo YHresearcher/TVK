@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { BUSINESS_LINE_LABELS } from "@/lib/types";
+import type { AnyRow, BusinessLineCode } from "@/lib/types";
 import type {
   ReconciliationPeriod,
   ReconciliationEntry,
@@ -102,7 +104,16 @@ export async function computeLiveTVKMetrics(
 
   // =========================================================================
   // (2) PHẢI THU TỪNG ĐỐI TÁC (partner_receivables, partners, sales_documents)
+  //     P4b: mỗi dòng đối chiếu kèm breakdown dư nợ theo ngành (by_line).
   // =========================================================================
+  const { data: lineRows } = await supabase
+    .from("business_lines")
+    .select("id, code");
+  const lineLabelOf = new Map<string, string>(
+    ((lineRows ?? []) as AnyRow[]).map((l) => [String(l.id), BUSINESS_LINE_LABELS[(l.code as BusinessLineCode) ?? "AUTO_PARTS"] ?? String(l.code)]),
+  );
+  const byLineLabel = (lineId: string | null | undefined): string =>
+    lineId ? (lineLabelOf.get(String(lineId)) ?? "Ngành khác") : "Chưa phân loại";
   const { data: receivables } = await supabase
     .from("partner_receivables")
     .select(`
@@ -112,6 +123,7 @@ export async function computeLiveTVKMetrics(
       amount_paid,
       status,
       due_date,
+      business_line_id,
       partners (id, name, code),
       sales_documents (id, doc_code, doc_date, amount, status)
     `)
@@ -145,6 +157,7 @@ export async function computeLiveTVKMetrics(
       partnerCode: string;
       totalRemaining: number;
       docs: any[];
+      byLine: Map<string | null, number>;
     }
   >();
 
@@ -167,9 +180,12 @@ export async function computeLiveTVKMetrics(
       partnerCode,
       totalRemaining: 0,
       docs: [] as any[],
+      byLine: new Map<string | null, number>(),
     };
 
     cur.totalRemaining += remaining;
+    const recLine = (r.business_line_id as string | null) ?? null;
+    cur.byLine.set(recLine, (cur.byLine.get(recLine) ?? 0) + remaining);
     cur.docs.push({
       id: r.id,
       code: r.sales_documents?.doc_code || `PT-${r.id.slice(0, 8)}`,
@@ -202,6 +218,11 @@ export async function computeLiveTVKMetrics(
           partner_name: pData.partnerName,
           partner_code: pData.partnerCode,
           vouchers: pData.docs,
+          by_line: Array.from(pData.byLine.entries()).map(([lineId, remaining]) => ({
+            business_line_id: lineId,
+            label: byLineLabel(lineId),
+            remaining,
+          })),
         },
       });
     }
@@ -209,6 +230,9 @@ export async function computeLiveTVKMetrics(
 
   // =========================================================================
   // (3) PHẢI TRẢ TỪNG NHÀ CUNG CẤP (supplier_payables, suppliers)
+  //     P4b: breakdown dư nợ theo ngành (by_line) + sửa lỗi latent:
+  //     purchase_receipts KHÔNG có cột receipt_no (chỉ có doc_code) —
+  //     select cũ làm PostgREST lỗi, cả mục PHẢI TRẢ đối chiếu bị trống.
   // =========================================================================
   const { data: payables } = await supabase
     .from("supplier_payables")
@@ -220,8 +244,9 @@ export async function computeLiveTVKMetrics(
       status,
       due_date,
       source_kind,
+      business_line_id,
       suppliers (id, name, code),
-      purchase_receipts (id, receipt_no, receipt_date, total_amount),
+      purchase_receipts (id, doc_code, receipt_date, total_amount),
       sales_documents (id, doc_code, doc_date)
     `)
     .limit(1000);
@@ -252,6 +277,7 @@ export async function computeLiveTVKMetrics(
       supplierCode: string;
       totalRemaining: number;
       vouchers: any[];
+      byLine: Map<string | null, number>;
     }
   >();
 
@@ -277,14 +303,17 @@ export async function computeLiveTVKMetrics(
       supplierCode,
       totalRemaining: 0,
       vouchers: [] as any[],
+      byLine: new Map<string | null, number>(),
     };
 
     cur.totalRemaining += remaining;
+    const payLine = (p.business_line_id as string | null) ?? null;
+    cur.byLine.set(payLine, (cur.byLine.get(payLine) ?? 0) + remaining);
     cur.vouchers.push({
       id: p.id,
       code:
         p.source_kind === "PURCHASE"
-          ? p.purchase_receipts?.receipt_no || "PN-MUA"
+          ? p.purchase_receipts?.doc_code || "PN-MUA"
           : p.sales_documents?.doc_code || "BH-KG",
       date: refDate || p.due_date || toDate,
       source_kind: p.source_kind,
@@ -316,6 +345,11 @@ export async function computeLiveTVKMetrics(
           supplier_name: sData.supplierName,
           supplier_code: sData.supplierCode,
           vouchers: sData.vouchers,
+          by_line: Array.from(sData.byLine.entries()).map(([lineId, remaining]) => ({
+            business_line_id: lineId,
+            label: byLineLabel(lineId),
+            remaining,
+          })),
         },
       });
     }

@@ -2,6 +2,7 @@ import { Card, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/com
 import SubmitButton from "@/components/SubmitButton";
 import { recordSettlementPaymentAction, reversePaymentAction } from "@/lib/actions";
 import {
+  getReversalLog,
   isReversiblePayment,
   paymentReversalLabel,
   type PaymentWithAllocations,
@@ -17,8 +18,10 @@ import type { AnyRow } from "@/lib/types";
  * - Lịch sử: phiếu thu/chi + các phiếu đảo của chúng, kèm phân bổ từng
  *   ngành (Dầu nhớt / Phụ tùng) và trạng thái đảo.
  * - Thanh toán DS: chỉ ghi settlement_id; trigger tự phân bổ theo dòng.
- * - Đảo bút toán: CHỈ KẾ TOÁN (quy định kế toán 28/10/2026). Chủ cửa
- *   hàng thấy ghi chú giải thích thay vì nút đảo.
+ * - Đảo bút toán: OWNER + KẾ TOÁN (quyết của chủ 23/11 21:48 — trước
+ *   đó chỉ Kế toán theo quyết định kế toán 28/10/2026).
+ * - Nhật ký đảo bút toán (P4): mọi phiếu đảo kèm phiếu gốc, số tiền,
+ *   lý do, người đảo, thời gian — OWNER và Kế toán đều xem được.
  */
 export default function PaymentHistory({
   kind,
@@ -52,6 +55,8 @@ export default function PaymentHistory({
     (s) => Number(s.total_amount) - (paidBySettlement.get(String(s.id)) ?? 0) > 0,
   );
   const reversible = payments.filter((p) => isReversiblePayment(p, payments));
+  // P4: nhật ký đảo — chỉ phiếu đảo, kèm phiếu gốc/lý do/người đảo/giờ đảo.
+  const reversalLog = getReversalLog(payments);
 
   return (
     <>
@@ -111,39 +116,32 @@ export default function PaymentHistory({
         </Card>
 
         <Card title="Đảo bút toán thanh toán">
-          {role === "ACCOUNTING" ? (
-            reversible.length === 0 ? (
-              <p className="text-sm text-slate-500">Chưa có phiếu nào đảo được.</p>
-            ) : (
-              <form action={reversePaymentAction} className="space-y-3">
-                <input type="hidden" name="return_to" value={returnTo} />
-                <div>
-                  <label className={labelCls}>Phiếu cần đảo *</label>
-                  <select name="payment_id" required className={inputCls}>
-                    <option value="">— Chọn —</option>
-                    {reversible.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.doc_code} — {p.obligationLabel} — {formatVND(p.amount)} ({formatDate(p.payment_date)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelCls}>Lý do đảo bút toán *</label>
-                  <textarea name="reason" required rows={3} className={inputCls} placeholder="VD: Ghi nhầm số tiền, trùng phiếu…" />
-                </div>
-                <SubmitButton className={`${btnCls} w-full`}>Đảo bút toán</SubmitButton>
-                <p className="text-xs text-slate-500">
-                  Phiếu gốc giữ nguyên — hệ thống tạo phiếu đảo ngược chiều, trừ đúng số tiền đã ghi và trả lại
-                  công nợ + quỹ. Phiếu đã đảo không đảo lại được.
-                </p>
-              </form>
-            )
+          {reversible.length === 0 ? (
+            <p className="text-sm text-slate-500">Chưa có phiếu nào đảo được.</p>
           ) : (
-            <p className="text-sm text-slate-600">
-              Chỉ Kế toán mới được đảo bút toán thanh toán (quy định kế toán 28/10/2026 — Chủ cửa hàng không tự
-              đảo được). Nếu cần đảo, nhờ Kế toán thực hiện ở đây.
-            </p>
+            <form action={reversePaymentAction} className="space-y-3">
+              <input type="hidden" name="return_to" value={returnTo} />
+              <div>
+                <label className={labelCls}>Phiếu cần đảo *</label>
+                <select name="payment_id" required className={inputCls}>
+                  <option value="">— Chọn —</option>
+                  {reversible.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.doc_code} — {p.obligationLabel} — {formatVND(p.amount)} ({formatDate(p.payment_date)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Lý do đảo bút toán *</label>
+                <textarea name="reason" required rows={3} className={inputCls} placeholder="VD: Ghi nhầm số tiền, trùng phiếu…" />
+              </div>
+              <SubmitButton className={`${btnCls} w-full`}>Đảo bút toán</SubmitButton>
+              <p className="text-xs text-slate-500">
+                Phiếu gốc giữ nguyên — hệ thống tạo phiếu đảo ngược chiều, trừ đúng số tiền đã ghi và trả lại
+                công nợ + quỹ. Phiếu đã đảo không đảo lại được. Chủ cửa hàng và Kế toán đều đảo được.
+              </p>
+            </form>
           )}
         </Card>
       </div>
@@ -194,6 +192,40 @@ export default function PaymentHistory({
           <p className="mt-2 text-xs text-slate-500">
             Phiếu đảo không sửa/xoá phiếu gốc — chỉ trừ đúng số tiền của phiếu bị đảo, công nợ và quỹ được trả lại
             tương ứng.
+          </p>
+        </div>
+      )}
+
+      {reversalLog.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-3 text-sm font-semibold text-slate-800">Nhật ký đảo bút toán</h2>
+          <TableWrap>
+            <thead>
+              <tr>
+                <th className={thCls}>Phiếu đảo</th>
+                <th className={thCls}>Phiếu gốc</th>
+                <th className={`${thCls} text-right`}>Số tiền</th>
+                <th className={thCls}>Lý do</th>
+                <th className={thCls}>Người đảo</th>
+                <th className={thCls}>Thời gian đảo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reversalLog.map((r) => (
+                <tr key={r.reversalId} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
+                  <td className={`${tdCls} font-mono text-xs font-semibold text-slate-900`}>{r.reversalCode}</td>
+                  <td className={`${tdCls} font-mono text-xs`}>{r.originalCode || "—"}</td>
+                  <td className={`${tdCls} text-right font-mono font-medium text-rose-700`}>{formatVND(r.amount)}</td>
+                  <td className={tdCls}>{r.reason || "—"}</td>
+                  <td className={tdCls}>{r.createdByName ?? "—"}</td>
+                  <td className={tdCls}>{r.createdAt ? new Date(r.createdAt).toLocaleString("vi-VN") : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </TableWrap>
+          <p className="mt-2 text-xs text-slate-500">
+            Mỗi lần đảo đều ghi lại phiếu gốc, phiếu đảo, số tiền, lý do bắt buộc, người đảo và thời gian — Chủ cửa
+            hàng và Kế toán đều xem được ở đây.
           </p>
         </div>
       )}

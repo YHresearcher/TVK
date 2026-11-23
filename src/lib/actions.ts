@@ -2783,7 +2783,8 @@ export async function recordSettlementPaymentAction(formData: FormData) {
  */
 export async function reversePaymentAction(formData: FormData) {
   const supabase = await db();
-  await requireRole(["ACCOUNTING"], "Chỉ Kế toán mới được đảo bút toán thanh toán.");
+  // Quyết của chủ 23/11 21:48: OWNER cũng được đảo bút toán (cùng Kế toán).
+  await requireRole(["OWNER", "ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được đảo bút toán thanh toán.");
   const paymentId = str(formData, "payment_id");
   const reason = str(formData, "reason").trim();
   if (!paymentId) throw new Error("Chưa chọn phiếu thanh toán cần đảo.");

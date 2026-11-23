@@ -430,30 +430,3 @@ export async function createReconciliationSnapshotAction(
     return { success: false, error: error.message || "Lỗi lưu bản chốt kỳ" };
   }
 }
-
-/**
- * Action: Xoá bản snapshot lịch sử (Chỉ OWNER)
- */
-export async function deleteReconciliationSnapshotAction(snapshotId: string) {
-  try {
-    await verifyReconciliationRole(
-      ["OWNER"],
-      "Xoá bản Snapshot lịch sử"
-    );
-
-    const supabase = await createClient();
-    if (!supabase) throw new Error("Hệ thống chưa cài đặt xong — hãy báo chủ cửa hàng.");
-
-    const { error } = await supabase
-      .from("reconciliation_snapshots")
-      .delete()
-      .eq("id", snapshotId);
-
-    if (error) throw error;
-
-    revalidatePath("/reconciliation");
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message || "Lỗi xoá bản chốt kỳ" };
-  }
-}

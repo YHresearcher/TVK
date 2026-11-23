@@ -116,13 +116,42 @@ mục A của file kiểm chứng P3).
 
 ## 7. Những gì P3 KHÔNG làm (để P4/P5)
 
-- Không thêm cột ngành lên `partner_receivables` / `supplier_payables`.
-- Không tách tổng phải thu/phải trả trên dashboard theo ngành (P4).
-- Không tách hoá đơn GTGT theo ngành (P4, BL-015).
+- ~~Không thêm cột ngành lên `partner_receivables` / `supplier_payables`.~~
+  → Đã làm ở P4 (0029 §1): cột `business_line_id` + backfill + trigger
+  tự điền + guard chặn đổi ngành; `v_unattributed_balances` gom khoản
+  chưa phân loại (BL-014).
+- Không tách tổng phải thu/phải trả trên dashboard theo ngành (P5 —
+  dời theo chỉ đạo parent; trang công nợ đã có cột Ngành + dư nợ theo
+  ngành ở P4).
+- ~~Không tách hoá đơn GTGT theo ngành (P4, BL-015).~~ → Đã làm ở P4
+  (0029 §2–§3): `create_vat_invoice` chặn trộn ngành + tách VAT 8%
+  sau giảm giá; `reverse_payment` chặn đảo khi đã có hoá đơn (BL-015).
 - Không xuất báo cáo phân bổ theo ngành (P5).
 - Không có chứng từ tạm ứng/đặt cọc cho tiền thừa (ngoài V2.0).
 
-## 8. Kiểm chứng
+## 8. Cutover P4a — số dư suy từ phân bổ (migration 0028)
+
+Trigger 0027 gộp cả cộng/trừ `amount_paid` VÀ chèn phân bổ trong một
+trigger nên không có "đường legacy" riêng để tắt — cutover P4a không
+tắt trigger cũ mà đổi cơ chế suy số dư:
+
+- `tvk_recompute_obligation_balance(p_payable_id, p_receivable_id)`:
+  `amount_paid = SUM(payment_allocations)`, trạng thái suy ra
+  PAID/PARTIAL/UNPAID.
+- `apply_payment_to_balance()` viết lại: 6 khối UPDATE cộng/trừ trực
+  tiếp (nhánh đảo, thu/trả trực tiếp, vòng DS) đổi thành gọi helper.
+- Guard `tvk_guard_obligation_balance()` + trigger BEFORE UPDATE trên
+  cả hai bảng công nợ: chặn sửa trực tiếp `amount_paid`/trạng thái trừ
+  khi đúng `SUM(phân bổ)` — đồng thời đóng lỗ hổng M4 "sửa trực tiếp
+  số dư suy ra từ trigger".
+- Post-check trong 0028: định nghĩa hàm không còn
+  `amount_paid = amount_paid ±`; mọi khoản thỏa
+  `amount_paid = SUM(phân bổ)` (kiểm chứng mục U trong
+  `docs/tests/p4_finance_vat_local.sql`).
+- Chỉ trigger + hàm backfill 0027 được ghi `amount_paid`; app không
+  bao giờ ghi trực tiếp cột này.
+
+## 9. Kiểm chứng
 
 - `docs/tests/p3_seed_local.sql` + `docs/tests/p3_payment_allocations_local.sql`
   (A–O) trên PostgreSQL 16 scratch, chạy bằng

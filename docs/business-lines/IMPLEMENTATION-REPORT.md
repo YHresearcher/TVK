@@ -588,3 +588,201 @@ code đã qua gate + E2E 67/67. Cần trước khi merge/deploy: chạy 0025 +
 test app trên staging theo role thật (đặc biệt: Kế toán đảo thử một
 phiếu, Chủ cửa hàng xác nhận không đảo được). Không merge vào main
 trong P3 (theo §0.2).
+
+# TVK V2.0 P4 — Implementation Report (Báo cáo triển khai P4)
+
+P4 = Tài chính + VAT tách theo ngành (prompt §13–§16), tách P4a
+(cutover phân bổ, §11.7) / P4b (công nợ, VAT, đối chiếu, quỹ).
+Migration 0028 + 0029, kiểm chứng trên PostgreSQL 16 scratch
+(`docs/tests/p4_finance_vat_local.sql`, `p4_seed_local.sql`,
+runner `/tmp/tvk-p4-verify/run-all.sh`).
+
+## P4.1. Thay đổi đã làm
+
+**P4a — migration 0028 (cutover phân bổ):**
+- `tvk_recompute_obligation_balance()` — `amount_paid` suy ra từ
+  `SUM(payment_allocations)`, trạng thái suy ra PAID/PARTIAL/UNPAID.
+- `apply_payment_to_balance()` viết lại: 6 khối UPDATE cộng/trừ trực
+  tiếp đổi thành gọi helper (nhánh đảo, thu/trả trực tiếp, vòng DS).
+- Guard `tvk_guard_obligation_balance()` + trigger BEFORE UPDATE trên
+  `supplier_payables` / `partner_receivables`: chặn sửa trực tiếp
+  `amount_paid`/trạng thái trừ khi đúng `SUM(phân bổ)` — đồng thời
+  đóng lỗ hổng M4 "sửa trực tiếp số dư suy ra từ trigger".
+- Post-check: định nghĩa hàm không còn `amount_paid = amount_paid ±`.
+
+**P4b — migration 0029 (công nợ, VAT, đối chiếu, quỹ):**
+- `business_line_id` (+ index) trên `partner_receivables` /
+  `supplier_payables`; backfill từ chứng từ gốc (hỗn hợp/NULL giữ
+  NULL); trigger BEFORE INSERT tự điền từ nguồn; guard chặn đổi ngành
+  đã gán (NULL→giá trị được). View `v_unattributed_balances` (BL-014:
+  hàng đợi khoản chưa phân loại để chủ soát, không tự tách).
+- `vat_invoices.business_line_id` + `total_before_tax` + `total_vat`;
+  `vat_invoice_lines.vat_rate`, `discount_amount`, `amount_before_tax`,
+  `vat_amount`, `amount_including_tax`; backfill giữ nguyên
+  `total_amount` (chia tách trên số đã lưu, discount = 0).
+- `create_vat_invoice` viết lại: khóa dòng `FOR UPDATE`; giải ngành
+  theo sản phẩm (fail-closed khi chưa phân loại); chặn hoá đơn trộn
+  ngành; kiểm tra quyền ngành của người gọi; chia giảm giá đầu chứng
+  từ xuống dòng theo tỷ lệ (floor 2 chữ số, phần dư về dòng lớn nhất);
+  tách VAT 8% trên cơ sở đã trừ giảm giá (`before_tax =
+  ROUND(base/1.08, 2)`, `vat = base − before_tax`); header total =
+  SUM các dòng đã tách (SỬA bản 0020 lấy SUM(line_total) nên bỏ qua
+  giảm giá, tính thừa thuế). Guard trigger: dòng phải cùng ngành với
+  header; header bất biến khi đã gán ngành/tổng (đổi trạng thái được).
+- `reverse_payment` viết lại + BL-015: chặn đảo khi chứng từ gốc đã có
+  hoá đơn GTGT còn hiệu lực (nêu đúng số hoá đơn; phải huỷ bản ghi hoá
+  đơn trước). Phải trả mua hàng không bao giờ bị chặn ở bước này.
+- BL-017: bản chụp đối chiếu bất biến — trigger chặn mọi UPDATE/DELETE
+  (mọi role), FK `period_id` CASCADE → RESTRICT, bỏ policy
+  UPDATE/DELETE của OWNER (giữ SELECT/INSERT). Tạo bản chụp hiệu chỉnh
+  mới vẫn được.
+- `cash_funds.business_line_id` (NULL = quỹ chung Model A; có giá trị
+  = quỹ riêng ngành Model B) + view `v_cash_flow_by_line` (quỹ × ngành;
+  phân loại theo kind của phiếu gốc — xem P4.3).
+- Không thêm UI gán quỹ (chờ chủ chốt mô hình quỹ).
+
+**App code:**
+- Mới `src/lib/vat.ts` (hàm thuần: `allocateDiscount`, `splitVat`,
+  `sumVatSplits`, `groupUninvoicedLinesByLine` — toán đồng bộ 0029).
+- `src/lib/queries.ts`: `listVatInvoices(lineId?)`,
+  `listUninvoicedLines(lineId?)` (hàng chưa phân loại vẫn hiện mọi
+  ngữ cảnh), `listPayables`/`listReceivables` lọc theo cột
+  `business_line_id` trực tiếp (giữ quy tắc NULL vẫn hiện),
+  `getInvoiceDetail` trả `business_line_id`/`total_before_tax`/
+  `total_vat` (total dùng số header đã trừ giảm giá khi > 0).
+- Trang Hoá đơn GTGT: nhóm dòng chưa ghi theo ngành (một thẻ ghi một
+  ngành; nhóm chưa phân loại chỉ cảnh báo, không cho ghi); bảng hoá
+  đơn thêm cột Ngành + Trước thuế + VAT.
+- Trang Phải thu / Phải trả: cột Ngành + dư nợ còn lại theo ngành
+  (chỉ hiện khi > 1 nhóm).
+- Đối chiếu: `computeLiveTVKMetrics` thêm `by_line` vào drilldown
+  RECEIVABLE/PAYABLE; `DrillDownDrawer` hiện "Dư nợ theo ngành".
+  Sửa bug tiềm ẩn: query PAYABLE chọn `purchase_receipts.receipt_no`
+  (cột không tồn tại) → `doc_code`.
+- `detail-actions.ts`: bỏ miễn trừ INV — hoá đơn nay có ngành nên
+  kiểm tra ngành áp cho mọi loại chứng từ.
+- `SnapshotHistoryModal`: bỏ nút "Xoá bản này"; `deleteReconciliation
+  SnapshotAction` đã xoá hẳn (không còn chỗ gọi).
+
+**Quyết mới của chủ 23/11 21:48 (áp trong P4, giải quyết P3.7 #1):**
+- **OWNER cũng được đảo bút toán** (cùng Kế toán). Sửa
+  `reverse_payment` (0029) + `reversePaymentAction` + thẻ đảo trong
+  `PaymentHistory` (OWNER thấy form thay vì ghi chú "chỉ Kế toán").
+  SALES / WAREHOUSE / CEO vẫn bị chặn ở cả 3 tầng (RPC, action, UI).
+- **Chủ xem được log đảo bút toán:** mục "Nhật ký đảo bút toán" trong
+  `PaymentHistory` (trang Phải thu / Phải trả) — mỗi dòng: phiếu đảo,
+  phiếu gốc, số tiền, lý do (bắt buộc), người đảo, thời gian đảo.
+  Nguồn: phiếu đảo (`note` chứa lý do, `created_by`, `created_at`,
+  `reversal_of_id`); helper thuần `reversalReasonFromNote` +
+  `getReversalLog` trong `src/lib/payment-allocations.ts`;
+  `listPaymentsWithAllocations` tra tên người tạo từ `profiles`.
+  Chỉ OWNER + Kế toán thấy (cùng gate với thẻ lịch sử thanh toán).
+
+## P4.2. Nội dung migration 0028 + 0029
+
+- 0028: helper recompute + viết lại `apply_payment_to_balance` +
+  2 guard trigger + post-check (không còn cộng/trừ trực tiếp).
+- 0029: §1 ngành trên công nợ + backfill + fill/guard trigger +
+  `v_unattributed_balances`; §2 cột VAT + backfill + 2 guard trigger
+  + viết lại `create_vat_invoice`; §3 viết lại `reverse_payment` +
+  BL-015 (+ quyền OWNER, xem P4.1); §4 BL-017 snapshots; §5 quỹ theo
+  ngành + `v_cash_flow_by_line`; §6 post-checks.
+
+## P4.3. Quyết định thiết kế (theo prompt §18.6)
+
+- **Cutover P4a:** trigger 0027 đã gộp cả cộng/trừ số dư VÀ chèn phân
+  bổ trong một trigger nên không có "đường legacy" riêng để tắt —
+  cutover = suy `amount_paid` từ phân bổ + guard chặn sửa trực tiếp.
+- **BL-014:** khoản hỗn hợp/chưa phân loại giữ NULL, hiện trong
+  `v_unattributed_balances` cho chủ soát; KHÔNG tự tách theo tỷ lệ,
+  KHÔNG xây workflow phê duyệt (chờ chủ quyết luồng).
+- **Khoản "chặn đảo khi đã thu tiền" (28/10):** với đảo *thanh toán*
+  thì không có ý nghĩa kiểm tra thêm ngoài các guard hiện có (chỉ có
+  nghĩa với đảo *chứng từ* gốc) — không thêm check.
+- **Dashboard KHÔNG đụng (P5)** — theo chỉ đạo của parent (P2 ghi
+  tổng nợ theo ngành là P4, parent chốt P5 — parent thắng, ghi nhận
+  mâu thuẫn ở đây).
+- **Khôi phục đúng 0027 trong `reverse_payment` (phát hiện khi soát
+  doc P4):** bản 0029 đầu tiên giữ nguyên `payment_kind` và bỏ bước
+  đánh dấu dòng tiền gốc `is_cancelled`. Giữ nguyên kind làm phiếu
+  đảo hiện 2 lần trong lịch sử app (vừa là dòng cùng kind, vừa được
+  lấy thêm qua `reversal_of_id`) và cộng trùng tiền đã trả của đợt
+  chốt sổ; đồng thời `v_cash_flow_by_line` lúc đầu phân loại theo kind
+  phiếu đảo nên sai ngăn thu/chi (W fail: in=550.000/out=−100.000).
+  Đã sửa: phiếu đảo đảo chiều IN↔OUT (mã do trigger cấp theo chiều
+  đã đảo), đánh dấu dòng tiền gốc `is_cancelled`, view phân loại theo
+  kind phiếu gốc (`coalesce(orig.payment_kind, ...)`). Kiểm chứng lại
+  toàn bộ: ALL PASS.
+
+## P4.4. Kết quả kiểm chứng
+
+- Gate: `tsc --noEmit` exit 0; `next lint` exit 0; `next build`
+  exit 0 (log `/tmp/tvk-p4-gates/`). Hai lỗi đã sửa trên đường:
+  spread `Map.values()` cần `Array.from` (target TS), spread
+  `Record<string, any>` làm sập kiểu ở trang hoá đơn (cast giao
+  `AnyRow & {id, business_line_id}`), hàm snapshot stub thừa gây lỗi
+  lint (đã xoá hẳn).
+- E2E: **79/79** (Tier 1–3: 55 + Tier 5: 24/24; Tier 4 SKIPPED —
+  chưa có `user-accounting-sample.csv`). Tier 5 mới 12 ca P4: chia
+  giảm giá (3), tách VAT (4), cộng header (1), nhóm dòng theo ngành
+  (1), lý do đảo + log đảo (3). Một test sai kỳ vọng đã sửa (floor
+  chia giảm giá tới 2 chữ số, không phải đồng chẵn — SQL và TS khớp
+  nhau: `floor(x*100)/100`).
+- Scratch PostgreSQL 16 (`/tmp/tvk-p4-verify/run-all.sh`, rebuild
+  toàn chuỗi 0001–0029 + seed + concurrency 2 phiên): **exit 0, ALL
+  DONE**. Tất cả mục PASS: A (cutover), B (guard số dư), C (backfill
+  ngành công nợ), D (BL-014), E/F (fill + bất biến ngành), VAT-01–11
+  (trộn ngành/sai đối tác/nháp/trùng dòng/chưa phân loại/quyền ngành/
+  chia giảm giá + VAT 8%/ghi lại/đồng thời), BL15-01/02/03, Y
+  (hỗn hợp), U (số dư = SUM phân bổ), V0–V6 (BL-017), W (dòng tiền
+  theo quỹ × ngành), X (bất biến tài chính), REV-01/02a/02b/02c/03/04
+  (OWNER đảo được; SALES/WAREHOUSE/CEO bị chặn; OWNER bị BL-015 chặn
+  khi đã có hoá đơn; log đảo đủ trường). Tổng kết: vat_invoices=4,
+  vat_lines=5, allocations=9, snapshots=2.
+- Concurrency VAT: 2 phiên cùng ghi một dòng → đúng 1 hoá đơn, phiên
+  còn lại bị chặn (lỗi kỳ vọng ở session B).
+
+## P4.5. P4 Exit Gate — ĐẠT
+
+- P4a (cutover): ĐẠT — số dư suy từ phân bổ, guard chặn sửa trực
+  tiếp, U + X giữ nguyên số liệu.
+- P4b (công nợ/VAT/đối chiếu/quỹ): ĐẠT — hoá đơn trộn ngành bị chặn,
+  VAT 8% + giảm giá đúng từng dòng, BL-015 chặn đảo khi đã có hoá
+  đơn, snapshot bất biến, quỹ hỗ trợ cả hai mô hình.
+- Lưu ý: P3.7 #1 đã giải quyết (OWNER đảo được, quyết 23/11 21:48);
+  log đảo OWNER xem được (P4.1). Dashboard tổng nợ theo ngành dời
+  sang P5 theo chỉ đạo parent.
+
+## P4.6. Hạn chế đã biết (P4)
+
+- BL-014: workflow phê duyệt tách tỷ lệ cho khoản hỗn hợp/chưa trả
+  một phần CHƯA xây (chỉ có view hàng đợi). Live hiện không có khoản
+  như vậy (payments live = 0) nên không chặn chạy staging.
+- Phiếu thanh toán không gắn công nợ/DS vẫn không đảo được (không có
+  phân bổ để gương) — giữ như P3.
+- Dashboard + báo cáo + trang điều hành vẫn hợp nhất (P5).
+- Trang chi tiết đối tác chưa lọc theo ngành (P5).
+
+## P4.7. Quyết định cần chủ cửa hàng (CẦN XÁC NHẬN)
+
+1. (Từ P1/P2) Có gán mặc định AUTO_PARTS cho tài khoản mới tạo sau này
+   không, hay OWNER gán tay từng người?
+2. (Từ P1) File `user-accounting-sample.csv` để chạy Tier 4 đầy đủ.
+3. Mô hình quỹ: chung két (Model A) hay riêng két theo ngành (Model B)
+   — P4 hỗ trợ cả hai, chưa có UI gán quỹ.
+4. Luồng phê duyệt BL-014 (tách tỷ lệ khoản hỗn hợp) — xây như thế nào,
+   ai duyệt?
+5. Thời điểm chạy 0025–0029 trên staging (bản sao live) để đối chiếu
+   trước khi lên live — cần chủ gật đầu và cách tạo staging (hoặc để
+   Muse tạo từ backup live).
+
+## P4.8. Production readiness (P4)
+
+**Chưa sẵn sàng deploy production.** P4 xong trên nhánh feature:
+0028 + 0029 kiểm chứng trên scratch (toàn bộ mục PASS + concurrency)
++ app qua gate + E2E 79/79. Cần trước khi merge/deploy: chạy
+0025–0029 trên staging (bản sao live) + đối chiếu tài chính + smoke
+test app trên staging theo role thật (đặc biệt: OWNER đảo thử một
+phiếu + xem log đảo; Kế toán ghi hoá đơn tách ngành thử; kiểm tra
+phiếu đảo không hiện trùng trong lịch sử). Không merge vào main trong
+P4 (theo §0.2).
