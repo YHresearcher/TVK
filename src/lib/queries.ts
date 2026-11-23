@@ -29,22 +29,31 @@ export async function getCurrentProfile(): Promise<QueryResult<Profile | null>> 
   return { configured: true, data: (data as Profile) ?? null };
 }
 
+/**
+ * P2: lineId lọc theo business_line_id (chỉ bảng nào có cột này mới
+ * truyền). lineId === undefined -> không lọc (ngữ cảnh ALL);
+ * lineId === null (tài khoản chưa gán ngành) -> trả rỗng ngay, không
+ * truy vấn — fail-closed.
+ */
 async function list<T = AnyRow>(
   table: string,
   order?: { column: string; ascending?: boolean },
-  limit = 500
+  limit = 500,
+  lineId?: string | null
 ): Promise<QueryResult<T[]>> {
   const supabase = await client();
   if (!supabase) return empty([]);
+  if (lineId === null) return { configured: true, data: [] };
   let q = supabase.from(table).select("*").limit(limit);
+  if (lineId !== undefined) q = q.eq("business_line_id", lineId);
   if (order) q = q.order(order.column, { ascending: order.ascending ?? false });
   const { data, error } = await q;
   if (error) return { configured: true, data: [] };
   return { configured: true, data: (data ?? []) as T[] };
 }
 
-export const listProducts = () =>
-  list("products", { column: "name", ascending: true });
+export const listProducts = (lineId?: string | null) =>
+  list("products", { column: "name", ascending: true }, 500, lineId);
 
 /** Các nhóm hàng đã dùng (để lọc + gợi ý khi gán nhóm). */
 export async function listProductGroups(): Promise<string[]> {
@@ -103,33 +112,91 @@ export const listPartners = () =>
   list("partners", { column: "name", ascending: true });
 export const listLocations = () =>
   list("locations", { column: "name", ascending: true });
-export const listPurchaseReceipts = () =>
-  list("purchase_receipts", { column: "created_at" });
-export const listConsignmentReceipts = () =>
-  list("consignment_receipts", { column: "created_at" });
-export const listConsignmentOutSlips = () =>
-  list("consignment_out_slips", { column: "created_at" });
-export const listConsumptionReports = () =>
-  list("consumption_reports", { column: "created_at" });
-export const listAllocations = () =>
-  list("allocation_slips", { column: "created_at" });
+export const listPurchaseReceipts = (lineId?: string | null) =>
+  list("purchase_receipts", { column: "created_at" }, 500, lineId);
+export const listConsignmentReceipts = (lineId?: string | null) =>
+  list("consignment_receipts", { column: "created_at" }, 500, lineId);
+export const listConsignmentOutSlips = (lineId?: string | null) =>
+  list("consignment_out_slips", { column: "created_at" }, 500, lineId);
+export const listConsumptionReports = (lineId?: string | null) =>
+  list("consumption_reports", { column: "created_at" }, 500, lineId);
+export const listAllocations = (lineId?: string | null) =>
+  list("allocation_slips", { column: "created_at" }, 500, lineId);
 export const listSalesOrders = () =>
   list("sales_orders", { column: "created_at" });
-export const listSalesDocuments = () =>
-  list("sales_documents", { column: "created_at" });
+export const listSalesDocuments = (lineId?: string | null) =>
+  list("sales_documents", { column: "created_at" }, 500, lineId);
 export const listVatInvoices = () =>
   list("vat_invoices", { column: "invoice_date" });
-export const listPayables = () =>
-  list("supplier_payables", { column: "created_at" });
+/**
+ * P2 — Phải trả / phải thu lọc theo ngành qua chứng từ gốc (§5.5: quy
+ * chiếu qua sales_documents / purchase_receipts, không thêm cột ngành
+ * lên bảng công nợ — đó là việc của P4). Hàng nào không quy chiếu được
+ * (chứng từ gốc NULL ngành hoặc đã xoá) vẫn hiện — không giấu tiền;
+ * chỉ ẩn hàng đã xác định thuộc ngành khác.
+ */
+export async function listPayables(lineId?: string | null): Promise<QueryResult<AnyRow[]>> {
+  const res = await list<AnyRow>("supplier_payables", { column: "created_at" });
+  if (lineId === undefined || lineId === null || !res.data.length) {
+    return lineId === null ? { configured: true, data: [] } : res;
+  }
+  const supabase = await client();
+  if (!supabase) return res;
+  const rows = res.data as AnyRow[];
+  const docIds = Array.from(new Set(rows.map((r) => String(r.source_document_id ?? "")).filter(Boolean)));
+  const receiptIds = Array.from(new Set(rows.map((r) => String(r.purchase_receipt_id ?? "")).filter(Boolean)));
+  const [docs, receipts] = await Promise.all([
+    docIds.length
+      ? supabase.from("sales_documents").select("id, business_line_id").in("id", docIds)
+      : Promise.resolve({ data: [] as AnyRow[] }),
+    receiptIds.length
+      ? supabase.from("purchase_receipts").select("id, business_line_id").in("id", receiptIds)
+      : Promise.resolve({ data: [] as AnyRow[] }),
+  ]);
+  const lineOf = new Map<string, string | null>();
+  for (const d of (docs.data ?? []) as AnyRow[]) lineOf.set(`doc:${d.id}`, (d.business_line_id as string | null) ?? null);
+  for (const d of (receipts.data ?? []) as AnyRow[]) lineOf.set(`rcpt:${d.id}`, (d.business_line_id as string | null) ?? null);
+  return {
+    configured: true,
+    data: rows.filter((r) => {
+      const key = r.purchase_receipt_id ? `rcpt:${r.purchase_receipt_id}` : `doc:${r.source_document_id}`;
+      if (!lineOf.has(key)) return true; // Không quy chiếu được -> vẫn hiện.
+      const l = lineOf.get(key);
+      return l === null || l === lineId;
+    }),
+  };
+}
 export const listCashFunds = () =>
   list("cash_funds", { column: "name", ascending: true });
 /** Số dư từng quỹ (số dư đầu kỳ + biến động thu/chi đã ghi). */
 export const getCashFundBalances = () =>
   list("v_cash_fund_balances", { column: "fund_name", ascending: true });
-export const listReceivables = () =>
-  list("partner_receivables", { column: "created_at" });
-export const listReturnDocuments = () =>
-  list("return_documents", { column: "created_at" });
+export async function listReceivables(lineId?: string | null): Promise<QueryResult<AnyRow[]>> {
+  const res = await list<AnyRow>("partner_receivables", { column: "created_at" });
+  if (lineId === undefined || lineId === null || !res.data.length) {
+    return lineId === null ? { configured: true, data: [] } : res;
+  }
+  const supabase = await client();
+  if (!supabase) return res;
+  const rows = res.data as AnyRow[];
+  const docIds = Array.from(new Set(rows.map((r) => String(r.source_document_id ?? "")).filter(Boolean)));
+  const { data: docs } = docIds.length
+    ? await supabase.from("sales_documents").select("id, business_line_id").in("id", docIds)
+    : { data: [] as AnyRow[] };
+  const lineOf = new Map(
+    ((docs ?? []) as AnyRow[]).map((d) => [String(d.id), (d.business_line_id as string | null) ?? null]),
+  );
+  return {
+    configured: true,
+    data: rows.filter((r) => {
+      if (!lineOf.has(String(r.source_document_id ?? ""))) return true; // Không quy chiếu được -> vẫn hiện.
+      const l = lineOf.get(String(r.source_document_id ?? ""));
+      return l === null || l === lineId;
+    }),
+  };
+}
+export const listReturnDocuments = (lineId?: string | null) =>
+  list("return_documents", { column: "created_at" }, 500, lineId);
 export const listSettlements = () =>
   list("settlements", { column: "created_at" });
 export const listPayments = () =>
@@ -394,7 +461,15 @@ export async function getSalesDocumentCosts(
   return map;
 }
 
-export async function getDashboard() {
+/**
+ * P2 — dashboard theo ngành: lineId === undefined -> toàn doanh nghiệp
+ * (ngữ cảnh ALL); lineId = uuid -> chỉ ngành đó. Tồn kho theo lô đã
+ * lọc qua view (v_batch_stock / v_batches_for_sales); doanh thu +
+ * "đã gửi ký gửi" lọc theo business_line_id của chứng từ/phiếu.
+ * Phải thu/phải trả + đối soát ký gửi vẫn hợp nhất — quy chiếu tài
+ * chính theo ngành là việc của P4 (ghi rõ trong báo cáo P2).
+ */
+export async function getDashboard(lineId?: string | null) {
   const supabase = await client();
   if (!supabase) {
     return {
@@ -425,19 +500,21 @@ export async function getDashboard() {
   const dayMs = 864e5;
   const isoDay = (daysAgo: number) =>
     new Date(Date.now() - daysAgo * dayMs).toISOString().slice(0, 10);
+  const salesDocsQ = supabase
+    .from("sales_documents")
+    .select("id, doc_date, discount_amount, business_line_id")
+    .eq("status", "CONFIRMED")
+    .gte("doc_date", isoDay(29));
+  if (lineId) salesDocsQ.eq("business_line_id", lineId);
   const [batchStock, payables, receivables, productStock, partnerCons, productMins, partnersList, salesDocs] = await Promise.all([
     supabase.from(isSales ? "v_batches_for_sales" : "v_batch_stock").select("*").limit(2000),
     supabase.from("supplier_payables").select("amount, amount_paid, status, due_date").in("status", ["UNPAID", "PARTIAL"]),
     supabase.from("partner_receivables").select("amount, amount_paid, status, due_date").in("status", ["UNPAID", "PARTIAL"]),
     supabase.from("v_product_stock").select("*").limit(2000),
     supabase.from("v_partner_consignment").select("*"),
-    supabase.from("products").select("id, min_stock, retail_price, wholesale_price"),
+    supabase.from("products").select("id, min_stock, retail_price, wholesale_price, business_line_id"),
     supabase.from("partners").select("id, name"),
-    supabase
-      .from("sales_documents")
-      .select("id, doc_date, discount_amount")
-      .eq("status", "CONFIRMED")
-      .gte("doc_date", isoDay(29)),
+    salesDocsQ,
   ]);
   // Lines of those confirmed documents drive both revenue (14d) and top products (30d).
   const docRows = (salesDocs.data ?? []) as AnyRow[];
@@ -499,11 +576,13 @@ export async function getDashboard() {
   // Giá chuyển giao mới nhất của từng lô đã gửi ký gửi (phiếu đã xác nhận):
   // hàng ở kho đối tác tính theo giá này, vì đó là giá đối tác sẽ trả khi
   // tiêu thụ — không phải giá vốn, không phải giá lẻ hiện tại.
-  const { data: confirmedSlips } = await supabase
+  const confirmedSlipsQ = supabase
     .from("consignment_out_slips")
-    .select("id, created_at")
+    .select("id, created_at, business_line_id")
     .eq("status", "CONFIRMED")
     .limit(500);
+  if (lineId) confirmedSlipsQ.eq("business_line_id", lineId);
+  const { data: confirmedSlips } = await confirmedSlipsQ;
   const slipCreated = new Map(
     ((confirmedSlips ?? []) as AnyRow[]).map((s) => [String(s.id), String(s.created_at)])
   );
@@ -718,11 +797,13 @@ export async function getDashboard() {
   // giới hạn ngày (ngày chứng từ có thể ghi lùi so với ngày nhập máy).
   // Giá vốn của mỗi dòng lấy từ lô đã bán của dòng đó (luồng đối tác thì
   // lô nằm ở dòng phân bổ gốc). Giảm giá trừ ở cấp chứng từ, như biểu đồ.
-  const allDocsRes = await supabase
+  const allDocsQ = supabase
     .from("sales_documents")
-    .select("id, doc_code, doc_date, doc_kind, discount_amount, partner_id, customer_name")
+    .select("id, doc_code, doc_date, doc_kind, discount_amount, partner_id, customer_name, business_line_id")
     .eq("status", "CONFIRMED")
     .limit(5000);
+  if (lineId) allDocsQ.eq("business_line_id", lineId);
+  const allDocsRes = await allDocsQ;
   const allDocRows = (allDocsRes.data ?? []) as AnyRow[];
   let allLines: AnyRow[] = [];
   if (allDocRows.length) {
@@ -820,11 +901,14 @@ export async function getDashboard() {
   let sentQty = 0;
   let sentValue = 0;
   {
-    const { data: slips } = await supabase
+    // P2: "đã gửi ký gửi" chỉ tính phiếu GK của ngành đang xem.
+    const sentQ = supabase
       .from("consignment_out_slips")
       .select("id")
       .eq("status", "CONFIRMED")
       .limit(5000);
+    if (lineId) sentQ.eq("business_line_id", lineId);
+    const { data: slips } = await sentQ;
     const slipIds = ((slips ?? []) as AnyRow[]).map((s) => String(s.id));
     if (slipIds.length) {
       const { data: items } = await supabase
@@ -899,8 +983,12 @@ export async function getDashboard() {
       receivablesUnpaid: remainingByStatus(receivables.data as AnyRow[] | null, "UNPAID"),
       receivablesPartial: remainingByStatus(receivables.data as AnyRow[] | null, "PARTIAL"),
     },
+    // P2: cảnh báo sắp hết hàng chỉ tính sản phẩm thuộc ngành đang xem;
+    // sản phẩm chưa phân loại (ngành NULL) vẫn hiện để không mất cảnh báo.
     lowStock: ((productStock.data ?? []) as AnyRow[]).filter(
-      (r) => Number(r.total_qty) <= (minMap.get(r.product_id) ?? 0)
+      (r) =>
+        Number(r.total_qty) <= (minMap.get(r.product_id) ?? 0) &&
+        (!lineId || (productMins.data ?? []).some((p: AnyRow) => p.id === r.product_id && (!p.business_line_id || p.business_line_id === lineId))),
     ),
     expiring: rows.filter(
       (r) => r.ownership === "CONSIGNED" && r.return_by_date && r.return_by_date <= soon && r.location_kind === "OWN_WAREHOUSE"
@@ -983,9 +1071,15 @@ export interface LedgerRow {
 }
 
 /** 200 bút toán kho mới nhất, kèm tên lô / sản phẩm / kho / người làm (nối tay, tránh join FK mơ hồ). */
-export async function listLedgerMovements(limit = 200): Promise<QueryResult<LedgerRow[]>> {
+/**
+ * P2 — lịch sử kho theo ngành: lineId === undefined -> toàn doanh nghiệp;
+ * lineId = uuid -> chỉ bút toán của lô thuộc ngành đó (quy chiếu qua
+ * lô -> sản phẩm); lineId === null (chưa gán ngành) -> rỗng.
+ */
+export async function listLedgerMovements(limit = 200, lineId?: string | null): Promise<QueryResult<LedgerRow[]>> {
   const supabase = await client();
   if (!supabase) return empty([]);
+  if (lineId === null) return { configured: true, data: [] };
   const { data: rows, error } = await supabase
     .from("stock_movements")
     .select("id, created_at, movement_kind, qty, from_location_id, to_location_id, ref_doc_type, ref_doc_id, reversal_of_id, created_by, batch_id")
@@ -1000,7 +1094,7 @@ export async function listLedgerMovements(limit = 200): Promise<QueryResult<Ledg
   const batches = (batchRows as AnyRow[]).map((b) => ({ ...b, id: b.batch_id }));
   const productIds = Array.from(new Set((batches as AnyRow[]).map((b) => b.product_id as string)));
   const products = productIds.length
-    ? ((await supabase.from("products").select("id, sku, name").in("id", productIds)).data ?? [])
+    ? ((await supabase.from("products").select("id, sku, name, business_line_id").in("id", productIds)).data ?? [])
     : [];
   const locIds = Array.from(
     new Set(list.flatMap((r) => [r.from_location_id, r.to_location_id]).filter(Boolean) as string[]),
@@ -1041,7 +1135,16 @@ export async function listLedgerMovements(limit = 200): Promise<QueryResult<Ledg
   }
   return {
     configured: true,
-    data: list.map((r) => {
+    data: list
+      // P2: bút toán của lô ngành khác (hoặc lô không tra được qua view
+      // đã lọc theo quyền) thì bỏ — chỉ giữ đúng ngành đang xem.
+      .filter((r) => {
+        if (!lineId) return true;
+        const batch = batchMap.get(r.batch_id as string);
+        const product = batch ? productMap.get(batch.product_id as string) : undefined;
+        return product?.business_line_id === lineId;
+      })
+      .map((r) => {
       const batch = batchMap.get(r.batch_id as string);
       const product = batch ? productMap.get(batch.product_id as string) : undefined;
       return {
@@ -1686,6 +1789,8 @@ export interface DocumentDetail {
   kindLabel: string;
   code: string;
   date: string;
+  /** P2: ngành của chứng từ (null với hoá đơn GTGT — P4 mới tách hoá đơn theo ngành, BL-015). */
+  business_line_id?: string | null;
   lines: DetailLine[];
   totalAmount: number;
   totalCost: number;
@@ -1763,7 +1868,7 @@ export async function getSalesDocumentDetail(docId: string): Promise<DocumentDet
   if (!supabase) return null;
   const { data: doc } = await supabase
     .from("sales_documents")
-    .select("id, doc_code, doc_kind, doc_date, partner_id")
+    .select("id, doc_code, doc_kind, doc_date, partner_id, business_line_id")
     .eq("id", docId)
     .maybeSingle();
   if (!doc) return null;
@@ -1793,6 +1898,7 @@ export async function getSalesDocumentDetail(docId: string): Promise<DocumentDet
     kindLabel: String(d.doc_kind) === "KG" ? "Chứng từ tiêu thụ ký gửi" : "Chứng từ bán hàng",
     code: String(d.doc_code),
     date: String(d.doc_date),
+    business_line_id: (d.business_line_id as string | null) ?? null,
     lines: detailLines,
     totalAmount,
     totalCost,
@@ -1878,7 +1984,7 @@ export async function getConsignmentSlipDetail(slipId: string): Promise<Document
   if (!supabase) return null;
   const { data: slip } = await supabase
     .from("consignment_out_slips")
-    .select("id, doc_code, slip_date, partner_id")
+    .select("id, doc_code, slip_date, partner_id, business_line_id")
     .eq("id", slipId)
     .maybeSingle();
   if (!slip) return null;
@@ -1968,6 +2074,7 @@ export async function getConsignmentSlipDetail(slipId: string): Promise<Document
     kindLabel: "Phiếu gửi ký gửi",
     code: String(s.doc_code),
     date: String(s.slip_date),
+    business_line_id: (s.business_line_id as string | null) ?? null,
     lines,
     totalAmount,
     totalCost,

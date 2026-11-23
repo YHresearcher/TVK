@@ -6,7 +6,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { formatNumber, formatVND, todayISO } from "@/lib/format";
 import { mapHeaderColumns, normalizeHeader, readFirstSheetAOA, toNum, toStr } from "@/lib/excel-parse";
 import { matchByNameVehicle, normCode } from "@/lib/product-match";
-import { type AnyRow, type PosProduct } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, type AnyRow, type BusinessLineCode, type PosProduct } from "@/lib/types";
 import type { DealerFifoBatchRow } from "@/components/ImportDealerSale";
 
 /** Cột tiền: căn phải để dễ dò số. */
@@ -59,6 +59,7 @@ export default function ImportConsignmentOut({
   codeMap,
   fifoBatches,
   action,
+  lineContext,
 }: {
   /** Đối tác nhận hàng ký gửi. */
   partners: AnyRow[];
@@ -70,8 +71,18 @@ export default function ImportConsignmentOut({
    * của nhà cung cấp chưa cho ký gửi tiếp. */
   fifoBatches: Record<string, DealerFifoBatchRow[]>;
   action: (formData: FormData) => Promise<void>;
+  /** P2: ngữ cảnh ngành — LINE thì phiếu cố định ngành đó, ALL thì chọn rõ trên form. */
+  lineContext?: {
+    mode: "ALL" | "LINE" | "NONE";
+    code: BusinessLineCode | null;
+    lines: { code: BusinessLineCode; name: string }[];
+  };
 }) {
   const [partnerId, setPartnerId] = useState("");
+  // P2: toàn bộ file thuộc một ngành (một phiếu GK chỉ thuộc một ngành).
+  const [businessLine, setBusinessLine] = useState(
+    lineContext?.mode === "LINE" ? lineContext.code ?? "" : lineContext?.lines[0]?.code ?? "",
+  );
   const [slipDate, setSlipDate] = useState(todayISO());
   const [settlementDueDate, setSettlementDueDate] = useState("");
   const [returnByDate, setReturnByDate] = useState("");
@@ -253,6 +264,7 @@ export default function ImportConsignmentOut({
     settlementDueDate,
     returnByDate,
     confirmNow,
+    businessLine,
     rows: okRows.flatMap((r) =>
       r.allocs.map((l) => ({
         batchCode: l.batchCode,
@@ -317,6 +329,34 @@ export default function ImportConsignmentOut({
           <label className={labelCls}>Hạn trả</label>
           <input type="date" value={returnByDate} onChange={(e) => setReturnByDate(e.target.value)} className={inputCls} />
         </div>
+        {/* P2: ngành của phiếu — một phiếu GK chỉ thuộc một ngành. */}
+        {lineContext ? (
+          lineContext.mode === "LINE" ? (
+            <div>
+              <label className={labelCls}>Ngành hàng</label>
+              <input
+                value={lineContext.code ? BUSINESS_LINE_LABELS[lineContext.code] : "—"}
+                disabled
+                className={inputCls}
+              />
+            </div>
+          ) : (
+            <div>
+              <label className={labelCls}>Ngành hàng *</label>
+              <select
+                value={businessLine}
+                onChange={(e) => setBusinessLine(e.target.value)}
+                className={inputCls}
+              >
+                {lineContext.lines.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {BUSINESS_LINE_LABELS[l.code] ?? l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        ) : null}
       </div>
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={confirmNow} onChange={(e) => setConfirmNow(e.target.checked)} />

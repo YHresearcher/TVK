@@ -7,12 +7,15 @@ import {
   getSalesDocumentDetail,
   type DocumentDetail,
 } from "@/lib/queries";
+import { getBusinessLineContext } from "@/lib/business-lines";
 
 export type DetailKind = "DOC" | "SLIP" | "INV";
 
 /** Chi tiết hàng hoá của một chứng từ / phiếu gửi / hoá đơn, đọc khi bấm.
  *  Giá vốn và lãi chỉ trả về cho Chủ, Kế toán và CEO — các vai trò khác
- *  nhận bản đã lược (giá vốn/lãi bằng 0) ngay từ phía server. */
+ *  nhận bản đã lược (giá vốn/lãi bằng 0) ngay từ phía server.
+ *  P2 (BL-001): chứng từ thuộc ngành khác thì không trả chi tiết — chỉ
+ *  hoá đơn GTGT (chưa có ngành, P4) là ngoại lệ. */
 export async function getDocumentDetailAction(
   kind: DetailKind,
   id: string
@@ -24,6 +27,15 @@ export async function getDocumentDetailAction(
   else if (kind === "SLIP") detail = await getConsignmentSlipDetail(id);
   else detail = await getInvoiceDetail(id);
   if (!detail) return { detail: null, canSeeCost };
+  if (kind !== "INV" && detail.business_line_id) {
+    const ctx = await getBusinessLineContext();
+    if (ctx.mode === "LINE" && detail.business_line_id !== ctx.lineId) {
+      return { detail: null, canSeeCost };
+    }
+    if (ctx.mode === "NONE") {
+      return { detail: null, canSeeCost };
+    }
+  }
   if (!canSeeCost) {
     detail = {
       ...detail,

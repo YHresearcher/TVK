@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Card, EmptyState, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { listLedgerMovements } from "@/lib/queries";
 import { formatNumber } from "@/lib/format";
 import { MOVEMENT_KIND_LABELS, REF_DOC_TYPE_LABELS } from "@/lib/types";
@@ -14,7 +16,10 @@ function fold(s: string): string {
 }
 
 export default async function LedgerPage({ searchParams }: { searchParams: { q?: string; kind?: string } }) {
-  const ledger = await listLedgerMovements(200);
+  // P2: lịch sử kho lọc theo ngành đang làm việc (quy chiếu qua lô).
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
+  const ledger = await listLedgerMovements(200, lineFilter);
   let rows = ledger.data;
   const q = (searchParams.q ?? "").trim();
   if (q) {
@@ -33,6 +38,9 @@ export default async function LedgerPage({ searchParams }: { searchParams: { q?:
         title="Lịch sử kho"
         description="Mỗi lần hàng vào, ra, chuyển kho hay bán hàng đều ghi lại một dòng ở đây. Đã ghi thì không sửa, không xoá."
       />
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode !== "NONE" && (
+      <>
       <Card>
         <form key={`${q}|${searchParams.kind ?? ""}`} method="get" className="flex flex-wrap items-end gap-3">
           <div className="min-w-0 flex-1">
@@ -119,6 +127,8 @@ export default async function LedgerPage({ searchParams }: { searchParams: { q?:
           </TableWrap>
         )}
       </Card>
+      </>
+      )}
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { ComposedChart, formatCompactVND, GroupedBarChart, HBarList, StackedBarList } from "@/components/Charts";
 import PartnerStatsDialog from "@/components/PartnerStatsDialog";
 import QuickShortcuts from "@/components/QuickShortcuts";
@@ -118,12 +120,23 @@ export default async function DashboardPage({
   const canSeeCost = ["OWNER", "ACCOUNTING", "CEO"].includes(profile.data?.role ?? "");
   const period = searchParams?.period ?? "90d";
   const { from, to } = periodRange(period, searchParams?.from, searchParams?.to);
+  // P2: tài khoản chưa gán ngành thì dừng ở đây — không tải dữ liệu.
+  const ctx = await getBusinessLineContext();
+  if (ctx.mode === "NONE") {
+    return (
+      <>
+        <PageHeader title="Tổng quan" />
+        <NoBusinessLineNotice />
+      </>
+    );
+  }
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : undefined;
   const [d, partnerStats, groupPerf, slow, recent, perf, groupValue, consBars, agingBars, cashflow, alertsResult, cashBalancesRes] = await Promise.all([
-    getDashboard(),
+    getDashboard(lineFilter),
     listPartnerStats(),
     getGroupPerformance(),
     getSlowMoving(90),
-    listLedgerMovements(8),
+    listLedgerMovements(8, lineFilter),
     canSeeCost ? getPerformanceSeries(from, to) : Promise.resolve([]),
     canSeeCost ? getInventoryValueByGroup() : Promise.resolve([]),
     canSeeMoney ? getPartnerConsignmentBars() : Promise.resolve([]),

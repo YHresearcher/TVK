@@ -2,10 +2,12 @@ import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, bt
 import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ExportExcelButton from "@/components/ExportExcelButton";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import { confirmReturnAction, createReturnAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { getCurrentProfile, listBatchesForSales, listPartners, listReturnDocuments, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
-import { OWNERSHIP_LABELS, RETURN_KINDS, RETURN_KIND_LABELS, RETURN_REASONS, RETURN_REASON_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, OWNERSHIP_LABELS, RETURN_KINDS, RETURN_KIND_LABELS, RETURN_REASONS, RETURN_REASON_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +16,17 @@ export default async function ReturnsPage({
 }: {
   searchParams: { ok?: string };
 }) {
+  // P2: phiếu trả lọc theo ngành đang làm việc.
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
   const [docs, batchStock, partners, suppliers, profile] = await Promise.all([
-    listReturnDocuments(),
+    listReturnDocuments(lineFilter),
     listBatchesForSales(),
     listPartners(),
     listSuppliers(),
     getCurrentProfile(),
   ]);
+  const lineLabelById = new Map(ctx.lines.map((l) => [l.id, BUSINESS_LINE_LABELS[l.code]]));
   const configured = docs.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
@@ -47,7 +53,9 @@ export default async function ReturnsPage({
         description="Hàng trả về luôn quay về đúng lô ban đầu của nó, để còn biết hàng của nhà cung cấp nào và giá vốn bao nhiêu. Nếu lô ký gửi đã bán mà bị trả lại: khoản phải trả chưa trả thì Kế toán huỷ đi; đã trả rồi thì trừ vào lần đối chiếu sau."
       />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode !== "NONE" && searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {ctx.mode === "NONE" ? null : (
       <div className="space-y-6">
         {!readOnly && (
         <Card title="Phiếu trả hàng mới">
@@ -62,6 +70,19 @@ export default async function ReturnsPage({
               <div><label className={labelCls}>Nhà cung cấp (trả nhà cung cấp)</label>
                 <select name="supplier_id" className={inputCls}><option value="">— Chọn —</option>{supplierOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
             </div>
+            {/* P2: phiếu trả thuộc ngành đang làm việc; ALL thì chọn rõ. */}
+            {ctx.mode === "LINE" ? (
+              <input type="hidden" name="business_line" value={ctx.code ?? ""} />
+            ) : (
+              <div>
+                <label className={labelCls}>Ngành hàng *</label>
+                <select name="business_line" required className={inputCls} defaultValue={ctx.lines[0]?.code ?? ""}>
+                  {ctx.lines.map((l) => (
+                    <option key={l.id} value={l.code}>{BUSINESS_LINE_LABELS[l.code]}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <ItemsRows fields={[
               { name: "batch_id", label: "Lô gốc", type: "select", options: batchOptions },
               { name: "qty", label: "Số lượng", type: "number" },
@@ -79,12 +100,13 @@ export default async function ReturnsPage({
         </div>
         {docs.data.length === 0 ? <EmptyState message="Chưa có phiếu trả hàng." /> : (
           <TableWrap>
-            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Bên liên quan</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
+            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Ngành</th><th className={thCls}>Bên liên quan</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
             <tbody>
               {docs.data.map((d) => (
                 <tr key={d.id} className="border-t border-slate-100">
                   <td className={`${tdCls} font-mono text-xs`}>{d.doc_code}</td>
                   <td className={tdCls}>{RETURN_KIND_LABELS[d.return_kind] ?? d.return_kind}</td>
+                  <td className={tdCls}>{lineLabelById.get(d.business_line_id) ?? "—"}</td>
                   <td className={tdCls}>{d.partner_id ? partnerName.get(d.partner_id) : d.supplier_id ? supplierName.get(d.supplier_id) : "—"}</td>
                   <td className={tdCls}>{formatDate(d.return_date)}</td>
                   <td className={tdCls}><StatusBadge status={d.status} /></td>
@@ -102,6 +124,7 @@ export default async function ReturnsPage({
           </TableWrap>
         )}
       </div>
+      )}
     </>
   );
 }

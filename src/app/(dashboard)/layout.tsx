@@ -4,9 +4,10 @@ import MobileTopBar from "@/components/MobileTopBar";
 import Sidebar from "@/components/Sidebar";
 import { signOutAction } from "@/lib/actions";
 import SubmitButton from "@/components/SubmitButton";
+import { getBusinessLineContext, type BusinessLineContext } from "@/lib/business-lines";
 import { getCurrentProfile } from "@/lib/queries";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
-import { ROLE_LABELS } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, ROLE_LABELS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,18 @@ export default async function DashboardLayout({
   let userName = "Chế độ cài đặt";
   let role = "Chưa cấu hình Supabase";
   let rawRole = "";
+  // P2: ngữ cảnh ngành hàng tải một lần ở layout, truyền xuống sidebar
+  // (switcher) + mobile top bar (nhãn ngành) và các trang con dùng lại
+  // qua getBusinessLineContext() khi cần.
+  let lineCtx: BusinessLineContext = {
+    mode: "NONE",
+    code: null,
+    lineId: null,
+    lines: [],
+    canSeeAll: false,
+    role: null,
+    userId: null,
+  };
 
   if (isSupabaseConfigured()) {
     const { data: profile } = await getCurrentProfile();
@@ -52,16 +65,24 @@ export default async function DashboardLayout({
     userName = profile.full_name;
     role = ROLE_LABELS[profile.role] ?? profile.role;
     rawRole = profile.role;
+    lineCtx = await getBusinessLineContext();
   }
+
+  const lineLabel =
+    lineCtx.mode === "ALL"
+      ? "Toàn doanh nghiệp"
+      : lineCtx.mode === "LINE" && lineCtx.code
+        ? BUSINESS_LINE_LABELS[lineCtx.code]
+        : "Chưa gán ngành";
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar userName={userName} role={role} rawRole={rawRole} />
+      <Sidebar userName={userName} role={role} rawRole={rawRole} context={lineCtx} />
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Thanh trên cùng cho màn hình nhỏ: hamburger + Trợ giúp.
             Từ lg trở lên ẩn — khi đó dùng sidebar tĩnh và hàng Trợ giúp
             bên dưới như cũ. */}
-        <MobileTopBar role={rawRole} />
+        <MobileTopBar role={rawRole} lineLabel={lineLabel} />
         <main className="min-w-0 flex-1 px-4 py-6 sm:px-6">
           <div className="mb-4 hidden items-center justify-end lg:flex">
             <HelpButton role={rawRole} />

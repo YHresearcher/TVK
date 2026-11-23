@@ -1,8 +1,10 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import AgingTable from "@/components/AgingTable";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordPayablePaymentAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { getCurrentProfile, listCashFunds, listPayables, listPurchaseReceipts, listSalesDocuments, listSettlements, listSuppliers } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
@@ -14,12 +16,16 @@ export default async function PayablesPage({
 }: {
   searchParams: { ok?: string };
 }) {
+  // P2: phải trả lọc theo ngành qua chứng từ gốc (hàng không quy chiếu
+  // được vẫn hiện — không giấu tiền).
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
   const [payables, settlements, suppliers, salesDocs, purchaseReceipts, funds, profile] = await Promise.all([
-    listPayables(),
+    listPayables(lineFilter),
     listSettlements(),
     listSuppliers(),
-    listSalesDocuments(),
-    listPurchaseReceipts(),
+    listSalesDocuments(lineFilter),
+    listPurchaseReceipts(lineFilter),
     listCashFunds(),
     getCurrentProfile(),
   ]);
@@ -44,6 +50,9 @@ export default async function PayablesPage({
     <>
       <PageHeader title="Phải trả nhà cung cấp" description="Khoản phải trả được tạo tự động theo 2 cách: khi một lô ký gửi bán được (theo đúng giá ký gửi đã thoả thuận của lô đó), và khi xác nhận phiếu nhập mua hàng (bằng tổng tiền phiếu, hạn trả theo số ngày trả của nhà cung cấp đó). Giảm giá cho khách hàng không bao giờ thay đổi các số tiền này." />
       {!configured && <NotConfigured />}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode === "NONE" ? null : (
+      <>
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <p className="mb-4 text-sm text-slate-600">Tổng còn nợ: <strong>{formatVND(totalOutstanding)}</strong></p>
 
@@ -158,6 +167,8 @@ export default async function PayablesPage({
             </tbody>
           </TableWrap>
         </div>
+      )}
+      </>
       )}
     </>
   );

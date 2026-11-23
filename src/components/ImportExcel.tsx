@@ -6,6 +6,7 @@ import { normCode } from "@/lib/product-match";
 import { TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import { formatDate, formatNumber, formatUSD, formatVND, todayISO } from "@/lib/format";
+import { BUSINESS_LINE_LABELS, type BusinessLineCode } from "@/lib/types";
 
 /** Cột tiền: căn phải để dễ dò số. */
 const thNumCls = `${thCls} text-right`;
@@ -74,6 +75,7 @@ export default function ImportExcel({
   codes,
   groups,
   action,
+  lineContext,
 }: {
   suppliers: AnyRow[];
   warehouses: AnyRow[];
@@ -81,8 +83,18 @@ export default function ImportExcel({
   codes: CatalogCode[];
   groups: string[];
   action: (formData: FormData) => Promise<void>;
+  /** P2: ngữ cảnh ngành — LINE thì file cố định ngành đó, ALL thì chọn rõ trên form. */
+  lineContext?: {
+    mode: "ALL" | "LINE" | "NONE";
+    code: BusinessLineCode | null;
+    lines: { code: BusinessLineCode; name: string }[];
+  };
 }) {
   const [kind, setKind] = useState<"PN" | "NK">("PN");
+  // P2: toàn bộ file thuộc một ngành (một phiếu nhập chỉ thuộc một ngành).
+  const [businessLine, setBusinessLine] = useState(
+    lineContext?.mode === "LINE" ? lineContext.code ?? "" : lineContext?.lines[0]?.code ?? "",
+  );
   // Chỉ có một nhà cung cấp / một kho thì chọn sẵn luôn — khỏi bắt chọn
   // tay mỗi lần import, không thì nút cứ mờ vì thiếu lựa chọn.
   const [supplierId, setSupplierId] = useState(
@@ -285,6 +297,7 @@ export default function ImportExcel({
     autoCreate,
     confirmNow,
     productGroup,
+    businessLine,
     rows: importable.map((r) => ({
       code: r.code,
       altCodes: r.altCodes,
@@ -454,6 +467,34 @@ export default function ImportExcel({
             ))}
           </datalist>
         </div>
+        {/* P2: ngành của file — một phiếu nhập chỉ thuộc một ngành. */}
+        {lineContext ? (
+          lineContext.mode === "LINE" ? (
+            <div>
+              <label className={labelCls}>Ngành hàng</label>
+              <input
+                value={lineContext.code ? BUSINESS_LINE_LABELS[lineContext.code] : "—"}
+                disabled
+                className={inputCls}
+              />
+            </div>
+          ) : (
+            <div>
+              <label className={labelCls}>Ngành hàng *</label>
+              <select
+                value={businessLine}
+                onChange={(e) => setBusinessLine(e.target.value)}
+                className={inputCls}
+              >
+                {lineContext.lines.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {BUSINESS_LINE_LABELS[l.code] ?? l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <label className="flex items-center gap-2 text-sm text-slate-700">

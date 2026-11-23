@@ -4,6 +4,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ImportExcel from "@/components/ImportExcel";
 import DeleteReceiptButton from "@/components/DeleteReceiptButton";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import {
   confirmConsignmentReceiptAction,
   confirmPurchaseReceiptAction,
@@ -12,9 +13,10 @@ import {
   deleteReceiptAction,
   importStockAction,
 } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { buildProductCodeMap, getCurrentProfile, listConsignmentReceipts, listLocations, listProductCodes, listProductGroups, listProducts, listPurchaseReceipts, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
-import { isReadOnlyRole, type AnyRow } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +31,15 @@ export default async function StockInPage({
       : searchParams.tab === "import"
         ? "import"
         : "purchase";
+  // P2: phiếu + sản phẩm lọc theo ngành đang làm việc.
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
   const [suppliers, locations, products, purchases, consignments, productCodes, groups, profile] = await Promise.all([
     listSuppliers(),
     listLocations(),
-    listProducts(),
-    listPurchaseReceipts(),
-    listConsignmentReceipts(),
+    listProducts(lineFilter),
+    listPurchaseReceipts(lineFilter),
+    listConsignmentReceipts(lineFilter),
     listProductCodes(),
     listProductGroups(),
     getCurrentProfile(),
@@ -60,8 +65,11 @@ export default async function StockInPage({
     <>
       <PageHeader title="Nhập kho" />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode !== "NONE" && searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       {searchParams.error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{searchParams.error}</p>}
+      {ctx.mode === "NONE" ? null : (
+      <>
       <div className="mb-6 flex flex-wrap gap-2">
         <Link href="/stock-in?tab=purchase" className={tabCls(tab === "purchase", "bg-blue-600 text-white")}>Phiếu nhập mua (PN)</Link>
         <Link href="/stock-in?tab=consignment" className={tabCls(tab === "consignment", "bg-amber-500 text-white")}>Phiếu nhận ký gửi (NK)</Link>
@@ -95,6 +103,7 @@ export default async function StockInPage({
                   }))}
                   groups={groups}
                   action={importStockAction}
+                  lineContext={ctx}
                 />
               </Card>
             </>
@@ -123,6 +132,19 @@ export default async function StockInPage({
                 <div><label className={labelCls}>Ngày nhập</label><input name="receipt_date" type="date" className={inputCls} /></div>
                 <div><label className={labelCls}>Số hoá đơn của nhà cung cấp</label><input name="supplier_invoice_no" className={inputCls} /></div>
               </div>
+              {/* P2: phiếu nhập thuộc ngành đang làm việc; ALL thì chọn rõ. */}
+              {ctx.mode === "LINE" ? (
+                <input type="hidden" name="business_line" value={ctx.code ?? ""} />
+              ) : (
+                <div>
+                  <label className={labelCls}>Ngành hàng *</label>
+                  <select name="business_line" required className={inputCls} defaultValue={ctx.lines[0]?.code ?? ""}>
+                    {ctx.lines.map((l) => (
+                      <option key={l.id} value={l.code}>{BUSINESS_LINE_LABELS[l.code]}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <ItemsRows codeMap={codeMap} fields={[
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty", label: "Số lượng", type: "number" },
@@ -168,6 +190,19 @@ export default async function StockInPage({
                 <div><label className={labelCls}>Ngày nhập</label><input name="receipt_date" type="date" className={inputCls} /></div>
                 <div><label className={labelCls}>Hạn trả (để trống = mặc định của nhà cung cấp)</label><input name="return_by_date" type="date" className={inputCls} /></div>
               </div>
+              {/* P2: phiếu nhận ký gửi thuộc ngành đang làm việc; ALL thì chọn rõ. */}
+              {ctx.mode === "LINE" ? (
+                <input type="hidden" name="business_line" value={ctx.code ?? ""} />
+              ) : (
+                <div>
+                  <label className={labelCls}>Ngành hàng *</label>
+                  <select name="business_line" required className={inputCls} defaultValue={ctx.lines[0]?.code ?? ""}>
+                    {ctx.lines.map((l) => (
+                      <option key={l.id} value={l.code}>{BUSINESS_LINE_LABELS[l.code]}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <ItemsRows codeMap={codeMap} fields={[
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty", label: "Số lượng", type: "number" },
@@ -190,6 +225,8 @@ export default async function StockInPage({
             hasDrafts={draftConsignments.length > 0}
           />
         </div>
+      )}
+      </>
       )}
     </>
   );

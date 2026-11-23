@@ -1,6 +1,7 @@
 import { BackLink, Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, btnGhostCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import { confirmAllocationAction, confirmAndIssueVatInvoiceAction, createAllocationDocumentsAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { getAllocationDetail, getCurrentProfile, listProducts } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
 import { NATURE_LABELS, isReadOnlyRole } from "@/lib/types";
@@ -18,6 +19,11 @@ export default async function AllocationDetailPage({
   if (!detail.configured) return (<><PageHeader title="Chia hàng đã bán cho từng lô" /><NotConfigured /></>);
   if (!detail.slip) return (<><BackLink href="/partner-consumption" label="Quay lại" /><EmptyState message="Không tìm thấy phiếu phân bổ." /></>);
   const slip = detail.slip;
+  // P2 (BL-001): phiếu ngành khác thì không mở được bằng đường dẫn trực tiếp.
+  const ctx = await getBusinessLineContext();
+  if (ctx.mode === "NONE" || (ctx.mode === "LINE" && slip.business_line_id !== ctx.lineId)) {
+    return (<><BackLink href="/partner-consumption" label="Quay lại Tiêu thụ của đối tác" /><EmptyState message="Phiếu phân bổ này không thuộc ngành hàng bạn được làm việc." /></>);
+  }
   const readOnly = isReadOnlyRole(profile.data?.role);
   const productName = new Map(products.data.map((p) => [p.id, `${p.sku} — ${p.name}`]));
   const documented = new Set(detail.documentedLineIds);

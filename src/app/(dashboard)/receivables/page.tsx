@@ -2,8 +2,10 @@ import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import AgingTable from "@/components/AgingTable";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordReceivablePaymentAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { getCurrentProfile, listCashFunds, listPartners, listReceivables, listSettlements } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
@@ -15,8 +17,12 @@ export default async function ReceivablesPage({
 }: {
   searchParams: { ok?: string };
 }) {
+  // P2: phải thu lọc theo ngành qua chứng từ gốc (hàng không quy chiếu
+  // được vẫn hiện — không giấu tiền).
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
   const [receivables, settlements, partners, funds, profile] = await Promise.all([
-    listReceivables(),
+    listReceivables(lineFilter),
     listSettlements(),
     listPartners(),
     listCashFunds(),
@@ -36,6 +42,9 @@ export default async function ReceivablesPage({
     <>
       <PageHeader title="Phải thu đối tác" description="Được tạo tự động khi xác nhận một giao dịch ghi nợ hoặc một đơn bán hàng hoặc hàng ký gửi đã bán (BH/KG). Số tiền BH là sau giảm giá; số tiền KG dùng giá chuyển giao đã thoả thuận." />
       {!configured && <NotConfigured />}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode === "NONE" ? null : (
+      <>
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <p className="mb-4 text-sm text-slate-600">Tổng còn phải thu: <strong>{formatVND(totalOutstanding)}</strong></p>
 
@@ -150,6 +159,8 @@ export default async function ReceivablesPage({
             </tbody>
           </TableWrap>
         </div>
+      )}
+      </>
       )}
     </>
   );

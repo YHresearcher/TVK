@@ -210,9 +210,9 @@ export const BUSINESS_LINE_LABELS: Record<BusinessLineCode, string> = {
 };
 
 /**
- * Quy tắc tương thích P1 (khớp hàm DB user_can_access_business_line):
- * OWNER/CEO xem mọi ngành; user chưa được gán ngành nào vẫn thấy toàn bộ
- * (hành vi cũ); ngược lại chỉ thấy ngành đã gán. P2 sẽ siết thành bắt buộc gán.
+ * P2 fail-closed (khớp hàm DB user_can_access_business_line sau 0026):
+ * OWNER/CEO xem mọi ngành; sản phẩm/chứng từ chưa phân loại (NULL) cho
+ * qua để xử lý ở hàng đợi; user chưa được gán ngành nào KHÔNG thấy gì.
  */
 export function userHasBusinessLineAccess(
   role: string | null | undefined,
@@ -221,7 +221,7 @@ export function userHasBusinessLineAccess(
 ): boolean {
   if (!businessLineId) return true; // Chưa phân loại -> hành vi cũ.
   if (role === "OWNER" || role === "CEO") return true;
-  if (assignedLineIds.length === 0) return true; // Chưa gán -> tương thích P1.
+  if (assignedLineIds.length === 0) return false; // P2: chưa gán -> không thấy gì.
   return assignedLineIds.includes(businessLineId);
 }
 

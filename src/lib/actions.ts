@@ -1,10 +1,28 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { todayISO } from "@/lib/format";
-import { compareLotOrder, isOilGroup, matchByNameVehicle, tierPriceOf } from "@/lib/product-match";
+import {
+  compareLotOrder,
+  isExpiredBatch,
+  isOilLineCode,
+  matchByNameVehicle,
+  splitByBusinessLine,
+  tierPriceOf,
+} from "@/lib/product-match";
+import {
+  assertBatchesInLine,
+  assertGroupMatchesLine,
+  assertProductsInLine,
+  BUSINESS_LINE_COOKIE,
+  getBusinessLineContext,
+  getLineByCode,
+  getLineLabelById,
+  getProductLineMap,
+  resolveWriteLine,
+} from "@/lib/business-lines";
 import { canChangeProductBusinessLine } from "@/lib/business-lines";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -217,10 +235,55 @@ export async function signOutAction() {
   redirect("/login");
 }
 
+/**
+ * P2 §18.2–§18.3 — Đổi ngữ cảnh ngành hàng của phiên làm việc (bộ chuyển
+ * ngành ở sidebar). Giá trị ghi cookie CHỈ là "ý muốn": mọi trang/action
+ * đều kiểm tra lại từ DB (getBusinessLineContext), nên chọn ngành không
+ * được gán hoặc ALL khi không đủ quyền sẽ rơi về mặc định an toàn.
+ * Chỉ OWNER/CEO được chọn "ALL" (toàn doanh nghiệp).
+ */
+export async function setBusinessLineContextAction(formData: FormData) {
+  const supabase = await db();
+  const uid = await userId();
+  if (!uid) throw new Error("Chưa đăng nhập.");
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("role, is_active")
+    .eq("id", uid)
+    .maybeSingle();
+  if (!prof || !prof.is_active) throw new Error("Tài khoản chưa sẵn sàng.");
+  const wanted = str(formData, "business_line");
+  const canSeeAll = prof.role === "OWNER" || prof.role === "CEO";
+  if (wanted === "ALL") {
+    if (!canSeeAll) throw new Error("Chỉ Chủ cửa hàng và CEO mới xem được toàn doanh nghiệp.");
+  } else {
+    const line = await getLineByCode(supabase, wanted);
+    if (!line) throw new Error("Ngành hàng không tồn tại hoặc đang tắt.");
+    const { data: assigned } = await supabase
+      .from("user_business_lines")
+      .select("business_line_id")
+      .eq("user_id", uid)
+      .eq("business_line_id", line.id)
+      .maybeSingle();
+    if (!assigned && !canSeeAll) {
+      throw new Error("Tài khoản chưa được gán ngành hàng này — nhờ chủ cửa hàng gán.");
+    }
+  }
+  (await cookies()).set(BUSINESS_LINE_COOKIE, wanted, {
+    path: "/",
+    sameSite: "lax",
+  });
+  revalidatePath("/dashboard", "layout");
+}
+
 // -------------------------------------------------------------- catalog
 export async function createProductAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","SALES","WAREHOUSE"], "Chỉ Chủ cửa hàng, Bán hàng và Thủ kho mới được tạo sản phẩm.");
+  // P2: sản phẩm mới thuộc ngành đang làm việc (ALL thì chọn rõ trên form).
+  const line = await resolveWriteLine(supabase, optStr(formData, "business_line"));
+  const productGroup = optStr(formData, "product_group");
+  await assertGroupMatchesLine(supabase, productGroup, line.id);
   const product = must(
     await supabase
       .from("products")
@@ -228,7 +291,7 @@ export async function createProductAction(formData: FormData) {
         sku: str(formData, "sku"),
         name: str(formData, "name"),
         brand: optStr(formData, "brand"),
-        product_group: optStr(formData, "product_group"),
+        product_group: productGroup,
         sae_viscosity: optStr(formData, "sae_viscosity"),
         api_standard: optStr(formData, "api_standard"),
         unit: str(formData, "unit") || "cái",
@@ -236,6 +299,7 @@ export async function createProductAction(formData: FormData) {
         garage_price: num(formData, "garage_price"),
         wholesale_price: num(formData, "wholesale_price"),
         min_stock: Math.trunc(num(formData, "min_stock")),
+        business_line_id: line.id,
       })
       .select("id")
       .single(),
@@ -318,6 +382,17 @@ export async function updateProductInfoAction(productId: string, formData: FormD
   const unit = str(formData, "unit");
   if (!name) throw new Error("Cần nhập tên hàng.");
   if (!unit) throw new Error("Cần nhập đơn vị tính.");
+  const productGroup = optStr(formData, "product_group");
+  // P2: đổi nhóm hàng sang nhóm đã mapping sang ngành khác -> từ chối
+  // (đổi ngành phải dùng quy trình đổi ngành riêng, có kiểm tra giao dịch).
+  const { data: product } = await supabase
+    .from("products")
+    .select("business_line_id")
+    .eq("id", productId)
+    .maybeSingle();
+  if (product?.business_line_id) {
+    await assertGroupMatchesLine(supabase, productGroup, String(product.business_line_id));
+  }
   done(
     await supabase.from("products").update({
       name,
@@ -505,6 +580,13 @@ export async function updateWarehouseAction(formData: FormData) {
 export async function createPurchaseReceiptAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được tạo phiếu nhập mua.");
+  // P2: phiếu thuộc một ngành; kiểm tra dòng trước khi ghi phiếu để
+  // phiếu bị từ chối không để lại phiếu nháp trống.
+  const line = await resolveWriteLine(supabase, optStr(formData, "business_line"));
+  const rawItems = zipItems(formData, ["product_id", "qty", "unit_cost", "expiry_date"])
+    .filter((r) => r.product_id && Number(r.qty) > 0);
+  if (!rawItems.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
+  await assertProductsInLine(supabase, rawItems.map((r) => String(r.product_id)), line.id);
   const receipt = must(
     await supabase
       .from("purchase_receipts")
@@ -515,13 +597,13 @@ export async function createPurchaseReceiptAction(formData: FormData) {
         supplier_invoice_no: optStr(formData, "supplier_invoice_no"),
         note: optStr(formData, "note"),
         created_by: await userId(),
+        business_line_id: line.id,
       })
       .select("id")
       .single(),
     "Tạo phiếu nhập mua"
   );
-  const items = zipItems(formData, ["product_id", "qty", "unit_cost", "expiry_date"])
-    .filter((r) => r.product_id && Number(r.qty) > 0)
+  const items = rawItems
     .map((r) => ({
       receipt_id: receipt.id,
       product_id: r.product_id,
@@ -529,7 +611,6 @@ export async function createPurchaseReceiptAction(formData: FormData) {
       unit_cost: Number(r.unit_cost),
       expiry_date: validDate(String(r.expiry_date ?? "")),
     }));
-  if (!items.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
   done(await supabase.from("purchase_receipt_items").insert(items), "Thêm dòng phiếu nhập");
   // Tick "Xác nhận ngay": xác nhận luôn trong cùng một thao tác, không để
   // lại phiếu nháp — cùng cách làm như import (xác nhận ngay).
@@ -544,9 +625,36 @@ export async function createPurchaseReceiptAction(formData: FormData) {
   redirect("/stock-in?tab=purchase&ok=1");
 }
 
+/**
+ * P2: chứng từ xác nhận phải có ngành hàng. Chứng từ lịch sử còn NULL
+ * ngành (hỗn hợp từ P1, chưa phân loại) không được xác nhận tiếp khi
+ * chưa phân loại xong — tránh phát sinh tồn/công nợ không thuộc ngành nào.
+ * Chứng từ đã xác nhận trên live đều đã có ngành sau backfill P1 nên
+ * kiểm tra này không chặn luồng thường.
+ */
+async function requireHeaderBusinessLine(
+  supabase: AnyRow,
+  table: string,
+  id: string,
+  label: string,
+): Promise<void> {
+  const { data } = await supabase
+    .from(table)
+    .select("business_line_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) throw new Error(`Không tìm thấy ${label}.`);
+  if (!data.business_line_id) {
+    throw new Error(
+      `${label} chưa có ngành hàng (chứng từ cũ chưa phân loại) — hãy phân loại ngành trước khi xác nhận.`,
+    );
+  }
+}
+
 export async function confirmPurchaseReceiptAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được xác nhận phiếu nhập.");
+  await requireHeaderBusinessLine(supabase, "purchase_receipts", str(formData, "id"), "Phiếu nhập");
   const { error } = await supabase.rpc("confirm_purchase_receipt", {
     p_receipt_id: str(formData, "id"),
   });
@@ -582,6 +690,12 @@ export async function deleteReceiptAction(formData: FormData) {
 export async function createConsignmentReceiptAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được tạo phiếu nhận ký gửi.");
+  // P2: như phiếu nhập mua — kiểm tra dòng trước khi ghi phiếu.
+  const line = await resolveWriteLine(supabase, optStr(formData, "business_line"));
+  const rawItems = zipItems(formData, ["product_id", "qty", "consignment_price", "expiry_date"])
+    .filter((r) => r.product_id && Number(r.qty) > 0);
+  if (!rawItems.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
+  await assertProductsInLine(supabase, rawItems.map((r) => String(r.product_id)), line.id);
   const receipt = must(
     await supabase
       .from("consignment_receipts")
@@ -592,13 +706,13 @@ export async function createConsignmentReceiptAction(formData: FormData) {
         return_by_date: optDate(formData, "return_by_date"),
         note: optStr(formData, "note"),
         created_by: await userId(),
+        business_line_id: line.id,
       })
       .select("id")
       .single(),
     "Tạo phiếu nhận ký gửi"
   );
-  const items = zipItems(formData, ["product_id", "qty", "consignment_price", "expiry_date"])
-    .filter((r) => r.product_id && Number(r.qty) > 0)
+  const items = rawItems
     .map((r) => ({
       receipt_id: receipt.id,
       product_id: r.product_id,
@@ -606,7 +720,6 @@ export async function createConsignmentReceiptAction(formData: FormData) {
       consignment_price: Number(r.consignment_price),
       expiry_date: validDate(String(r.expiry_date ?? "")),
     }));
-  if (!items.length) throw new Error("Phiếu nhập cần ít nhất một dòng hàng.");
   done(await supabase.from("consignment_receipt_items").insert(items), "Thêm dòng phiếu nhập");
   // Tick "Xác nhận ngay": xác nhận luôn trong cùng một thao tác, không để
   // lại phiếu nháp — cùng cách làm như import (xác nhận ngay).
@@ -624,6 +737,7 @@ export async function createConsignmentReceiptAction(formData: FormData) {
 export async function confirmConsignmentReceiptAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được xác nhận phiếu nhận ký gửi.");
+  await requireHeaderBusinessLine(supabase, "consignment_receipts", str(formData, "id"), "Phiếu nhận ký gửi");
   const { error } = await supabase.rpc("confirm_consignment_receipt", {
     p_receipt_id: str(formData, "id"),
   });
@@ -682,6 +796,11 @@ export async function importStockAction(formData: FormData) {
   const productGroup = String(payload.productGroup ?? "").trim() || null;
   const rawRows: ImportPayloadRow[] = Array.isArray(payload.rows) ? payload.rows : [];
   if (!rawRows.length) throw new Error("File không có dòng nào để nhập.");
+  // P2: toàn bộ file thuộc một ngành (ngữ cảnh phiên làm việc; ALL thì
+  // chọn rõ trên form). Nhóm hàng cho sản phẩm mới đã mapping sang ngành
+  // khác -> từ chối cả file.
+  const line = await resolveWriteLine(supabase, String(payload.businessLine ?? "").trim() || null);
+  await assertGroupMatchesLine(supabase, productGroup, line.id);
 
   // FS-05: Truy vấn mục tiêu theo danh sách mã trong file, loại bỏ giới hạn cứng .limit(5000), tránh duplicate SKU
   const candidateCodesSet = new Set<string>();
@@ -707,16 +826,20 @@ export async function importStockAction(formData: FormData) {
 
   const bySku = new Map<string, string>();
   const byCode = new Map<string, string>();
+  // P2: ngành của từng sản phẩm đã có (để từ chối dòng sai ngành / chưa
+  // phân loại trước khi ghi bất cứ thứ gì).
+  const lineByProduct = new Map<string, string | null>();
 
   const CHUNK_SIZE = 500;
   for (let i = 0; i < candidateCodes.length; i += CHUNK_SIZE) {
     const chunk = candidateCodes.slice(i, i + CHUNK_SIZE);
     const [pRes, cRes] = await Promise.all([
-      supabase.from("products").select("id, sku").in("sku", chunk),
+      supabase.from("products").select("id, sku, business_line_id").in("sku", chunk),
       supabase.from("product_codes").select("code, product_id").in("code", chunk),
     ]);
     for (const p of ((pRes.data ?? []) as AnyRow[])) {
       if (p.sku && p.id) bySku.set(normKey(p.sku), p.id as string);
+      if (p.id) lineByProduct.set(p.id as string, (p.business_line_id as string | null) ?? null);
     }
     for (const c of ((cRes.data ?? []) as AnyRow[])) {
       if (c.code && c.product_id) byCode.set(normKey(c.code), c.product_id as string);
@@ -771,6 +894,18 @@ export async function importStockAction(formData: FormData) {
     }
     if (!found && (!autoCreate || !String(r.name ?? "").trim()))
       invalid.push(code);
+    // P2: sản phẩm đã có phải thuộc đúng ngành của file (chưa phân loại
+    // hoặc lệch ngành đều từ chối cả file — không nhập một phần).
+    if (found) {
+      const pLine = lineByProduct.get(found);
+      if (!pLine) {
+        invalid.push(`${code} (chưa phân loại ngành hàng)`);
+      } else if (pLine !== line.id) {
+        const other = await getLineLabelById(supabase, pLine);
+        const want = await getLineLabelById(supabase, line.id);
+        invalid.push(`${code} (thuộc ngành ${other}, file đang nhập ngành ${want})`);
+      }
+    }
   }
   if (invalid.length)
     rejectImport(invalid);
@@ -791,6 +926,7 @@ export async function importStockAction(formData: FormData) {
     garage_price: number;
     wholesale_price: number;
     min_stock: number;
+    business_line_id: string;
   }[] = [];
   const codeRows: { productRef: string; code: string; code_kind: string }[] = [];
   const fitmentReqs: { productRef: string; fitment: string }[] = [];
@@ -833,6 +969,8 @@ export async function importStockAction(formData: FormData) {
           garage_price: 0,
           wholesale_price: salePrice,
           min_stock: 0,
+          // P2: sản phẩm mới thuộc ngành của file import.
+          business_line_id: line.id,
         });
       }
       productRef = ref;
@@ -971,6 +1109,7 @@ export async function importStockAction(formData: FormData) {
           supplier_invoice_no: String(payload.supplierInvoiceNo ?? "").trim() || null,
           rounding_adjustment: roundingAdjustment,
           created_by: me,
+          business_line_id: line.id,
         })
         .select("id")
         .single(),
@@ -1008,6 +1147,7 @@ export async function importStockAction(formData: FormData) {
         receipt_date: receiptDate,
         rounding_adjustment: roundingAdjustment,
         created_by: me,
+        business_line_id: line.id,
       })
       .select("id")
       .single(),
@@ -1040,6 +1180,13 @@ export async function importStockAction(formData: FormData) {
 export async function createConsignmentOutAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được tạo phiếu gửi ký gửi.");
+  // P2: phiếu thuộc một ngành; kiểm tra lô trước khi ghi phiếu.
+  const line = await resolveWriteLine(supabase, optStr(formData, "business_line"));
+  const raw = zipItems(formData, ["batch_id", "qty", "term", "transfer_price"]).filter(
+    (r) => r.batch_id && Number(r.qty) > 0
+  );
+  if (!raw.length) throw new Error("Phiếu cần ít nhất một dòng lô hàng.");
+  await assertBatchesInLine(supabase, raw.map((r) => String(r.batch_id)), line.id);
   const slip = must(
     await supabase
       .from("consignment_out_slips")
@@ -1050,15 +1197,12 @@ export async function createConsignmentOutAction(formData: FormData) {
         return_by_date: optDate(formData, "return_by_date"),
         note: optStr(formData, "note"),
         created_by: await userId(),
+        business_line_id: line.id,
       })
       .select("id")
       .single(),
     "Tạo phiếu gửi ký gửi"
   );
-  const raw = zipItems(formData, ["batch_id", "qty", "term", "transfer_price"]).filter(
-    (r) => r.batch_id && Number(r.qty) > 0
-  );
-  if (!raw.length) throw new Error("Phiếu cần ít nhất một dòng lô hàng.");
   const batchIds = raw.map((r) => r.batch_id as string);
   const { data: batchInfos } = await supabase
     .from("stock_batches")
@@ -1101,6 +1245,7 @@ export async function createConsignmentOutAction(formData: FormData) {
 export async function confirmConsignmentOutAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được xác nhận phiếu gửi ký gửi.");
+  await requireHeaderBusinessLine(supabase, "consignment_out_slips", str(formData, "id"), "Phiếu gửi ký gửi");
   const { error } = await supabase.rpc("confirm_consignment_out", {
     p_slip_id: str(formData, "id"),
   });
@@ -1129,13 +1274,20 @@ export async function importConsignmentOutAction(formData: FormData) {
   const confirmNow = !!payload.confirmNow;
   const rawRows: AnyRow[] = Array.isArray(payload.rows) ? payload.rows : [];
   if (!rawRows.length) throw new Error("File không có dòng nào để gửi.");
+  // P2: toàn bộ file thuộc một ngành — lô sai ngành / chưa phân loại đều
+  // từ chối cả file (một phiếu GK chỉ thuộc một ngành, §10.2).
+  const line = await resolveWriteLine(supabase, String(payload.businessLine ?? "").trim() || null);
 
   const batchCodes = Array.from(new Set(rawRows.map((r) => String(r.batchCode ?? "").trim()))).filter(Boolean);
   const { data: batches } = await supabase
     .from("stock_batches")
-    .select("id, batch_code, ownership, supplier_id, unit_cost")
+    .select("id, batch_code, ownership, supplier_id, unit_cost, product_id")
     .in("batch_code", batchCodes);
   const batchByCode = new Map(((batches ?? []) as AnyRow[]).map((b) => [normKey(b.batch_code), b]));
+  const batchLineMap = await getProductLineMap(
+    supabase,
+    Array.from(batchByCode.values()).map((b) => String(b.product_id)),
+  );
   const batchIds = Array.from(batchByCode.values()).map((b) => b.id as string);
   // Vị trí kho mình giữ nhiều nhất của mỗi lô — đúng vị trí phiếu sẽ trừ.
   const mainOwn = await mainOwnLocations(supabase, batchIds);
@@ -1164,6 +1316,18 @@ export async function importConsignmentOutAction(formData: FormData) {
     const batch = batchByCode.get(normKey(code));
     if (!batch) {
       invalid.push(code);
+      continue;
+    }
+    // P2: lô phải thuộc ngành của file.
+    const bLine = batchLineMap.get(String(batch.product_id));
+    if (!bLine?.lineId) {
+      invalid.push(`${code} (lô thuộc sản phẩm chưa phân loại ngành hàng)`);
+      continue;
+    }
+    if (bLine.lineId !== line.id) {
+      const other = await getLineLabelById(supabase, bLine.lineId);
+      const want = await getLineLabelById(supabase, line.id);
+      invalid.push(`${code} (lô thuộc ngành ${other}, file đang gửi ngành ${want})`);
       continue;
     }
     if (batch.ownership === "CONSIGNED" && !subOk.get(batch.supplier_id as string)) {
@@ -1227,6 +1391,7 @@ export async function importConsignmentOutAction(formData: FormData) {
         settlement_due_date: String(payload.settlementDueDate ?? "").trim() || null,
         return_by_date: String(payload.returnByDate ?? "").trim() || null,
         created_by: me,
+        business_line_id: line.id,
       })
       .select("id")
       .single(),
@@ -1281,7 +1446,7 @@ async function createSaleFromForm(formData: FormData) {
   const batchIds = lines.map((l) => l.batch_id);
   const { data: batchRows, error } = await supabase
     .from("v_batches_for_sales")
-    .select("batch_id, product_id, ownership")
+    .select("batch_id, batch_code, product_id, ownership, business_line_id, business_line_code, expiry_date")
     .in("batch_id", batchIds);
   const batches = ((batchRows ?? []) as AnyRow[]).map((b) => ({ ...b, id: b.batch_id }));
   if (error) throw new Error(error.message);
@@ -1316,20 +1481,57 @@ async function createSaleFromForm(formData: FormData) {
     .in("id", batchIds);
   const costMap = new Map(((batchCosts ?? []) as AnyRow[]).map((b) => [b.id as string, Number(b.unit_cost) || 0]));
 
-  const groups: Record<string, AnyRow[]> = { BH: [], KG: [] };
+  // P2 §9.3/E11 — checkout chung tách thành chứng từ riêng theo
+  // (tính chất lô, ngành): tối đa 4 chứng từ (2 ngành × BH/KG). Mã
+  // chứng từ vẫn BH/KG như cũ; ngành phân biệt bằng business_line_id.
+  interface SaleGroup {
+    kind: "BH" | "KG";
+    lineId: string;
+    lineCode: string;
+    lines: AnyRow[];
+  }
+  const groups = new Map<string, SaleGroup>();
+  // Ngày nghiệp vụ để xét hạn dùng: ngày bán trên chứng từ (file import
+  // có thể ghi lùi ngày); không có thì ngày hiện tại.
+  const businessDate = saleDate || todayISO();
   for (const l of lines) {
     const batch = batchMap.get(l.batch_id);
     if (!batch) throw new Error("Không tìm thấy lô hàng.");
+    // P2: lô của sản phẩm chưa phân loại thì chưa bán được (chứng từ có
+    // ngành chỉ nhận dòng cùng ngành; DB guard cũng chặn, đây báo sớm).
+    if (!batch.business_line_id) {
+      throw new Error(
+        `Lô ${batch.batch_code} thuộc sản phẩm chưa phân loại ngành hàng — hãy phân loại trước khi bán.`,
+      );
+    }
+    // P2 BL-006: lô dầu đã hết hạn thì không được bán (chặn ở đây cho
+    // cả bán tay lẫn import; FEFO đã loại lô hết hạn từ bước phân bổ).
+    if (
+      isOilLineCode(batch.business_line_code) &&
+      isExpiredBatch(batch.expiry_date, businessDate)
+    ) {
+      throw new Error(
+        `Lô ${batch.batch_code} đã hết hạn ngày ${String(batch.expiry_date).slice(0, 10)} — không được bán. Kiểm tra lại lô dầu trước khi bán.`,
+      );
+    }
     const cost = costMap.get(l.batch_id as string) ?? 0;
     if (batch.ownership === "CONSIGNED" && cost > 0 && Number(l.unit_price) < cost) {
       throw new Error(`Không thể bán hàng ký gửi dưới giá vốn (giá bán ${Number(l.unit_price)} < giá vốn ${cost}).`);
+    }
+    const kind = batch.ownership === "OWNED" ? "BH" : "KG";
+    const lineCode = String(batch.business_line_code ?? "");
+    const key = `${kind}:${lineCode}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { kind, lineId: String(batch.business_line_id ?? ""), lineCode, lines: [] };
+      groups.set(key, group);
     }
     const splits = splitAcrossShelves(
       ownLocs.get(l.batch_id as string),
       Math.trunc(Number(l.qty))
     );
     for (const s of splits) {
-      groups[batch.ownership === "OWNED" ? "BH" : "KG"].push({
+      group.lines.push({
         product_id: batch.product_id,
         batch_id: l.batch_id,
         from_location_id: s.locationId,
@@ -1340,28 +1542,50 @@ async function createSaleFromForm(formData: FormData) {
   }
 
   const discountRequested = num(formData, "discount_amount");
+  // Giảm giá chỉ áp cho BH (như cũ); khi tách thành 2 chứng từ BH thì
+  // chia theo tỷ lệ tiền hàng từng chứng từ, đồng cuối cùng dồn vào
+  // chứng từ BH lớn nhất — tổng giảm giá không đổi.
+  const bhGroups = Array.from(groups.values()).filter((g) => g.kind === "BH");
+  const bhSubtotals = bhGroups.map((g) =>
+    g.lines.reduce((a, l) => a + l.qty * l.unit_price, 0),
+  );
+  const bhTotal = bhSubtotals.reduce((a, b) => a + b, 0);
+  const totalDiscount = Math.min(discountRequested, bhTotal);
+  const discountByKey = new Map<string, number>();
+  {
+    let allocated = 0;
+    bhGroups.forEach((g, i) => {
+      const d =
+        i === bhGroups.length - 1
+          ? totalDiscount - allocated
+          : Math.floor((totalDiscount * bhSubtotals[i]) / (bhTotal || 1));
+      allocated += d;
+      discountByKey.set(`${g.kind}:${g.lineCode}`, d);
+    });
+  }
   let orderTotal = 0;
-  for (const kind of ["BH", "KG"] as const) {
-    const docLines = groups[kind];
+  for (const [key, group] of Array.from(groups.entries())) {
+    const docLines = group.lines;
     if (!docLines.length) continue;
     const subtotal = docLines.reduce((a, l) => a + l.qty * l.unit_price, 0);
-    const discount = kind === "BH" ? Math.min(discountRequested, subtotal) : 0;
+    const discount = group.kind === "BH" ? discountByKey.get(key) ?? 0 : 0;
     const doc = must(
       await supabase
         .from("sales_documents")
         .insert({
-          doc_kind: kind,
+          doc_kind: group.kind,
           sales_order_id: order.id,
           partner_id: partnerId,
           customer_name: optStr(formData, "customer_name"),
           is_credit: formData.get("is_credit") === "on",
           discount_amount: discount,
           created_by: await userId(),
+          business_line_id: group.lineId,
           ...(saleDate ? { doc_date: saleDate } : {}),
         })
         .select("id")
         .single(),
-      `Tạo chứng từ ${kind}`
+      `Tạo chứng từ ${group.kind}`
     );
     done(
       await supabase.from("sales_document_lines").insert(
@@ -1438,7 +1662,7 @@ export async function importDealerSaleAction(formData: FormData) {
   // dòng nào đó thiếu mã — cùng luật khớp với bản xem trước ở client.
   const { data: allProducts } = await supabase
     .from("products")
-    .select("id, name, sku, retail_price, garage_price, wholesale_price")
+    .select("id, name, sku, retail_price, garage_price, wholesale_price, business_line_id")
     .limit(5000);
   const { data: allCodes } = await supabase.from("product_codes").select("code, product_id").limit(10000);
   const { data: allFitments } = await supabase
@@ -1520,32 +1744,52 @@ export async function importDealerSaleAction(formData: FormData) {
   if (invalid.length) rejectImport(invalid);
   const productIds = Array.from(new Set(resolved.map((r) => r.productId)));
 
+  // P2: mọi sản phẩm trong file phải thuộc ngành user được làm việc.
+  // Ngữ cảnh LINE -> chỉ đúng ngành đó; ALL -> cả hai ngành đều được
+  // (checkout tách ở createSaleFromForm); chưa phân loại -> từ chối.
+  const ctx = await getBusinessLineContext();
+  if (ctx.mode === "NONE") {
+    throw new Error("Tài khoản chưa được gán ngành hàng — nhờ chủ cửa hàng gán ngành trước khi bán hàng.");
+  }
+  const lineByProduct = new Map(
+    ((allProducts ?? []) as AnyRow[]).map((p) => [
+      p.id as string,
+      (p.business_line_id as string | null) ?? null,
+    ]),
+  );
+  const lineInvalid: string[] = [];
+  for (const r of resolved) {
+    const pLine = lineByProduct.get(r.productId);
+    if (!pLine) {
+      lineInvalid.push(`${r.label} (chưa phân loại ngành hàng)`);
+    } else if (ctx.mode === "LINE" && pLine !== ctx.lineId) {
+      lineInvalid.push(`${r.label} (không thuộc ngành đang làm việc)`);
+    }
+  }
+  if (lineInvalid.length) rejectImport(lineInvalid);
+
   // Hàng đợi FIFO theo sản phẩm: lô cũ nhất (received_date, rồi mã lô)
   // trước; nhớt thì FEFO — hạn dùng gần nhất trước, lô không hạn xếp
-  // sau cùng rồi mới theo FIFO. Tồn khả dụng của mỗi lô = tồn tại vị
-  // trí kho mình giữ nhiều nhất — đúng vị trí phiếu sẽ trừ.
+  // sau cùng rồi mới theo FIFO. Lô dầu HẾT HẠN (tính theo ngày bán của
+  // file) bị loại khỏi hàng đợi bán thường (BL-006). Tồn khả dụng của
+  // mỗi lô = tồn tại vị trí kho mình giữ nhiều nhất — đúng vị trí phiếu
+  // sẽ trừ.
   const { data: batchRows } = productIds.length
     ? await supabase
         .from("v_batches_for_sales")
-        .select("batch_id, batch_code, product_id, ownership, received_date, expiry_date")
+        .select("batch_id, batch_code, product_id, ownership, received_date, expiry_date, business_line_code")
         .in("product_id", productIds)
     : { data: [] as AnyRow[] };
   const batches = ((batchRows ?? []) as AnyRow[]).map((b) => ({ ...b, id: b.batch_id }));
-  const { data: groupRows } = productIds.length
-    ? await supabase
-        .from("products")
-        .select("id, product_group")
-        .in("id", productIds)
-    : { data: [] as AnyRow[] };
-  const oilByProduct = new Map<string, boolean>(
-    ((groupRows ?? []) as AnyRow[]).map((p) => [p.id as string, isOilGroup(p.product_group)])
-  );
   const batchIds = ((batches ?? []) as AnyRow[]).map((b) => b.id as string);
   const ownLocs = await mainOwnLocations(supabase, batchIds);
   const fifoByProduct = new Map<string, { id: string; qty: number }[]>();
+  // P2: FEFO theo ngành chuẩn business_line_code (không theo tên nhóm);
+  // lô dầu hết hạn loại khỏi hàng đợi (createSaleFromForm chặn lại lần nữa).
   for (const b of ((batches ?? []) as AnyRow[]).sort((x, y) =>
-    compareLotOrder(x, y, oilByProduct.get(x.product_id as string) ?? false)
+    compareLotOrder(x, y, isOilLineCode(x.business_line_code))
   )) {
+    if (isOilLineCode(b.business_line_code) && isExpiredBatch(b.expiry_date, saleDate)) continue;
     const q = ownLocs.get(b.id as string)?.qty ?? 0;
     if (q <= 0) continue;
     const list = fifoByProduct.get(b.product_id as string) ?? [];
@@ -1597,6 +1841,12 @@ export async function importDealerSaleAction(formData: FormData) {
 export async function createConsumptionReportAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","SALES","ACCOUNTING"], "Chỉ Chủ cửa hàng, Bán hàng và Kế toán mới được tạo báo cáo tiêu thụ.");
+  // P2: báo cáo thuộc một ngành; kiểm tra dòng trước khi ghi báo cáo.
+  const line = await resolveWriteLine(supabase, optStr(formData, "business_line"));
+  const rawItems = zipItems(formData, ["product_id", "qty_consumed"])
+    .filter((r) => r.product_id && Number(r.qty_consumed) > 0);
+  if (!rawItems.length) throw new Error("Báo cáo cần ít nhất một dòng hàng.");
+  await assertProductsInLine(supabase, rawItems.map((r) => String(r.product_id)), line.id);
   const report = must(
     await supabase
       .from("consumption_reports")
@@ -1606,19 +1856,18 @@ export async function createConsumptionReportAction(formData: FormData) {
         period_to: str(formData, "period_to"),
         note: optStr(formData, "note"),
         created_by: await userId(),
+        business_line_id: line.id,
       })
       .select("id")
       .single(),
     "Tạo báo cáo tiêu thụ"
   );
-  const items = zipItems(formData, ["product_id", "qty_consumed"])
-    .filter((r) => r.product_id && Number(r.qty_consumed) > 0)
+  const items = rawItems
     .map((r) => ({
       report_id: report.id,
       product_id: r.product_id,
       qty_consumed: Math.trunc(Number(r.qty_consumed)),
     }));
-  if (!items.length) throw new Error("Báo cáo cần ít nhất một dòng hàng.");
   done(await supabase.from("consumption_report_items").insert(items), "Thêm dòng báo cáo");
   revalidatePath("/partner-consumption");
   redirect("/partner-consumption?ok=1");
@@ -1627,6 +1876,10 @@ export async function createConsumptionReportAction(formData: FormData) {
 export async function setConsumptionReportStatusAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","SALES","ACCOUNTING"], "Chỉ Chủ cửa hàng, Bán hàng và Kế toán mới được đổi trạng thái báo cáo.");
+  // P2: chỉ xác nhận báo cáo đã có ngành.
+  if (str(formData, "status") === "CONFIRMED") {
+    await requireHeaderBusinessLine(supabase, "consumption_reports", str(formData, "id"), "Báo cáo tiêu thụ");
+  }
   done(
     await supabase
       .from("consumption_reports")
@@ -1640,6 +1893,13 @@ export async function setConsumptionReportStatusAction(formData: FormData) {
 export async function createAllocationAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","SALES","ACCOUNTING"], "Chỉ Chủ cửa hàng, Bán hàng và Kế toán mới được tạo phiếu phân bổ.");
+  // P2: phiếu thuộc một ngành; kiểm tra dòng (sản phẩm + lô) trước khi ghi.
+  const line = await resolveWriteLine(supabase, optStr(formData, "business_line"));
+  const rawLines = zipItems(formData, ["product_id", "batch_id", "nature", "qty", "unit_price"])
+    .filter((r) => r.batch_id && r.product_id && Number(r.qty) > 0);
+  if (!rawLines.length) throw new Error("Phiếu phân bổ cần ít nhất một dòng.");
+  await assertProductsInLine(supabase, rawLines.map((r) => String(r.product_id)), line.id);
+  await assertBatchesInLine(supabase, rawLines.map((r) => String(r.batch_id)), line.id);
   const slip = must(
     await supabase
       .from("allocation_slips")
@@ -1648,13 +1908,13 @@ export async function createAllocationAction(formData: FormData) {
         partner_id: str(formData, "partner_id"),
         note: optStr(formData, "note"),
         created_by: await userId(),
+        business_line_id: line.id,
       })
       .select("id")
       .single(),
     "Tạo phiếu phân bổ"
   );
-  const lines = zipItems(formData, ["product_id", "batch_id", "nature", "qty", "unit_price"])
-    .filter((r) => r.batch_id && r.product_id && Number(r.qty) > 0)
+  const lines = rawLines
     .map((r) => ({
       allocation_id: slip.id,
       product_id: r.product_id,
@@ -1663,7 +1923,6 @@ export async function createAllocationAction(formData: FormData) {
       qty: Math.trunc(Number(r.qty)),
       unit_price: Number(r.unit_price),
     }));
-  if (!lines.length) throw new Error("Phiếu phân bổ cần ít nhất một dòng.");
   done(await supabase.from("allocation_lines").insert(lines), "Thêm dòng phân bổ");
   revalidatePath("/partner-consumption");
   redirect(`/partner-consumption/allocations/${slip.id}?ok=1`);
@@ -1672,6 +1931,7 @@ export async function createAllocationAction(formData: FormData) {
 export async function confirmAllocationAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","SALES","ACCOUNTING"], "Chỉ Chủ cửa hàng, Bán hàng và Kế toán mới được xác nhận phân bổ.");
+  await requireHeaderBusinessLine(supabase, "allocation_slips", str(formData, "id"), "Phiếu phân bổ");
   const { error } = await supabase.rpc("confirm_allocation", {
     p_allocation_id: str(formData, "id"),
   });
@@ -1726,34 +1986,66 @@ export async function importConsumptionReportAction(formData: FormData) {
   if (invalid.length)
     rejectImport(invalid);
 
+  // P2 §10.4: một file BT có thể chứa cả hai ngành — tách thành báo cáo
+  // riêng theo ngành, giữ nguyên đối tác + kỳ. Ngữ cảnh LINE thì chỉ
+  // nhận đúng ngành đó (dòng ngành khác -> từ chối cả file); chưa phân
+  // loại -> từ chối (không lặng lẽ bỏ dòng).
+  const ctx = await getBusinessLineContext();
+  if (ctx.mode === "NONE") {
+    throw new Error("Tài khoản chưa được gán ngành hàng — nhờ chủ cửa hàng gán ngành trước khi nhập báo cáo.");
+  }
+  const lineMap = await getProductLineMap(supabase, items.map((i) => i.product_id));
+  const codeByProduct = new Map<string, string>();
+  for (const r of rawRows) {
+    const pid = bySku.get(normKey(String(r.code ?? "").trim())) ?? byCode.get(normKey(String(r.code ?? "").trim()));
+    if (pid) codeByProduct.set(pid, String(r.code ?? "").trim());
+  }
+  const groups = splitByBusinessLine(items, (i) => lineMap.get(i.product_id)?.lineId ?? null);
+  const unclassified = groups.get("") ?? [];
+  if (unclassified.length) {
+    rejectImport(unclassified.map((i) => `${codeByProduct.get(i.product_id) ?? i.product_id} (chưa phân loại ngành hàng)`));
+  }
+  if (ctx.mode === "LINE") {
+    const foreign = Array.from(groups.keys()).filter((k) => k !== ctx.lineId);
+    if (foreign.length) {
+      const want = await getLineLabelById(supabase, ctx.lineId);
+      throw new Error(
+        `File có dòng thuộc ngành khác — đang ở ngữ cảnh ${want}. Chuyển ngữ cảnh sang Toàn doanh nghiệp để tách thành 2 báo cáo, hoặc tách file theo ngành rồi nhập lại.`,
+      );
+    }
+  }
+
   const me = await userId();
-  const report = must(
-    await supabase
-      .from("consumption_reports")
-      .insert({
-        partner_id: partnerId,
-        period_from: periodFrom,
-        period_to: periodTo,
-        created_by: me,
-      })
-      .select("id")
-      .single(),
-    "Tạo báo cáo tiêu thụ"
-  );
-  done(
-    await supabase.from("consumption_report_items").insert(
-      items.map((i) => ({ report_id: report.id, ...i }))
-    ),
-    "Thêm dòng báo cáo"
-  );
-  if (confirmNow) {
-    done(
+  for (const [lineId, gItems] of Array.from(groups.entries())) {
+    const report = must(
       await supabase
         .from("consumption_reports")
-        .update({ status: "CONFIRMED" })
-        .eq("id", report.id),
-      "Xác nhận báo cáo"
+        .insert({
+          partner_id: partnerId,
+          period_from: periodFrom,
+          period_to: periodTo,
+          created_by: me,
+          business_line_id: lineId,
+        })
+        .select("id")
+        .single(),
+      "Tạo báo cáo tiêu thụ",
     );
+    done(
+      await supabase.from("consumption_report_items").insert(
+        gItems.map((i) => ({ report_id: report.id, ...i })),
+      ),
+      "Thêm dòng báo cáo",
+    );
+    if (confirmNow) {
+      done(
+        await supabase
+          .from("consumption_reports")
+          .update({ status: "CONFIRMED" })
+          .eq("id", report.id),
+        "Xác nhận báo cáo",
+      );
+    }
   }
   revalidatePath("/partner-consumption");
   redirect("/partner-consumption?ok=1");
@@ -1885,27 +2177,58 @@ export async function importAllocationAction(formData: FormData) {
   if (invalid.length)
     rejectImport(invalid);
 
+  // P2 §10.4: tách file PB theo ngành như BT (một phiếu PB chỉ thuộc
+  // một ngành). Ngữ cảnh LINE thì chỉ nhận đúng ngành đó; chưa phân
+  // loại -> từ chối cả file.
+  const ctx = await getBusinessLineContext();
+  if (ctx.mode === "NONE") {
+    throw new Error("Tài khoản chưa được gán ngành hàng — nhờ chủ cửa hàng gán ngành trước khi nhập phân bổ.");
+  }
+  const pbLineMap = await getProductLineMap(supabase, lines.map((l) => l.product_id));
+  const pbCodeByBatch = new Map(
+    Array.from(batchByCode.values()).map((b) => [String(b.id), String(b.batch_code)]),
+  );
+  const pbGroups = splitByBusinessLine(lines, (l) => pbLineMap.get(l.product_id)?.lineId ?? null);
+  const pbUnclassified = pbGroups.get("") ?? [];
+  if (pbUnclassified.length) {
+    rejectImport(pbUnclassified.map((l) => `${pbCodeByBatch.get(l.batch_id) ?? l.batch_id} (chưa phân loại ngành hàng)`));
+  }
+  if (ctx.mode === "LINE") {
+    const foreign = Array.from(pbGroups.keys()).filter((k) => k !== ctx.lineId);
+    if (foreign.length) {
+      const want = await getLineLabelById(supabase, ctx.lineId);
+      throw new Error(
+        `File có dòng thuộc ngành khác — đang ở ngữ cảnh ${want}. Chuyển ngữ cảnh sang Toàn doanh nghiệp để tách thành 2 phiếu, hoặc tách file theo ngành rồi nhập lại.`,
+      );
+    }
+  }
+
   const me = await userId();
-  const slip = must(
-    await supabase
-      .from("allocation_slips")
-      .insert({ report_id: reportId, partner_id: partnerId, created_by: me })
-      .select("id")
-      .single(),
-    "Tạo phiếu phân bổ"
-  );
-  done(
-    await supabase.from("allocation_lines").insert(
-      lines.map((l) => ({ allocation_id: slip.id, ...l }))
-    ),
-    "Thêm dòng phân bổ"
-  );
-  if (confirmNow) {
-    const { error } = await supabase.rpc("confirm_allocation", { p_allocation_id: slip.id });
-    if (error) throw new Error(error.message);
+  const createdSlips: string[] = [];
+  for (const [lineId, gLines] of Array.from(pbGroups.entries())) {
+    const slip = must(
+      await supabase
+        .from("allocation_slips")
+        .insert({ report_id: reportId, partner_id: partnerId, created_by: me, business_line_id: lineId })
+        .select("id")
+        .single(),
+      "Tạo phiếu phân bổ",
+    );
+    done(
+      await supabase.from("allocation_lines").insert(
+        gLines.map((l) => ({ allocation_id: slip.id, ...l })),
+      ),
+      "Thêm dòng phân bổ",
+    );
+    if (confirmNow) {
+      const { error } = await supabase.rpc("confirm_allocation", { p_allocation_id: slip.id });
+      if (error) throw new Error(error.message);
+    }
+    createdSlips.push(slip.id as string);
   }
   revalidatePath("/partner-consumption");
-  redirect(`/partner-consumption/allocations/${slip.id}?ok=1`);
+  if (createdSlips.length === 1) redirect(`/partner-consumption/allocations/${createdSlips[0]}?ok=1`);
+  redirect("/partner-consumption?ok=1");
 }
 
 /** Turn a CONFIRMED allocation into BH/KG documents (one per nature), then confirm them. */
@@ -1938,30 +2261,65 @@ export async function createAllocationDocumentsAction(formData: FormData) {
   const fromLocation = await partnerLocationId(supabase, slip.partner_id);
   if (!fromLocation) throw new Error("Không tìm thấy kho của đối tác trên hệ thống.");
 
-  const groups: Record<string, AnyRow[]> = { BH: [], KG: [] };
-  for (const l of pending) {
-    groups[l.nature === "PURCHASED" ? "BH" : "KG"].push(l);
+  // P2 §9.3/E11: một lần chia có thể tạo tối đa 4 chứng từ (2 ngành ×
+  // BH/KG). Dòng chưa phân loại -> từ chối (không đoán ngành); lô dầu
+  // hết hạn -> chặn bán (BL-006, tính theo ngày hôm nay vì chứng từ
+  // phân bổ không có ngày lùi).
+  const allocLineMap = await getProductLineMap(
+    supabase,
+    pending.map((l: AnyRow) => String(l.product_id)),
+  );
+  const allocBatchIds = Array.from(new Set(pending.map((l: AnyRow) => String(l.batch_id)).filter(Boolean)));
+  const { data: allocBatches } = allocBatchIds.length
+    ? await supabase.from("stock_batches").select("id, batch_code, expiry_date").in("id", allocBatchIds)
+    : { data: [] as AnyRow[] };
+  const allocBatchById = new Map(((allocBatches ?? []) as AnyRow[]).map((b) => [String(b.id), b]));
+  const allocToday = todayISO();
+  for (const l of pending as AnyRow[]) {
+    const entry = allocLineMap.get(String(l.product_id));
+    if (!entry?.lineId) {
+      throw new Error("Một dòng phân bổ thuộc sản phẩm chưa phân loại ngành hàng — hãy phân loại trước khi lập chứng từ.");
+    }
+    if (isOilLineCode(entry.code)) {
+      const b = allocBatchById.get(String(l.batch_id));
+      if (b && isExpiredBatch(b.expiry_date, allocToday)) {
+        throw new Error(
+          `Lô ${b.batch_code} đã hết hạn ngày ${String(b.expiry_date).slice(0, 10)} — không được bán. Kiểm tra lại lô dầu trước khi lập chứng từ.`,
+        );
+      }
+    }
   }
-  for (const kind of ["BH", "KG"] as const) {
-    const group = groups[kind];
-    if (!group.length) continue;
+  const groups = new Map<string, { kind: "BH" | "KG"; lineId: string; lines: AnyRow[] }>();
+  for (const l of pending as AnyRow[]) {
+    const kind = l.nature === "PURCHASED" ? "BH" : "KG";
+    const lineId = allocLineMap.get(String(l.product_id))?.lineId as string;
+    const key = `${kind}:${lineId}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { kind, lineId, lines: [] };
+      groups.set(key, group);
+    }
+    group.lines.push(l);
+  }
+  for (const group of Array.from(groups.values())) {
     const doc = must(
       await supabase
         .from("sales_documents")
         .insert({
-          doc_kind: kind,
+          doc_kind: group.kind,
           allocation_id: allocationId,
           partner_id: slip.partner_id,
           is_credit: true,
           created_by: await userId(),
+          business_line_id: group.lineId,
         })
         .select("id")
         .single(),
-      `Tạo chứng từ ${kind}`
+      `Tạo chứng từ ${group.kind}`
     );
     done(
       await supabase.from("sales_document_lines").insert(
-        group.map((l: AnyRow) => ({
+        group.lines.map((l: AnyRow) => ({
           document_id: doc.id,
           product_id: l.product_id,
           batch_id: l.batch_id,
@@ -2220,6 +2578,13 @@ export async function createReturnAction(formData: FormData) {
   await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được tạo phiếu trả hàng.");
   const kind = str(formData, "return_kind");
   const partnerId = optStr(formData, "partner_id");
+  // P2: phiếu trả thuộc một ngành; kiểm tra lô trước khi ghi phiếu.
+  const line = await resolveWriteLine(supabase, optStr(formData, "business_line"));
+  const raw = zipItems(formData, ["batch_id", "qty", "reason"]).filter(
+    (r) => r.batch_id && Number(r.qty) > 0
+  );
+  if (!raw.length) throw new Error("Phiếu trả cần ít nhất một dòng lô hàng.");
+  await assertBatchesInLine(supabase, raw.map((r) => String(r.batch_id)), line.id);
   const doc = must(
     await supabase
       .from("return_documents")
@@ -2229,15 +2594,12 @@ export async function createReturnAction(formData: FormData) {
         supplier_id: optStr(formData, "supplier_id"),
         note: optStr(formData, "note"),
         created_by: await userId(),
+        business_line_id: line.id,
       })
       .select("id")
       .single(),
     "Tạo phiếu trả hàng"
   );
-  const raw = zipItems(formData, ["batch_id", "qty", "reason"]).filter(
-    (r) => r.batch_id && Number(r.qty) > 0
-  );
-  if (!raw.length) throw new Error("Phiếu trả cần ít nhất một dòng lô hàng.");
   const defaultWh = await defaultWarehouseId(supabase);
   const ownLocs =
     kind === "SUPPLIER_RETURN"
@@ -2293,6 +2655,7 @@ export async function createReturnAction(formData: FormData) {
 export async function confirmReturnAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được xác nhận phiếu trả hàng.");
+  await requireHeaderBusinessLine(supabase, "return_documents", str(formData, "id"), "Phiếu trả hàng");
   const { error } = await supabase.rpc("confirm_return_document", {
     p_return_id: str(formData, "id"),
   });
@@ -2493,6 +2856,27 @@ export async function updateCashFundAction(formData: FormData) {
 export async function createStockAdjustmentAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","WAREHOUSE"], "Chỉ Chủ cửa hàng và Thủ kho mới được điều chỉnh kho.");
+  // P2: chỉ điều chỉnh lô thuộc ngành mình được làm việc (danh sách lô
+  // trên giao diện đã lọc theo ngành; đây là kiểm tra lại phía server).
+  const ctx = await getBusinessLineContext();
+  if (ctx.mode === "NONE") {
+    throw new Error("Tài khoản chưa được gán ngành hàng — nhờ chủ cửa hàng gán ngành trước khi điều chỉnh kho.");
+  }
+  if (ctx.mode === "LINE") {
+    const batchId = str(formData, "batch_id");
+    const { data: batch } = await supabase
+      .from("stock_batches")
+      .select("product_id")
+      .eq("id", batchId)
+      .maybeSingle();
+    if (batch) {
+      const lineMap = await getProductLineMap(supabase, [String(batch.product_id)]);
+      const entry = lineMap.get(String(batch.product_id));
+      if (!entry?.lineId || entry.lineId !== ctx.lineId) {
+        throw new Error("Lô hàng này không thuộc ngành đang làm việc — đổi ngữ cảnh ngành rồi thử lại.");
+      }
+    }
+  }
   const { error } = await supabase.rpc("create_stock_adjustment", {
     p_batch_id: str(formData, "batch_id"),
     p_location_id: str(formData, "location_id"),

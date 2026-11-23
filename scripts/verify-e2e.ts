@@ -3,6 +3,7 @@ import { runTier1Tests } from "./e2e/tier1-features.test";
 import { runTier2Tests } from "./e2e/tier2-boundaries.test";
 import { runTier3Tests } from "./e2e/tier3-combinations.test";
 import { runTier4Tests } from "./e2e/tier4-real-sample.test";
+import { runTier5Tests } from "./e2e/tier5-business-lines.test";
 
 async function main() {
   const startTime = performance.now();
@@ -55,10 +56,19 @@ async function main() {
       console.log(` Tier 4 Passed: ${t4.passed}/${t4.total} tests in ${t4Duration}s\n`);
     }
 
+    // TIER 5 (P2 — V2.0 Business Line Separation: hàm thuần, không chạm DB)
+    console.log("━━━ TIER 5: BUSINESS-LINE SEPARATION P2 (8 Test Cases: BL-003/004/005/006/007/008) ━━━");
+    const t5Start = performance.now();
+    const t5 = await runTier5Tests();
+    const t5Duration = ((performance.now() - t5Start) / 1000).toFixed(2);
+    totalPassed += t5.passed;
+    totalTests += t5.total;
+    console.log(` Tier 5 Passed: ${t5.passed}/${t5.total} tests in ${t5Duration}s\n`);
+
     const totalDuration = ((performance.now() - startTime) / 1000).toFixed(2);
     console.log("================================================================================");
     if (t4.skipped) {
-      console.log(` TIER 1–3: ${totalPassed}/${totalTests} E2E TESTS COMPLETED SUCCESSFULLY! (${totalDuration}s)`);
+      console.log(` TIER 1–3 + 5: ${totalPassed}/${totalTests} E2E TESTS COMPLETED SUCCESSFULLY! (${totalDuration}s)`);
       console.log(" Tier 4 SKIPPED: enterprise sample file not available (see above).");
     } else {
       console.log(` ALL ${totalPassed}/${totalTests} E2E TESTS COMPLETED SUCCESSFULLY! (${totalDuration}s)`);
