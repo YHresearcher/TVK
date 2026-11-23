@@ -1,7 +1,8 @@
--- 0021: P0 fail-closed row access for the cost-free stock view.
+-- 0024: P0 fail-closed row access for the cost-free stock view.
 -- Fixes regression verified on local: an authenticated JWT without a TVK
 -- profile received all rows from v_batches_for_sales (92 in test).
--- Must run after 0020. Only read privileges for active TVK users.
+-- Must run after 0020; main's 0021-0023 do not touch this view.
+-- Only read privileges for active TVK users.
 BEGIN;
 
 CREATE OR REPLACE VIEW public.v_batches_for_sales

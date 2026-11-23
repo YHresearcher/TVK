@@ -1,4 +1,5 @@
--- Run ONLY against restored Supabase LOCAL DB after 0020 and 0021.
+-- Run ONLY against restored Supabase LOCAL DB after
+-- supabase/migrations/0024_sales_view_profile_guard.sql.
 -- psql -v ON_ERROR_STOP=1 -f docs/tests/p0_sales_view_rls_local.sql
 -- This test does not modify business data.
 SELECT id AS sales_id FROM public.profiles WHERE role='SALES' AND is_active = true LIMIT 1
