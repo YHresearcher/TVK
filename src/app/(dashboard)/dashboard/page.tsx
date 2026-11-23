@@ -12,8 +12,10 @@ import {
   getCashFundBalances,
   getCurrentProfile,
   getDashboard,
+  getDebtByLine,
   getGroupPerformance,
   getInventoryValueByGroup,
+  getLineComparison,
   getPartnerConsignmentBars,
   getPerformanceSeries,
   getReceivableAgingBars,
@@ -21,6 +23,7 @@ import {
   listLedgerMovements,
   listPartnerStats,
 } from "@/lib/queries";
+import { checkLineTotals, sumDebtByLine } from "@/lib/reporting";
 import { formatDate, formatNumber, formatVND, todayISO } from "@/lib/format";
 import { MOVEMENT_KIND_LABELS } from "@/lib/types";
 
@@ -131,19 +134,22 @@ export default async function DashboardPage({
     );
   }
   const lineFilter = ctx.mode === "LINE" ? ctx.lineId : undefined;
-  const [d, partnerStats, groupPerf, slow, recent, perf, groupValue, consBars, agingBars, cashflow, alertsResult, cashBalancesRes] = await Promise.all([
+  const isAll = ctx.mode === "ALL";
+  const [d, partnerStats, groupPerf, slow, recent, perf, groupValue, consBars, agingBars, cashflow, alertsResult, cashBalancesRes, debtByLine, lineComparison] = await Promise.all([
     getDashboard(lineFilter),
     listPartnerStats(),
-    getGroupPerformance(),
-    getSlowMoving(90),
+    getGroupPerformance(lineFilter),
+    getSlowMoving(90, lineFilter),
     listLedgerMovements(8, lineFilter),
-    canSeeCost ? getPerformanceSeries(from, to) : Promise.resolve([]),
-    canSeeCost ? getInventoryValueByGroup() : Promise.resolve([]),
-    canSeeMoney ? getPartnerConsignmentBars() : Promise.resolve([]),
-    canSeeMoney ? getReceivableAgingBars() : Promise.resolve([]),
+    canSeeCost ? getPerformanceSeries(from, to, lineFilter) : Promise.resolve([]),
+    canSeeCost ? getInventoryValueByGroup(lineFilter) : Promise.resolve([]),
+    canSeeMoney ? getPartnerConsignmentBars(lineFilter) : Promise.resolve([]),
+    canSeeMoney ? getReceivableAgingBars(lineFilter) : Promise.resolve([]),
     canSeeMoney ? getCashFlowRunway() : Promise.resolve(null),
     canSeeMoney ? getExecutiveAlerts() : Promise.resolve(null),
     canSeeMoney ? getCashFundBalances() : Promise.resolve({ configured: true, data: [] }),
+    canSeeMoney && isAll ? getDebtByLine() : Promise.resolve([]),
+    canSeeMoney && isAll ? getLineComparison() : Promise.resolve([]),
   ]);
   const cashBalances = cashBalancesRes.data ?? [];
   const totalCash = cashBalances.reduce((a, f) => a + Number(f.balance ?? 0), 0);
@@ -174,6 +180,42 @@ export default async function DashboardPage({
 
   const role = profile.data?.role ?? "";
 
+  // P5 — số liệu cho 2 bảng theo ngành ở tầng 1 (chỉ chế độ ALL; khi đã
+  // chọn một ngành thì mọi số trên trang đã là của ngành đó).
+  const comparisonOil = lineComparison.find((r) => r.lineCode === "OIL");
+  const comparisonParts = lineComparison.find((r) => r.lineCode === "AUTO_PARTS");
+  const comparisonAll = lineComparison.find((r) => r.lineCode === "ALL");
+  const revenueCheck = checkLineTotals(
+    [comparisonOil?.revenue ?? 0, comparisonParts?.revenue ?? 0],
+    comparisonAll?.revenue ?? 0,
+  );
+  const debtByCode = (code: string | null) => ({
+    recv: sumDebtByLine(
+      debtByLine.filter((r) => r.lineCode === code),
+      "RECEIVABLE",
+    ),
+    pay: sumDebtByLine(
+      debtByLine.filter((r) => r.lineCode === code),
+      "PAYABLE",
+    ),
+  });
+  const debtOil = debtByCode("OIL");
+  const debtParts = debtByCode("AUTO_PARTS");
+  const debtUncl = debtByCode(null);
+  const debtAll = {
+    recv: sumDebtByLine(debtByLine, "RECEIVABLE"),
+    pay: sumDebtByLine(debtByLine, "PAYABLE"),
+  };
+  const hasUnclassifiedDebt = debtByLine.some((r) => r.lineCode === null);
+  const debtTableRows = [
+    { label: "Dầu nhớt", recv: debtOil.recv, pay: debtOil.pay, bold: false },
+    { label: "Phụ tùng", recv: debtParts.recv, pay: debtParts.pay, bold: false },
+    ...(hasUnclassifiedDebt
+      ? [{ label: "Chưa phân loại", recv: debtUncl.recv, pay: debtUncl.pay, bold: false }]
+      : []),
+    { label: "Toàn doanh nghiệp", recv: debtAll.recv, pay: debtAll.pay, bold: true },
+  ];
+
   // Tầng 1 — Tổng quan điều hành: 5 giây nắm tình hình. Tiền tổng chỉ
   // Chủ cửa hàng, Kế toán và CEO thấy (canSeeMoney); Bán hàng và Thủ kho
   // không thấy tầng này. Lợi nhuận gộp chặn thêm một lớp (canSeeCost).
@@ -190,6 +232,58 @@ export default async function DashboardPage({
         <StatCard label="Giá trị hàng sở hữu" value={formatVND(ownedRealValue)} sub="Theo giá bán / giá chuyển giao" tone="sky" />
       </div>
       <p className="mt-2 text-xs text-slate-500">Chưa tách thuế GTGT.</p>
+      {isAll && lineComparison.length > 0 && (
+        <div className="mt-4">
+          <Card title="So sánh theo ngành" tone="blue">
+            <TableWrap>
+              <thead><tr><th className={thCls}>Ngành</th><th className={thCls}>Doanh thu</th><th className={thCls}>Lãi gộp</th><th className={thCls}>Tồn kho (giá vốn)</th><th className={thCls}>Phải thu còn nợ</th><th className={thCls}>Phải trả còn nợ</th></tr></thead>
+              <tbody>
+                {lineComparison.map((r) => (
+                  <tr key={r.lineLabel} className={`border-t border-slate-100 ${r.lineCode === "ALL" ? "bg-slate-50 font-bold" : ""}`}>
+                    <td className={tdCls}>{r.lineLabel}</td>
+                    <td className={tdCls}>{formatVND(r.revenue)}</td>
+                    <td className={tdCls}>{formatVND(r.profit)}</td>
+                    <td className={tdCls}>{formatVND(r.inventoryValue)}</td>
+                    <td className={tdCls}>{formatVND(r.receivableOutstanding)}</td>
+                    <td className={tdCls}>{formatVND(r.payableOutstanding)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </TableWrap>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              {revenueCheck.matches
+                ? "Tổng các ngành = toàn doanh nghiệp (BL-020: khớp, chênh lệch 0đ)."
+                : `Tổng Dầu nhớt + Phụ tùng lệch ${formatVND(Math.abs(revenueCheck.diff))} so với toàn doanh nghiệp — đúng bằng doanh thu chưa phân loại ngành (BL-020).`}
+              {" "}Tồn kho tính theo giá vốn lô, chỉ hàng TVK sở hữu.
+            </p>
+          </Card>
+        </div>
+      )}
+      {isAll && debtByLine.length > 0 && (
+        <div className="mt-4">
+          <Card title="Công nợ theo ngành" tone="rose">
+            <TableWrap>
+              <thead><tr><th className={thCls}>Ngành</th><th className={thCls}>Phải thu còn nợ</th><th className={thCls}>Phải thu quá hạn</th><th className={thCls}>Phải trả còn nợ</th><th className={thCls}>Phải trả quá hạn</th></tr></thead>
+              <tbody>
+                {debtTableRows.map((r) => (
+                  <tr key={r.label} className={`border-t border-slate-100 ${r.bold ? "bg-slate-50 font-bold" : ""}`}>
+                    <td className={tdCls}>{r.label}</td>
+                    <td className={tdCls}>{formatVND(r.recv.outstanding)}</td>
+                    <td className={tdCls}>{formatVND(r.recv.overdue)}</td>
+                    <td className={tdCls}>{formatVND(r.pay.outstanding)}</td>
+                    <td className={tdCls}>{formatVND(r.pay.overdue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </TableWrap>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              {hasUnclassifiedDebt
+                ? `Còn công nợ chưa phân loại ngành: phải thu ${formatVND(debtUncl.recv.outstanding)}, phải trả ${formatVND(debtUncl.pay.outstanding)} — tổng Dầu nhớt + Phụ tùng lệch đúng bằng số này (BL-020).`
+                : "Tổng các ngành = toàn doanh nghiệp (BL-020: khớp, chênh lệch 0đ)."}
+            </p>
+          </Card>
+        </div>
+      )}
       {cashBalances.length > 0 && (
         <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Tiền mặt & ngân hàng</p>

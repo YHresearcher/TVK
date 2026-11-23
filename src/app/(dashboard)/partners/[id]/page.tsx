@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, tdCls, thCls } from "@/components/ui";
 import DocDetailDialog from "@/components/DocDetailDialog";
+import { listBusinessLines } from "@/lib/business-lines";
 import {
   CONSIGNMENT_GOOD_STATUS_LABELS,
   getPartnerConsignmentGoods,
@@ -38,10 +39,23 @@ function StatBox({ label, value, sub }: { label: string; value: string; sub: str
   );
 }
 
-export default async function PartnerDetailPage({ params }: { params: { id: string } }) {
+export default async function PartnerDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { line?: string };
+}) {
+  // P5: lọc các bảng đối soát / phải thu / hàng ký gửi theo ngành qua
+  // ?line= (ALL / mã ngành). Mã lạ -> về ALL. Ngành lấy từ DB qua
+  // listBusinessLines() (không tin mã do trình duyệt gửi để tra cứu).
+  const lines = await listBusinessLines();
+  const lineParam = searchParams?.line ?? "ALL";
+  const selectedLine = lineParam === "ALL" ? null : lines.find((l) => l.code === lineParam) ?? null;
+  const lineFilter = selectedLine ? selectedLine.id : undefined;
   const [detail, consignmentGoods, receivableDocs] = await Promise.all([
-    getPartnerDetail(params.id),
-    getPartnerConsignmentGoods(params.id),
+    getPartnerDetail(params.id, lineFilter),
+    getPartnerConsignmentGoods(params.id, lineFilter),
     getPartnerReceivableDocs(params.id),
   ]);
   const { partner, consignment, receivables, invoices, stats } = detail.data;
@@ -95,6 +109,38 @@ export default async function PartnerDetailPage({ params }: { params: { id: stri
     <>
       <PageHeader title={partner.name} description="Hồ sơ và thống kê của đối tác — bấm tên đối tác ở bất kỳ bảng nào để mở trang này." />
       <p className="mb-4 text-sm"><Link href="/partners" className="font-medium text-blue-700 hover:underline">← Quay lại danh sách đối tác</Link></p>
+
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Ngành hàng:</span>
+        <Link
+          href={`/partners/${params.id}`}
+          className={
+            !selectedLine
+              ? "touch-control inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white"
+              : "touch-control inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50"
+          }
+        >
+          Toàn doanh nghiệp
+        </Link>
+        {lines.map((l) => (
+          <Link
+            key={l.id}
+            href={`/partners/${params.id}?line=${l.code}`}
+            className={
+              selectedLine?.id === l.id
+                ? "touch-control inline-flex items-center rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white"
+                : "touch-control inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50"
+            }
+          >
+            {l.name}
+          </Link>
+        ))}
+        {selectedLine && (
+          <span className="text-xs text-slate-500">
+            Đang lọc theo ngành {selectedLine.name} — các bảng đối soát, phải thu và hàng ký gửi chỉ hiện số của ngành này.
+          </span>
+        )}
+      </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatBox label="Số dư còn phải thu" value={formatVND(stats.outstanding)} sub="Đối tác còn nợ TVK" />

@@ -255,6 +255,8 @@ Nút **In tem mã vạch** ở trang **Sản phẩm**: tick chọn các mã cầ
 ### D9. Báo cáo
 **Công nợ & Báo cáo → Báo cáo**: báo cáo tồn kho, bán hàng, đối chiếu với từng nhà cung cấp (hàng ký gửi: đã nhận / đã bán / còn giữ / phải trả) và từng đối tác (đã gửi / đã bán / còn giữ / phải thu); xuất **CSV** để mở bằng Excel khi cần gửi đối tác/kế toán.
 
+**Báo cáo theo ngành (V2.0 P5)**: mục đầu trang Báo cáo là **"Doanh thu, lãi và tồn kho theo ngành"** — bảng so sánh Dầu nhớt / Phụ tùng / Toàn doanh nghiệp (doanh thu thuần, giá vốn theo lô thực tế, lãi gộp, tồn kho theo giá vốn, dư nợ phải thu/phải trả), chỉ Chủ cửa hàng, Kế toán và CEO thấy, và chỉ hiện khi đang xem **Toàn doanh nghiệp** (chọn một ngành rồi thì mọi số trên trang đã là của ngành đó). Tổng các ngành cộng lại bằng số toàn doanh nghiệp; nếu có hàng chưa phân loại ngành thì bảng ghi rõ chênh lệch đúng bằng phần đó (BL-020). Trang **Tổng quan** cũng có 2 bảng tương tự ở tầng Tổng quan điều hành — **"So sánh theo ngành"** và **"Công nợ theo ngành"** (phải thu/phải trả từng ngành). Trang **Executive** (CEO chỉ xem) có mục **"So sánh theo ngành"** + link sang Báo cáo. Trang **chi tiết đối tác** có nút lọc Tất cả / Dầu nhớt / Phụ tùng để xem đối soát, phải thu và hàng ký gửi theo từng ngành. Trang **Lịch sử kho** hiện tổng số bút toán ("đang hiện X / tổng Y").
+
 ---
 
 ## PHẦN E — VAI TRÒ & PHÂN QUYỀN
@@ -281,7 +283,7 @@ Từ migration 0018, mọi thao tác xác nhận (phiếu nhập, gửi ký gử
 - **File Excel trộn ngành**: phiếu nhập kho và phiếu gửi ký gửi chỉ nhận một ngành — file có cả 2 ngành sẽ bị từ chối toàn bộ, không nhập một phần. Sửa file thành từng ngành riêng rồi tải lại.
 - **Dầu nhớt — hạn dùng (FEFO)**: lô dầu xuất theo hạn gần nhất trước; lô không có hạn dùng xếp sau lô có hạn. **Lô dầu đã hết hạn thì không bán được** — hệ thống chặn và báo rõ. Tồn kho hiện cảnh báo "Hết hạn" (đỏ) / "Sắp hết" trong 30 ngày (vàng) ở cột Hạn dùng.
 - **Xuất Excel theo ngành**: ở cuối mỗi trang xuất có tham số `?line=OIL` / `?line=AUTO_PARTS` / `?line=ALL`; tài khoản chỉ làm 1 ngành thì không xuất được ngành còn lại. Một số bảng tổng hợp ký gửi xuất luôn hợp nhất cả 2 ngành (chưa tách theo ngành).
-- **Tổng tiền trên Tổng quan và trang công nợ vẫn hợp nhất 2 ngành** (phân bổ tài chính theo ngành là giai đoạn sau) — chỉ danh sách chứng từ và tồn kho đã lọc theo ngành. **Riêng lịch sử thanh toán đã tách theo ngành (P3)**: mỗi phiếu thu/chi hiện phân bổ từng ngành (Dầu nhớt / Phụ tùng) ở trang Phải thu / Phải trả; xem chi tiết ở mục D5 Công nợ.
+- **Tổng tiền trên Tổng quan và trang công nợ đã tách theo ngành (P5)**: khi xem Toàn doanh nghiệp, Tổng quan có bảng **So sánh theo ngành** và **Công nợ theo ngành** (doanh thu/lãi/tồn kho/dư nợ từng ngành + tổng); danh sách chứng từ và tồn kho lọc theo ngành đang chọn. **Riêng lịch sử thanh toán đã tách theo ngành (P3)**: mỗi phiếu thu/chi hiện phân bổ từng ngành (Dầu nhớt / Phụ tùng) ở trang Phải thu / Phải trả; xem chi tiết ở mục D5 Công nợ.
 
 ### Tài khoản & mật khẩu
 - Chỉ **Chủ cửa hàng** tạo/sửa/khoá/xoá tài khoản và gán vai trò (Cài đặt → Quản lý tài khoản). Sửa được họ tên và tên đăng nhập của từng tài khoản (kể cả tài khoản của chính mình); email không sửa được vì là danh tính đăng nhập. Đăng nhập bằng **tên đăng nhập hoặc email**. Quên mật khẩu: bấm **Quên mật khẩu?** ở trang đăng nhập để nhận email đặt lại, hoặc Chủ cửa hàng bấm **Đặt lại mật khẩu** trong Quản lý tài khoản.

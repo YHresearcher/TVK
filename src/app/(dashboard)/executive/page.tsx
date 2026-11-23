@@ -6,10 +6,12 @@ import {
   getCurrentProfile,
   getDashboard,
   getExecutiveReceivableAging,
+  getLineComparison,
   getPartnerConsignmentBars,
   getPerformanceSeries,
   getTopCategoriesProfitability,
 } from "@/lib/queries";
+import { checkLineTotals } from "@/lib/reporting";
 import { formatNumber, formatVND, todayISO } from "@/lib/format";
 import { SEMANTIC_COLORS } from "@/lib/tokens";
 
@@ -76,6 +78,7 @@ export default async function ExecutivePage({
     receivableAging,
     distributors,
     topCategories,
+    lineComparison,
   ] = await Promise.all([
     getDashboard(),
     getCashFlowRunway(),
@@ -83,7 +86,17 @@ export default async function ExecutivePage({
     getExecutiveReceivableAging(),
     getPartnerConsignmentBars(),
     getTopCategoriesProfitability(range.from, range.to),
+    getLineComparison(),
   ]);
+
+  // P5 (BL-020): tổng Dầu nhớt + Phụ tùng so với toàn doanh nghiệp.
+  const comparisonOil = lineComparison.find((r) => r.lineCode === "OIL");
+  const comparisonParts = lineComparison.find((r) => r.lineCode === "AUTO_PARTS");
+  const comparisonAll = lineComparison.find((r) => r.lineCode === "ALL");
+  const revenueCheck = checkLineTotals(
+    [comparisonOil?.revenue ?? 0, comparisonParts?.revenue ?? 0],
+    comparisonAll?.revenue ?? 0,
+  );
 
   // Tính toán KPI chiến lược theo chuẩn đặc tả v1.1
   // Net Revenue, COGS, Gross Profit cho kỳ được chọn
@@ -261,6 +274,58 @@ export default async function ExecutivePage({
           </p>
         </div>
       </div>
+
+      {/* =========================================================================
+          KHỐI 1b: SO SÁNH THEO NGÀNH (P5 — CEO chỉ xem, số từ view 0030)
+      ========================================================================= */}
+      {lineComparison.length > 0 && (
+        <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                So sánh theo ngành
+              </h2>
+              <p className="text-xs text-slate-500">
+                Doanh thu, lãi gộp, tồn kho và dư nợ của Dầu nhớt và Phụ tùng. Số toàn doanh nghiệp gồm cả chứng từ chưa phân loại ngành (BL-020).
+              </p>
+            </div>
+            <Link href="/reports" className="text-xs font-medium text-blue-700 hover:underline">
+              Xem báo cáo đầy đủ →
+            </Link>
+          </div>
+
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 text-slate-400">
+                <th className="pb-2 font-medium">Ngành</th>
+                <th className="pb-2 font-medium text-right">Doanh thu</th>
+                <th className="pb-2 font-medium text-right">Lãi gộp</th>
+                <th className="pb-2 font-medium text-right">Tồn kho (giá vốn)</th>
+                <th className="pb-2 font-medium text-right">Phải thu còn nợ</th>
+                <th className="pb-2 font-medium text-right">Phải trả còn nợ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {lineComparison.map((r) => (
+                <tr key={r.lineLabel} className={r.lineCode === "ALL" ? "font-bold text-slate-900 bg-slate-50/50" : ""}>
+                  <td className="py-2.5 font-medium">{r.lineLabel}</td>
+                  <td className="py-2.5 text-right font-mono">{formatVND(r.revenue)}</td>
+                  <td className="py-2.5 text-right font-mono">{formatVND(r.profit)}</td>
+                  <td className="py-2.5 text-right font-mono">{formatVND(r.inventoryValue)}</td>
+                  <td className="py-2.5 text-right font-mono">{formatVND(r.receivableOutstanding)}</td>
+                  <td className="py-2.5 text-right font-mono">{formatVND(r.payableOutstanding)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <p className="mt-3 text-xs text-slate-500">
+            {revenueCheck.matches
+              ? "Tổng các ngành = toàn doanh nghiệp (BL-020: khớp, chênh lệch 0đ)."
+              : `Tổng Dầu nhớt + Phụ tùng lệch ${formatVND(Math.abs(revenueCheck.diff))} so với toàn doanh nghiệp — đúng bằng doanh thu chưa phân loại ngành (BL-020).`}
+          </p>
+        </div>
+      )}
 
       {/* =========================================================================
           KHỐI 2: DỰ BÁO DÒNG TIỀN 14-30 NGÀY TỚI (CASH FLOW RUNWAY)

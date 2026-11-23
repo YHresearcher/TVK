@@ -72,7 +72,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: { q?:
           )}
         </form>
       </Card>
-      <Card title={`200 lần nhập – xuất mới nhất${rows.length < 200 ? ` — đang hiện ${rows.length}` : ""}`}>
+      <Card title={`200 lần nhập – xuất mới nhất — đang hiện ${rows.length} / tổng ${formatNumber(ledger.total)} bút toán`}>
         {rows.length === 0 ? (
           <EmptyState message="Chưa có lần nhập – xuất nào. Dòng mới xuất hiện khi một phiếu được xác nhận." />
         ) : (

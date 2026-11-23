@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
-import { getCurrentProfile, getPartnerRemainingEstimates, listPartnerConsignment, listProductStock, listSupplierConsignment } from "@/lib/queries";
+import { getBusinessLineContext } from "@/lib/business-lines";
+import { getCurrentProfile, getLineComparison, getPartnerRemainingEstimates, listPartnerConsignment, listProductStock, listSupplierConsignment } from "@/lib/queries";
+import { checkLineTotals } from "@/lib/reporting";
 import { formatNumber, formatVND } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
-  const [suppliers, partners, stock, estimates, profile] = await Promise.all([
+  const [suppliers, partners, stock, estimates, profile, ctx] = await Promise.all([
     listSupplierConsignment(),
     listPartnerConsignment(),
     listProductStock(),
     getPartnerRemainingEstimates(),
     getCurrentProfile(),
+    getBusinessLineContext(),
   ]);
   const configured = suppliers.configured;
   // Phải trả NCC: chỉ Chủ/Kế toán/CEO. Ước tính theo giá chuyển giao là
@@ -21,12 +24,52 @@ export default async function ReportsPage() {
   const canSeePayables = ["OWNER", "ACCOUNTING", "CEO"].includes(role ?? "");
   const canSeeEstimates = ["OWNER", "ACCOUNTING", "CEO"].includes(role ?? "");
   const canSeeReceivables = ["OWNER", "ACCOUNTING", "CEO", "SALES"].includes(role ?? "");
+  // P5: bảng so sánh theo ngành chỉ vai trò xem được tiền, và chỉ ở chế
+  // độ ALL (khi đã chọn một ngành thì các số trên trang đã là của ngành
+  // đó — giống 2 bảng theo ngành ở tầng 1 dashboard).
+  const canSeeMoney = canSeePayables;
+  const showLineComparison = canSeeMoney && ctx.mode === "ALL";
+  const lineComparison = showLineComparison ? await getLineComparison() : [];
+  const comparisonOil = lineComparison.find((r) => r.lineCode === "OIL");
+  const comparisonParts = lineComparison.find((r) => r.lineCode === "AUTO_PARTS");
+  const comparisonAll = lineComparison.find((r) => r.lineCode === "ALL");
+  const revenueCheck = checkLineTotals(
+    [comparisonOil?.revenue ?? 0, comparisonParts?.revenue ?? 0],
+    comparisonAll?.revenue ?? 0,
+  );
 
   return (
     <>
       <PageHeader title="Báo cáo" description="Các bảng này lấy thẳng từ số liệu đã ghi. Bấm xuất CSV ở đầu mỗi phần." />
       {!configured && <NotConfigured />}
       <div className="space-y-8">
+        {showLineComparison && lineComparison.length > 0 && (<section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800">Doanh thu, lãi và tồn kho theo ngành</h2>
+          </div>
+          <TableWrap>
+            <thead><tr><th className={thCls}>Ngành</th><th className={thCls}>Doanh thu</th><th className={thCls}>Lãi gộp</th><th className={thCls}>Số đơn</th><th className={thCls}>Tồn kho (giá vốn)</th><th className={thCls}>Phải thu còn nợ</th><th className={thCls}>Phải trả còn nợ</th></tr></thead>
+            <tbody>
+              {lineComparison.map((r) => (
+                <tr key={r.lineLabel} className={`border-t border-slate-100 ${r.lineCode === "ALL" ? "bg-slate-50 font-bold" : ""}`}>
+                  <td className={tdCls}>{r.lineLabel}</td>
+                  <td className={tdCls}>{formatVND(r.revenue)}</td>
+                  <td className={tdCls}>{formatVND(r.profit)}</td>
+                  <td className={tdCls}>{formatNumber(r.orders)}</td>
+                  <td className={tdCls}>{formatVND(r.inventoryValue)}</td>
+                  <td className={tdCls}>{formatVND(r.receivableOutstanding)}</td>
+                  <td className={tdCls}>{formatVND(r.payableOutstanding)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </TableWrap>
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">
+            {revenueCheck.matches
+              ? "Tổng các ngành = toàn doanh nghiệp (BL-020: khớp, chênh lệch 0đ)."
+              : `Tổng Dầu nhớt + Phụ tùng lệch ${formatVND(Math.abs(revenueCheck.diff))} so với toàn doanh nghiệp — đúng bằng doanh thu chưa phân loại ngành (BL-020).`}
+            {" "}Doanh thu là doanh thu thuần (đã trừ giảm giá); tồn kho tính theo giá vốn lô, chỉ hàng TVK sở hữu.
+          </p>
+        </section>)}
         {canSeePayables && (<section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-800">Đối chiếu hàng ký gửi với nhà cung cấp (đã nhận – đã bán – đã trả – còn giữ – còn nợ)</h2>

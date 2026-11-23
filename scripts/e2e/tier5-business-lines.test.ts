@@ -20,6 +20,14 @@ import {
   splitVat,
   sumVatSplits,
 } from "../../src/lib/vat";
+import {
+  buildLineComparison,
+  businessLineLabel,
+  checkLineTotals,
+  mergeGroupPerformance,
+  sumDebtByLine,
+  sumSalesByLine,
+} from "../../src/lib/reporting";
 
 /**
  * TIER 5 — TVK V2.0 P2 + P3 + P4: tách ngành hàng + phân bổ / đảo thanh
@@ -35,6 +43,9 @@ import {
  *    dòng chưa ghi hoá đơn theo ngành (P4).
  *  - reversalReasonFromNote / getReversalLog: tách lý do đảo + nhật ký
  *    đảo bút toán cho OWNER/Kế toán xem (P4, quyết chủ 23/11 21:48).
+ *  - sumSalesByLine / sumDebtByLine / buildLineComparison /
+ *    mergeGroupPerformance / checkLineTotals / businessLineLabel:
+ *    cộng số theo ngành + kiểm tra BL-020 + bảng so sánh ngành (P5).
  * Ràng buộc DB (trigger, view, RLS) được kiểm chứng riêng bằng file
  * docs/tests/p2_operational_local.sql (P2),
  * docs/tests/p3_payment_allocations_local.sql (P3, BL-021/022/023) và
@@ -353,6 +364,174 @@ export async function runTier5Tests(): Promise<{ passed: number; total: number }
     assert.equal(log[1].reversalCode, "PT-0002");
     assert.equal(log[1].reason, "Ghi nhầm số tiền");
     assert.equal(log[1].createdByName, "Thanh Phan");
+  });
+
+  // ---- P5 (báo cáo theo ngành, §17.6 / BL-020): hàm thuần reporting. ----
+  const mkSales = (
+    lineId: string | null,
+    lineCode: string | null,
+    revenue: number,
+    profit: number,
+  ) => ({
+    lineId,
+    lineCode,
+    orders: 1,
+    qty: 10,
+    revenue,
+    cogs: revenue - profit,
+    profit,
+    soldQty: 10,
+    soldRevenue: revenue,
+    revenue30d: revenue,
+    cogs30d: revenue - profit,
+    profit30d: profit,
+    orders30d: 1,
+  });
+
+  test("BL-020: sumSalesByLine cộng doanh thu/lãi theo ngành = tổng hợp (gồm hàng NULL)", () => {
+    const rows = [
+      mkSales("line-oil", "OIL", 1_000_000, 200_000),
+      mkSales("line-part", "AUTO_PARTS", 2_500_000, 500_000),
+      mkSales(null, null, 300_000, 60_000),
+    ];
+    const totals = sumSalesByLine(rows);
+    assert.equal(totals.revenue, 3_800_000);
+    assert.equal(totals.profit, 760_000);
+    assert.equal(totals.orders, 3);
+    // BL-020: Dầu nhớt + Phụ tùng + Chưa phân loại = tổng hợp.
+    const check = checkLineTotals(
+      [1_000_000, 2_500_000, 300_000],
+      totals.revenue,
+    );
+    assert.equal(check.matches, true);
+    assert.equal(check.diff, 0);
+  });
+
+  test("BL-020: checkLineTotals phát hiện chênh lệch đúng bằng số chưa phân loại", () => {
+    // Chỉ cộng 2 ngành đã phân loại, tổng hợp vẫn chứa 300.000 chưa phân loại.
+    const check = checkLineTotals([1_000_000, 2_500_000], 3_800_000);
+    assert.equal(check.matches, false);
+    assert.equal(check.diff, -300_000);
+    assert.equal(check.perLineSum, 3_500_000);
+    assert.equal(check.consolidated, 3_800_000);
+  });
+
+  test("BL-020: sumDebtByLine cộng dư nợ theo ngành = tổng hợp, lọc đúng loại nợ", () => {
+    const rows = [
+      { kind: "RECEIVABLE" as const, lineId: "line-oil", lineCode: "OIL", outstanding: 400_000, unpaid: 400_000, partial: 0, overdue: 100_000, count: 2 },
+      { kind: "RECEIVABLE" as const, lineId: "line-part", lineCode: "AUTO_PARTS", outstanding: 600_000, unpaid: 500_000, partial: 100_000, overdue: 0, count: 3 },
+      { kind: "RECEIVABLE" as const, lineId: null, lineCode: null, outstanding: 50_000, unpaid: 50_000, partial: 0, overdue: 50_000, count: 1 },
+      { kind: "PAYABLE" as const, lineId: "line-part", lineCode: "AUTO_PARTS", outstanding: 700_000, unpaid: 700_000, partial: 0, overdue: 0, count: 1 },
+    ];
+    const recv = sumDebtByLine(rows, "RECEIVABLE");
+    assert.equal(recv.outstanding, 1_050_000);
+    assert.equal(recv.overdue, 150_000);
+    assert.equal(recv.count, 6);
+    const pay = sumDebtByLine(rows, "PAYABLE");
+    assert.equal(pay.outstanding, 700_000);
+    const check = checkLineTotals([400_000, 600_000, 50_000], recv.outstanding);
+    assert.equal(check.matches, true);
+  });
+
+  test("BL-020: buildLineComparison đủ 3 hàng OIL/AUTO/ALL, tổng đúng", () => {
+    const comparison = buildLineComparison({
+      sales: [
+        mkSales("line-oil", "OIL", 1_000_000, 200_000),
+        mkSales("line-part", "AUTO_PARTS", 2_500_000, 500_000),
+      ],
+      debts: [
+        { kind: "RECEIVABLE" as const, lineId: "line-oil", lineCode: "OIL", outstanding: 400_000, unpaid: 400_000, partial: 0, overdue: 0, count: 1 },
+        { kind: "PAYABLE" as const, lineId: "line-part", lineCode: "AUTO_PARTS", outstanding: 700_000, unpaid: 700_000, partial: 0, overdue: 0, count: 1 },
+      ],
+      inventory: [
+        { lineId: "line-oil", lineCode: "OIL", ownedCostTotal: 800_000, consignedCost: 0 },
+        { lineId: "line-part", lineCode: "AUTO_PARTS", ownedCostTotal: 1_200_000, consignedCost: 100_000 },
+      ],
+      lines: [
+        { id: "line-part", code: "AUTO_PARTS" as const },
+        { id: "line-oil", code: "OIL" as const },
+      ],
+    });
+    assert.equal(comparison.length, 3);
+    assert.equal(comparison[0].lineLabel, "Dầu nhớt");
+    assert.equal(comparison[1].lineLabel, "Phụ tùng");
+    assert.equal(comparison[2].lineLabel, "Toàn doanh nghiệp");
+    assert.equal(comparison[0].revenue, 1_000_000);
+    assert.equal(comparison[1].profit, 500_000);
+    assert.equal(comparison[0].inventoryValue, 800_000);
+    assert.equal(comparison[1].payableOutstanding, 700_000);
+    assert.equal(comparison[2].revenue, 3_500_000);
+    assert.equal(comparison[2].profit, 700_000);
+    assert.equal(comparison[2].inventoryValue, 2_000_000);
+    assert.equal(comparison[2].receivableOutstanding, 400_000);
+  });
+
+  test("BL-020: buildLineComparison tách hàng chưa phân loại thành hàng riêng, ALL vẫn đủ tổng", () => {
+    const comparison = buildLineComparison({
+      sales: [
+        mkSales("line-oil", "OIL", 1_000_000, 200_000),
+        mkSales(null, null, 300_000, 60_000),
+      ],
+      debts: [],
+      inventory: [],
+      lines: [
+        { id: "line-oil", code: "OIL" as const },
+        { id: "line-part", code: "AUTO_PARTS" as const },
+      ],
+    });
+    assert.equal(comparison.length, 4);
+    const uncl = comparison.find((r) => r.lineLabel === "Chưa phân loại");
+    assert.equal(uncl?.revenue, 300_000);
+    const all = comparison.find((r) => r.lineCode === "ALL");
+    assert.equal(all?.revenue, 1_300_000);
+    // Ngành phụ tùng không có số liệu thì 0, không vỡ bảng.
+    assert.equal(comparison.find((r) => r.lineCode === "AUTO_PARTS")?.revenue, 0);
+  });
+
+  test("P5: mergeGroupPerformance gộp 2 ngành cùng nhóm hàng, xếp theo doanh thu", () => {
+    const merged = mergeGroupPerformance([
+      { group: "Linh kiện ô tô tải", lineId: "line-part", revenue: 2_000_000, qty: 40 },
+      { group: "Nhớt", lineId: "line-oil", revenue: 1_000_000, qty: 20 },
+      { group: "Linh kiện ô tô tải", lineId: "line-oil", revenue: 500_000, qty: 5 },
+    ]);
+    assert.equal(merged.length, 2);
+    assert.equal(merged[0].group, "Linh kiện ô tô tải");
+    assert.equal(merged[0].revenue, 2_500_000);
+    assert.equal(merged[0].qty, 45);
+    assert.equal(merged[1].group, "Nhớt");
+    assert.equal(merged[1].revenue, 1_000_000);
+  });
+
+  test("P5: businessLineLabel đúng nhãn Dầu nhớt / Phụ tùng / Toàn doanh nghiệp / Chưa phân loại", () => {
+    assert.equal(businessLineLabel("OIL"), "Dầu nhớt");
+    assert.equal(businessLineLabel("AUTO_PARTS"), "Phụ tùng");
+    assert.equal(businessLineLabel("ALL"), "Toàn doanh nghiệp");
+    assert.equal(businessLineLabel(null), "Chưa phân loại");
+    assert.equal(businessLineLabel(undefined), "Chưa phân loại");
+    assert.equal(businessLineLabel("KHAC"), "Chưa phân loại");
+  });
+
+  test("P5: input rỗng — tổng 0, bảng so sánh vẫn đủ hàng, gộp nhóm rỗng", () => {
+    const sales = sumSalesByLine([]);
+    assert.equal(sales.revenue, 0);
+    assert.equal(sales.profit, 0);
+    assert.equal(sales.orders, 0);
+    const debts = sumDebtByLine([]);
+    assert.equal(debts.outstanding, 0);
+    assert.equal(debts.count, 0);
+    const comparison = buildLineComparison({
+      sales: [],
+      debts: [],
+      inventory: [],
+      lines: [
+        { id: "line-oil", code: "OIL" as const },
+        { id: "line-part", code: "AUTO_PARTS" as const },
+      ],
+    });
+    assert.equal(comparison.length, 3);
+    assert.equal(comparison[2].revenue, 0);
+    assert.equal(mergeGroupPerformance([]).length, 0);
+    assert.equal(checkLineTotals([], 0).matches, true);
   });
 
   return { passed, total };

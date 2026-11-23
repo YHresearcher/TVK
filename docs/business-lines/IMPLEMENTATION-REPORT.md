@@ -786,3 +786,180 @@ test app trên staging theo role thật (đặc biệt: OWNER đảo thử một
 phiếu + xem log đảo; Kế toán ghi hoá đơn tách ngành thử; kiểm tra
 phiếu đảo không hiện trùng trong lịch sử). Không merge vào main trong
 P4 (theo §0.2).
+
+# TVK V2.0 P5 — Implementation Report (Báo cáo triển khai P5)
+
+Báo cáo + dashboard tách theo ngành và có số tổng hợp (prompt §17,
+§18.1, E8, BL-020). Thiết kế chi tiết: `docs/business-lines/REPORTING.md`.
+
+## P5.1. Thay đổi đã làm
+
+- **Migration `supabase/migrations/0030_reporting_aggregation.sql`**
+  (mới): 10 view tổng hợp theo ngành, tất cả `security_invoker = true`,
+  `GRANT SELECT TO authenticated` — xem §P5.2. Chỉ tạo view, không đổi
+  dữ liệu, không thêm cột/bảng.
+- **`src/lib/reporting.ts` (mới, hàm thuần)**: `sumSalesByLine`,
+  `sumDebtByLine`, `buildLineComparison` (OIL / AUTO_PARTS / ALL +
+  hàng "Chưa phân loại" riêng khi có dữ liệu NULL),
+  `mergeGroupPerformance`, `businessLineLabel` (§18.1),
+  `checkLineTotals` (BL-020: trả `diff`/`matches`).
+- **`src/lib/queries.ts`**: `fetchAllPages` (phân trang range, thứ tự
+  ổn định, throw khi lỗi), `chunkIds` (IN tối đa 200 id); hàm đọc view
+  `getSalesByLine`, `getDebtByLine`, `getInventoryValueByLine`,
+  `getConsignmentFlowByLine`, `getLineComparison`;
+  `getDashboard(lineId?)` viết lại theo E8 — số tiền tổng lấy từ view
+  (không giới hạn dòng), phần tử theo dòng lấy bằng `fetchAllPages`,
+  **giữ nguyên hình dạng object trả về**; tồn kho trong `getDashboard`
+  nay lọc theo ngành đang chọn (trước đây không lọc);
+  `getPerformanceSeries(from, to, lineId?)` đọc
+  `v_daily_revenue_by_line`; `getGroupPerformance(lineId?)` đọc
+  `v_group_performance_by_line`; `listLedgerMovements(limit, lineId?)`
+  đọc `v_stock_movements_with_line` + đếm tổng bằng DB, trả thêm
+  `total`; `lineId?` thêm cho `getPartnerDetail`,
+  `getPartnerConsignmentGoods`, `getSlowMoving`,
+  `getInventoryValueByGroup`, `getReceivableAgingBars`,
+  `getPartnerConsignmentBars` (đọc `v_partner_consignment_by_line`),
+  `getPartnerRemainingEstimates`.
+- **Giao diện (tiếng Việt, giữ nguyên gate vai trò)**:
+  - Dashboard: `lineFilter` truyền vào mọi truy vấn L3/L4; ở chế độ
+    ALL, tầng L1 (chỉ Chủ/Kế toán/CEO) thêm bảng **"So sánh theo
+    ngành"** và **"Công nợ theo ngành"** + ghi chú BL-020 — đây là phần
+    tổng nợ theo ngành dời từ P4 sang P5.
+  - `/reports`: mục đầu **"Doanh thu, lãi và tồn kho theo ngành"**
+    (chỉ Chủ/Kế toán/CEO, chỉ chế độ ALL) + ghi chú BL-020.
+  - `/executive`: mục **"So sánh theo ngành"** (CEO chỉ đọc) + link
+    sang `/reports`.
+  - Chi tiết đối tác: filter pills `?line=` (Tất cả / Dầu nhớt /
+    Phụ tùng); đối soát/phải thu/hàng ký gửi lọc theo ngành.
+  - `/ledger`: hiện "đang hiện X / tổng Y bút toán".
+- **`HUONG-DAN-VAN-HANH.md`**: cập nhật D9 (báo cáo theo ngành) +
+  sửa câu "Tổng tiền trên Tổng quan và trang công nợ vẫn hợp nhất 2
+  ngành" (nay đã tách theo ngành ở P5).
+- **Test**: 8 test P5 mới trong
+  `scripts/e2e/tier5-business-lines.test.ts` (`BL-020-…`/`P5: …`).
+
+## P5.2. Nội dung migration 0030
+
+| View | Nội dung |
+|---|---|
+| `v_sales_doc_totals` | Từng chứng từ đã xác nhận: doanh thu thuần `GREATEST(SUM(line_total) − discount, 0)`, giá vốn theo lô thực tế đã xuất, lãi |
+| `v_sales_by_line` | Doanh thu/giá vốn/lãi/số đơn/số lượng theo ngành + bản 30 ngày |
+| `v_daily_revenue_by_line` | Doanh thu thuần + giá vốn theo ngày × ngành |
+| `v_product_sales_30d` | Sản phẩm × 30 ngày / lũy kế (chỉ dòng chứng từ đã xác nhận) |
+| `v_group_performance_by_line` | Nhóm hàng × ngành, doanh thu **gộp** trước chiết khấu |
+| `v_debt_by_line` | Phải thu/phải trả × ngành: còn nợ / chưa trả / trả một phần / quá hạn / số khoản |
+| `v_inventory_value_by_line` | Giá trị tồn kho theo giá vốn: kho TVK / tại đối tác / ký gửi giữ hộ |
+| `v_partner_consignment_by_line` | Đối tác × ngành: đã gửi / đã tiêu thụ / đã trả lại / còn giữ / phải thu |
+| `v_consignment_flow_by_line` | Đã gửi theo phiếu GK đã xác nhận |
+| `v_stock_movements_with_line` | Sổ cái + ngành của lô (qua `v_batches_for_sales`); lô không quy chiếu được → ngành NULL |
+
+Post-check: thiếu view nào thì `RAISE EXCEPTION`. Một lỗi thật đã bắt
+được khi kiểm chứng: `v_product_sales_30d` bản đầu dùng `LEFT JOIN …
+AND d.status = 'CONFIRMED'` trong mệnh đề ON — điều kiện ở ON không
+loại dòng DRAFT khỏi `SUM(l.qty)` (a1 lũy kế ra 11 thay vì 5). Đã sửa
+bằng cách lọc trước chứng từ đã xác nhận trong subquery, chạy lại
+chuỗi, đối chiếu lại đúng (a1 5 / 750.000đ, a3 11 / 550.000đ).
+
+## P5.3. Quyết định thiết kế (theo prompt §17.6 + E8)
+
+- **Một định nghĩa duy nhất**: doanh thu thuần = tổng dòng − chiết
+  khấu đầu chứng từ; giá vốn = lô thực tế đã xuất; doanh thu nhóm hàng
+  = gộp trước chiết khấu (giữ ý nghĩa cũ của `getGroupPerformance`).
+  Tổng thuần 1.750.000đ vs tổng gộp 1.800.000đ trong dữ liệu kiểm
+  chứng chênh đúng 50.000đ = chiết khấu BH-VAT-0001.
+- **`getPerformanceSeries` đổi nguồn, KHÔNG đổi định nghĩa** (phát
+  hiện khi kiểm chứng, sửa lại giả định trong brief): hàm cũ đọc header
+  `total_amount`, nhưng `confirm_sales_document` (0019) đã ghi
+  `total_amount = subtotal − discount_amount` nên giá trị kỳ vọng
+  khớp với định nghĩa view. Khác biệt duy nhất: chứng từ có
+  `total_amount` lưu sẵn lệch tổng dòng thì nay lấy theo tổng dòng, và
+  kỳ dài >2000 chứng từ trước đây bị cắt ngắn âm thầm (E8), nay đủ số.
+  Đã ghi rõ trong comment hàm.
+- **Lỗi DB lan ra (throw)** ở `getDashboard`/`getPerformanceSeries`
+  để số tiền sai không hiện như số đúng; widget phụ giữ hành vi cũ là
+  trả rỗng; `listLedgerMovements` trả rỗng + `total: 0` khi lỗi (trang
+  sổ cái không sập khi DB chưa chạy 0030).
+- **Bảng so sánh theo ngành chỉ hiện ở chế độ ALL** (dashboard +
+  reports): tài khoản Kế toán chỉ gán một ngành không thấy số ngành kia.
+- **Hàng chưa phân loại** luôn nằm trong số toàn doanh nghiệp nhưng
+  không nằm trong số ngành nào; `checkLineTotals` trả chênh lệch đúng
+  bằng phần chưa phân loại, UI ghi rõ thay vì giấu.
+
+## P5.4. Kết quả kiểm chứng
+
+- **DB scratch PostgreSQL 16** (`docs/tests/p5_reporting_local.sql`,
+  chuỗi 0001–0029 + seed + 0030): **16/16 PASS** (R5-01→R5-14) —
+  đủ 10 view + `security_invoker` + grants; giá trị từng view đã đối
+  chiếu tay (AUTO 1.100.000đ / OIL 550.000đ / chưa phân loại 100.000đ;
+  phải thu 1.900.000đ / phải trả 2.650.000đ, quá hạn OIL 200.000đ;
+  tồn AUTO 10.500.000đ / OIL 2.400.000đ; BH-P5-0001 300.000đ/200.000đ,
+  BH-P5-0002 200.000đ/200.000đ; luồng gửi AUTO 3 / 450.000đ);
+  **BL-020**: tổng theo ngành = tổng hợp, đối chiếu độc lập bằng truy
+  vấn trực tiếp (doanh thu 1.750.000đ, giá vốn 400.000đ, 9 đơn);
+  sổ cái theo OWNER (AUTO 2 / OIL 1) / user chỉ-OIL (chỉ bút toán OIL
+  quy chiếu được) / ghost (thấy dòng, không quy chiếu ngành); rào
+  chắn SALES (giá vốn qua view = 0, không thấy phải trả, không thấy
+  giá trị tồn kho); bất biến tài chính sau 0030 (payables 3 /
+  receivables 10 / payments 1 / movements 3 / docs 9).
+  **Điều tra RLS đã chốt trong P5**: `stock_batches` SELECT đã bị
+  0018 siết chỉ OWNER/WAREHOUSE/ACCOUNTING/CEO (SALES bị loại) — xác
+  nhận bằng `pg_policies`; SALES đọc `v_sales_by_line` thấy doanh thu
+  vì SALES vốn đã đọc được `sales_documents`/`sales_document_lines`,
+  không phải rò rỉ mới.
+- **Gate** (chạy độc lập 2 lần — subagent P5 + lead kiểm tra lại):
+  `npx tsc --noEmit` exit 0, `npx next lint` exit 0,
+  `npx next build` exit 0.
+- **E2E**: `npm run test:e2e` **87/87 pass** (Tier 1–3: 55 + Tier 5:
+  32/32, gồm 8 test P5 mới); Tier 4 vẫn SKIP (không có
+  `user-accounting-sample.csv`).
+
+## P5.5. P5 Exit Gate — ĐẠT (với 2 lưu ý)
+
+- Tất cả test pass (87/87 + 16/16 kiểm chứng DB).
+- Tổng theo ngành cộng lại đúng số tổng hợp (BL-020) — không có chênh
+  lệch ngoài phần chưa phân loại đã ghi rõ.
+- **Lưu ý 1**: chưa chạy thử với DB thật có 0030 (chỉ biên dịch +
+  build + DB scratch) — số liệu dashboard/báo cáo trên DB thật cần
+  kiểm tra ở P6 rehearsal.
+- **Lưu ý 2**: production rehearsal + release checklist (prompt P5
+  có nhắc) thuộc P6 theo kế hoạch phase (§20) — chưa làm trong P5.
+
+## P5.6. Hạn chế đã biết (P5)
+
+- `getSalesDocumentCosts` (cột Giá vốn/Lãi gộp trang Bán hàng) vẫn
+  dùng `.limit(20000)` trên `sales_document_lines` theo từng đợt
+  chứng từ của trang — không nằm trong danh sách E8 nêu tên nên giữ
+  nguyên; ứng viên cho P6 hardening.
+- `getPartnerRemainingEstimates` vẫn giữ `.limit(500/5000)` cũ (phiếu
+  GK, dòng GK) — ngoài phạm vi P5.
+- `getMonthlyCashflowSummary` (báo cáo dòng tiền theo tháng, code gốc)
+  vẫn đọc `sales_documents.total_amount` với `.limit(3000)` — ngoài
+  phạm vi P5; ứng viên cho P6.
+- Biểu đồ "Doanh thu theo cấp nhớt / theo thương hiệu" (§17.3/17.4,
+  E10) chưa làm: `sae_viscosity`/`brand` là text tự do, cần quy tắc
+  chuẩn hoá trước khi vẽ — chưa có quy tắc này.
+- BL-014 (workflow phê duyệt tách tỷ lệ cho khoản chưa phân loại)
+  vẫn chỉ có view hàng đợi (từ P4) — không đổi trong P5.
+
+## P5.7. Quyết định cần chủ cửa hàng (CẦN XÁC NHẬN)
+
+1. (Từ P1/P2) Có gán mặc định AUTO_PARTS cho tài khoản mới tạo sau này
+   không, hay OWNER gán tay từng người?
+2. (Từ P1) File `user-accounting-sample.csv` để chạy Tier 4 đầy đủ.
+3. Mô hình quỹ: chung két (Model A) hay riêng két theo ngành (Model B)
+   — P4 hỗ trợ cả hai, chưa có UI gán quỹ.
+4. Luồng phê duyệt BL-014 (tách tỷ lệ khoản hỗn hợp) — xây như thế nào,
+   ai duyệt?
+5. Thời điểm chạy 0025–0030 trên staging (bản sao live) để đối chiếu
+   trước khi lên live — cần chủ gật đầu và cách tạo staging (hoặc để
+   Muse tạo từ backup live).
+
+## P5.8. Production readiness (P5)
+
+**Chưa sẵn sàng deploy production.** P5 xong trên nhánh feature:
+0030 kiểm chứng trên scratch (16/16 PASS) + app qua gate + E2E 87/87.
+Cần trước khi merge/deploy (P6): chạy 0025–0030 trên staging (bản sao
+live) + đối chiếu tài chính + smoke test app trên staging theo role
+thật (đặc biệt: dashboard/báo cáo theo ngành + tổng hợp đối chiếu đúng
+số live; OWNER xem bảng so sánh theo ngành; SALES không thấy số tiền).
+Không merge vào main trong P5 (theo §0.2).
