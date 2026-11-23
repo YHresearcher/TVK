@@ -3,9 +3,11 @@ import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, bt
 import SubmitButton from "@/components/SubmitButton";
 import AgingTable from "@/components/AgingTable";
 import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
+import PaymentHistory from "@/components/PaymentHistory";
 import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordReceivablePaymentAction } from "@/lib/actions";
 import { getBusinessLineContext } from "@/lib/business-lines";
+import { listPaymentsWithAllocations } from "@/lib/payment-allocations";
 import { getCurrentProfile, listCashFunds, listPartners, listReceivables, listSettlements } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
@@ -21,12 +23,13 @@ export default async function ReceivablesPage({
   // được vẫn hiện — không giấu tiền).
   const ctx = await getBusinessLineContext();
   const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
-  const [receivables, settlements, partners, funds, profile] = await Promise.all([
+  const [receivables, settlements, partners, funds, profile, payments] = await Promise.all([
     listReceivables(lineFilter),
     listSettlements(),
     listPartners(),
     listCashFunds(),
     getCurrentProfile(),
+    listPaymentsWithAllocations("IN", lineFilter),
   ]);
   const configured = receivables.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
@@ -160,6 +163,17 @@ export default async function ReceivablesPage({
           </TableWrap>
         </div>
       )}
+
+      {/* P3: lịch sử thu tiền + phân bổ theo ngành, thu tiền đợt chốt sổ, đảo bút toán. */}
+      <PaymentHistory
+        kind="IN"
+        partyKind="PARTNER"
+        payments={payments.data}
+        settlements={partnerSettlements}
+        funds={activeFunds}
+        role={profile.data?.role}
+        returnTo="/receivables"
+      />
       </>
       )}
     </>

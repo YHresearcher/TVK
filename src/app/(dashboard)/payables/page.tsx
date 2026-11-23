@@ -2,9 +2,11 @@ import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, bt
 import SubmitButton from "@/components/SubmitButton";
 import AgingTable from "@/components/AgingTable";
 import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
+import PaymentHistory from "@/components/PaymentHistory";
 import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordPayablePaymentAction } from "@/lib/actions";
 import { getBusinessLineContext } from "@/lib/business-lines";
+import { listPaymentsWithAllocations } from "@/lib/payment-allocations";
 import { getCurrentProfile, listCashFunds, listPayables, listPurchaseReceipts, listSalesDocuments, listSettlements, listSuppliers } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { isReadOnlyRole } from "@/lib/types";
@@ -20,7 +22,7 @@ export default async function PayablesPage({
   // được vẫn hiện — không giấu tiền).
   const ctx = await getBusinessLineContext();
   const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
-  const [payables, settlements, suppliers, salesDocs, purchaseReceipts, funds, profile] = await Promise.all([
+  const [payables, settlements, suppliers, salesDocs, purchaseReceipts, funds, profile, payments] = await Promise.all([
     listPayables(lineFilter),
     listSettlements(),
     listSuppliers(),
@@ -28,6 +30,7 @@ export default async function PayablesPage({
     listPurchaseReceipts(lineFilter),
     listCashFunds(),
     getCurrentProfile(),
+    listPaymentsWithAllocations("OUT", lineFilter),
   ]);
   const configured = payables.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
@@ -168,6 +171,17 @@ export default async function PayablesPage({
           </TableWrap>
         </div>
       )}
+
+      {/* P3: lịch sử chi tiền + phân bổ theo ngành, chi tiền đợt chốt sổ, đảo bút toán. */}
+      <PaymentHistory
+        kind="OUT"
+        partyKind="SUPPLIER"
+        payments={payments.data}
+        settlements={supplierSettlements}
+        funds={activeFunds}
+        role={profile.data?.role}
+        returnTo="/payables"
+      />
       </>
       )}
     </>

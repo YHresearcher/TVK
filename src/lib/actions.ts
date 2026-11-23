@@ -2733,6 +2733,74 @@ export async function recordReceivablePaymentAction(formData: FormData) {
   redirect("/receivables?ok=1");
 }
 
+/**
+ * P3 — Ghi nhận thanh toán một đợt chốt sổ (DS). Chỉ ghi settlement_id;
+ * trigger apply_payment_to_balance tự phân bổ theo từng dòng DS (theo
+ * thứ tự dòng) và ghi payment_allocations; trả thừa bị chặn ở DB (BL-023).
+ * Chiều: đối tác trả -> IN, trả nhà cung cấp -> OUT.
+ */
+export async function recordSettlementPaymentAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được ghi nhận thanh toán đợt chốt sổ.");
+  const settlementId = str(formData, "settlement_id");
+  const partyKind = str(formData, "party_kind");
+  const method = str(formData, "method") || "BANK";
+  const fundId = str(formData, "fund_id");
+  await validateFundForMethod(supabase, fundId, method);
+  const { data: ds } = await supabase
+    .from("settlements")
+    .select("id, party_kind")
+    .eq("id", settlementId)
+    .maybeSingle();
+  if (!ds) throw new Error("Không tìm thấy đợt chốt sổ đã chọn.");
+  if (ds.party_kind !== partyKind) throw new Error("Đợt chốt sổ không khớp đối tượng (đối tác / nhà cung cấp).");
+  const amount = num(formData, "amount");
+  if (amount <= 0) throw new Error("Số tiền thanh toán phải lớn hơn 0.");
+  done(
+    await supabase.from("payments").insert({
+      payment_kind: partyKind === "SUPPLIER" ? "OUT" : "IN",
+      settlement_id: settlementId,
+      amount,
+      method,
+      fund_id: fundId,
+      payment_date: optDate(formData, "payment_date") ?? undefined,
+      note: optStr(formData, "note"),
+      created_by: await userId(),
+    }),
+    "Ghi nhận thanh toán đợt chốt sổ"
+  );
+  const back = partyKind === "SUPPLIER" ? "/payables" : "/receivables";
+  revalidatePath(back);
+  revalidatePath("/dashboard");
+  redirect(`${back}?ok=1`);
+}
+
+/**
+ * P3 — Đảo bút toán thanh toán (BL-021). CHỈ KẾ TOÁN (quyết định kế toán
+ * 2026-10-28: chỉ Kế toán mới được đảo chứng từ; Chủ cửa hàng cũng không
+ * đảo được). RPC reverse_payment tạo phiếu đảo + phân bổ gương âm + dòng
+ * tiền ngược chiều; phiếu gốc giữ nguyên, không sửa/xoá.
+ */
+export async function reversePaymentAction(formData: FormData) {
+  const supabase = await db();
+  await requireRole(["ACCOUNTING"], "Chỉ Kế toán mới được đảo bút toán thanh toán.");
+  const paymentId = str(formData, "payment_id");
+  const reason = str(formData, "reason").trim();
+  if (!paymentId) throw new Error("Chưa chọn phiếu thanh toán cần đảo.");
+  if (!reason) throw new Error("Bắt buộc nhập lý do đảo bút toán.");
+  const { error } = await supabase.rpc("reverse_payment", {
+    p_payment_id: paymentId,
+    p_reason: reason,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/receivables");
+  revalidatePath("/payables");
+  revalidatePath("/cashflow");
+  revalidatePath("/dashboard");
+  const back = str(formData, "return_to") || "/receivables";
+  redirect(`${back}?ok=1`);
+}
+
 export async function createSettlementAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER","ACCOUNTING"], "Chỉ Chủ cửa hàng và Kế toán mới được tạo đợt chốt sổ.");
@@ -3280,8 +3348,6 @@ export async function toggleCashCategoryAction(formData: FormData) {
 export async function createOperatingCashMovementAction(formData: FormData) {
   const supabase = await db();
   await requireRole(["OWNER"], "Chỉ Chủ cửa hàng mới được ghi nhận thu/chi vận hành.");
-  const uid = await userId();
-
   const fundId = str(formData, "fund_id");
   const categoryId = str(formData, "category_id");
   const amount = num(formData, "amount");
@@ -3292,42 +3358,23 @@ export async function createOperatingCashMovementAction(formData: FormData) {
   if (!categoryId) throw new Error("Chưa chọn khoản mục thu/chi.");
   if (amount <= 0) throw new Error("Số tiền thu/chi phải lớn hơn 0.");
 
-  const { data: fund, error: fundErr } = await supabase
-    .from("cash_funds")
-    .select("id, is_active")
-    .eq("id", fundId)
-    .single();
-  if (fundErr || !fund) throw new Error("Không tìm thấy quỹ tiền.");
-  if (!fund.is_active) throw new Error("Quỹ tiền đã chọn đang tắt.");
-
-  const { data: category, error: catErr } = await supabase
-    .from("cash_categories")
-    .select("name, kind")
-    .eq("id", categoryId)
-    .single();
-  if (catErr || !category) throw new Error("Không tìm thấy thông tin khoản mục.");
-
-  const finalAmount = category.kind === "IN" ? Math.abs(amount) : -Math.abs(amount);
-  const finalNote = note || (category.kind === "IN" ? `Thu vận hành: ${category.name}` : `Chi vận hành: ${category.name}`);
-
-  done(
-    await supabase.from("cash_movements").insert({
-      fund_id: fundId,
-      movement_kind: "OPERATING",
-      category_id: categoryId,
-      amount: finalAmount,
-      movement_date: movementDate,
-      note: finalNote,
-      created_by: uid,
-    }),
-    "Ghi nhận thu chi vận hành"
-  );
+  // P3 (BL-022): ghi trực tiếp vào cash_movements đã bị chặn ở RLS — đi
+  // qua RPC record_operating_cash_movement (SECURITY DEFINER, tự kiểm tra
+  // quỹ + khoản mục, ký dấu tiền theo loại khoản mục, ghi diễn giải mặc định).
+  const { data, error } = await supabase.rpc("record_operating_cash_movement", {
+    p_fund_id: fundId,
+    p_category_id: categoryId,
+    p_amount: amount,
+    p_movement_date: movementDate,
+    p_note: note,
+  });
+  if (error) throw new Error(error.message);
 
   revalidatePath("/cashflow");
   revalidatePath("/executive");
   const returnTo = optStr(formData, "return_to");
   if (returnTo) redirect(returnTo);
-  return { ok: true };
+  return { ok: true, movement_id: data };
 }
 
 export async function transferInternalCashFundsAction(formData: FormData) {

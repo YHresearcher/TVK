@@ -5,15 +5,25 @@ import {
   isOilLineCode,
   splitByBusinessLine,
 } from "../../src/lib/product-match";
+import {
+  allocationLineLabel,
+  buildAllocationSummary,
+  isReversiblePayment,
+  paymentReversalLabel,
+} from "../../src/lib/payment-allocations";
 
 /**
- * TIER 5 — TVK V2.0 P2: tách ngành hàng (Business Line Separation).
+ * TIER 5 — TVK V2.0 P2 + P3: tách ngành hàng + phân bổ / đảo thanh toán.
  * Chỉ kiểm tra các hàm thuần (không chạm DB thật, không chạm Supabase):
  *  - splitByBusinessLine: tách checkout / file import theo ngành.
  *  - isOilLineCode / isExpiredBatch: phân loại FEFO theo ngành chuẩn.
  *  - compareLotOrder: thứ tự FEFO (dầu) / FIFO (phụ tùng).
+ *  - buildAllocationSummary / isReversiblePayment / paymentReversalLabel:
+ *    gom phân bổ theo ngành + điều kiện đảo phiếu (P3, BL-021).
  * Ràng buộc DB (trigger, view, RLS) được kiểm chứng riêng bằng file
- * docs/tests/p2_operational_local.sql trên PostgreSQL scratch.
+ * docs/tests/p2_operational_local.sql (P2) và
+ * docs/tests/p3_payment_allocations_local.sql (P3, BL-021/022/023)
+ * trên PostgreSQL scratch.
  */
 export async function runTier5Tests(): Promise<{ passed: number; total: number }> {
   let passed = 0;
@@ -126,6 +136,47 @@ export async function runTier5Tests(): Promise<{ passed: number; total: number }
     assert.equal(groups.size, 2);
     assert.equal(groups.get("")?.length, 1);
     assert.equal(groups.get("")?.[0].product_id, "p-unknown");
+  });
+
+  // ---- P3 (BL-021): hàm thuần cho lịch sử phân bổ + đảo phiếu. ----
+  test("P3: buildAllocationSummary gom phân bổ theo ngành, cộng tiền từng ngành", () => {
+    const summary = buildAllocationSummary([
+      { business_line_code: "OIL", amount: 100000 },
+      { business_line_code: "AUTO_PARTS", amount: 50000 },
+      { business_line_code: "OIL", amount: -100000 },
+      { business_line_code: null, amount: 7000 },
+    ]);
+    assert.equal(summary.length, 3);
+    assert.equal(summary.find((s) => s.lineCode === "OIL")?.amount, 0);
+    assert.equal(summary.find((s) => s.lineCode === "AUTO_PARTS")?.amount, 50000);
+    assert.equal(summary.find((s) => s.lineCode === null)?.lineLabel, "Chưa phân loại");
+    assert.equal(summary.find((s) => s.lineCode === "OIL")?.lineLabel, "Dầu nhớt");
+    assert.equal(summary.find((s) => s.lineCode === "AUTO_PARTS")?.lineLabel, "Phụ tùng");
+  });
+
+  test("P3: allocationLineLabel đúng nhãn Dầu nhớt / Phụ tùng / Chưa phân loại", () => {
+    assert.equal(allocationLineLabel("OIL"), "Dầu nhớt");
+    assert.equal(allocationLineLabel("AUTO_PARTS"), "Phụ tùng");
+    assert.equal(allocationLineLabel(null), "Chưa phân loại");
+    assert.equal(allocationLineLabel(undefined), "Chưa phân loại");
+    assert.equal(allocationLineLabel("KHAC"), "Chưa phân loại");
+  });
+
+  test("P3 (BL-021): isReversiblePayment — phiếu thường đảo được, phiếu đảo và phiếu đã đảo thì không", () => {
+    const all = [
+      { id: "p1", reversal_of_id: null },
+      { id: "p2", reversal_of_id: null },
+      { id: "r1", reversal_of_id: "p1" },
+    ];
+    assert.equal(isReversiblePayment(all[0], all), false); // p1 đã bị đảo bởi r1
+    assert.equal(isReversiblePayment(all[1], all), true); // p2 chưa bị đảo
+    assert.equal(isReversiblePayment(all[2], all), false); // r1 là phiếu đảo
+  });
+
+  test("P3 (BL-021): paymentReversalLabel — Bút toán đảo / Đã đảo (mã phiếu đảo) / rỗng", () => {
+    assert.equal(paymentReversalLabel({ reversal_of_id: "p1" }, null), "Bút toán đảo");
+    assert.equal(paymentReversalLabel({ reversal_of_id: null }, "PC-2611-0001"), "Đã đảo (PC-2611-0001)");
+    assert.equal(paymentReversalLabel({ reversal_of_id: null }, null), "");
   });
 
   return { passed, total };

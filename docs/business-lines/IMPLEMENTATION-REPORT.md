@@ -378,3 +378,213 @@ trong app — chờ phiếu nhập dầu thật đầu tiên.
 Cần trước khi merge/deploy: chạy 0025 + 0026 trên staging (bản sao live)
 + đối chiếu tài chính + smoke test app trên staging theo role thật.
 Không merge vào main trong P2 (theo §0.2).
+
+# TVK V2.0 P3 — Implementation Report (Báo cáo triển khai P3)
+
+## P3.1. Thay đổi đã làm
+
+### Migration mới
+
+- `supabase/migrations/0027_payment_allocations_reversal.sql` — xem P3.2.
+
+### Code app mới / sửa
+
+- Mới `src/lib/payment-allocations.ts`: kiểu `PaymentAllocationRow` /
+  `PaymentWithAllocations`, `listPaymentsWithAllocations(kind, lineId?)`
+  (lấy phiếu thu/chi + các phiếu đảo của chúng + phân bổ theo ngành +
+  nhãn đối tượng + trạng thái đảo; lọc theo ngành qua phân bổ, phiếu
+  không có phân bổ vẫn hiện), hàm thuần `buildAllocationSummary`,
+  `isReversiblePayment`, `paymentReversalLabel`, `allocationLineLabel`.
+- Mới `src/components/PaymentHistory.tsx`: thẻ "Ghi nhận thu/chi tiền
+  đợt chốt sổ (DS)", thẻ "Đảo bút toán thanh toán" (chỉ ACCOUNTING;
+  OWNER thấy ghi chú giải thích), bảng "Lịch sử thu/chi tiền + phân bổ
+  theo ngành" (chỉ OWNER/ACCOUNTING thấy, theo RLS bảng `payments`).
+- `src/lib/actions.ts`: mới `recordSettlementPaymentAction` (chỉ ghi
+  `settlement_id`, trigger tự phân bổ) + `reversePaymentAction`
+  (ACCOUNTING-only, gọi RPC `reverse_payment`); sửa
+  `createOperatingCashMovementAction` — bỏ INSERT trực tiếp vào
+  `cash_movements`, đi qua RPC `record_operating_cash_movement` (BL-022).
+- Trang Phải thu / Phải trả: gắn `<PaymentHistory>` (IN/PARTNER,
+  OUT/SUPPLIER).
+- Sổ dòng tiền (`CashflowLedger.tsx`): ẩn nút "Huỷ phiếu" với dòng tiền
+  gắn phiếu thu/chi, hiện "Đảo ở phiếu thanh toán".
+- Tier 5 E2E: +4 test hàm thuần P3 (tổng Tier 5: 12).
+- Không đụng VAT (P4) hay báo cáo (P5).
+
+### Kiểm chứng database local
+
+- Mới `docs/tests/p3_seed_local.sql` (chứng từ dầu + phụ tùng, 2 đợt
+  chốt sổ 2 dòng, khoản mua hỗn hợp để kiểm chứng âm) +
+  `docs/tests/p3_payment_allocations_local.sql` (A–O, 15 mục).
+- Chạy bằng `bash /tmp/tvk-p3-verify/run-all.sh` (chuỗi đầy đủ
+  0001–0027 + seed P1/P2/P3; script ở ngoài repo, như P2).
+
+### Tài liệu (§23 — phần P3)
+
+- Mới `docs/business-lines/SETTLEMENT-AND-PAYMENTS.md` +
+  `docs/business-lines/PAYMENT-REVERSAL.md`.
+- Mục P3 này trong `IMPLEMENTATION-REPORT.md`.
+- `HUONG-DAN-VAN-HANH.md`: mục D5 Công nợ (phân bổ, thanh toán DS,
+  đảo bút toán, huỷ dòng tiền gắn phiếu).
+
+## P3.2. Nội dung migration 0027
+
+1. `payments.reversal_of_id` + unique partial index
+   `uq_payments_one_reversal` (một phiếu gốc chỉ có một phiếu đảo) +
+   index thường trên cột.
+2. Bảng `payment_allocations` (id, payment_id, receivable/payable,
+   settlement/settlement_line, business_line_id NOT NULL, amount
+   numeric(15,4), reversal_of_id) + CHECK đúng một khoản công nợ +
+   CHECK dấu tiền (thường > 0, gương < 0) + unique index
+   `(payment_id, receivable_id, payable_id, settlement_line_id)` NULLS
+   NOT DISTINCT (chống ghi trùng). RLS: SELECT OWNER/ACCOUNTING/CEO;
+   không policy ghi — chỉ trigger SECURITY DEFINER ghi.
+3. Hàm `tvk_resolve_obligation_line()` — quy chiếu ngành qua chứng từ
+   gốc (phải thu → chứng từ bán; phải trả mua → phiếu nhập; phải trả ký
+   gửi → chứng từ bán); chứng từ gốc NULL ngành thì suy từ một ngành
+   duy nhất của các dòng; hỗn hợp 2 ngành → RAISE (fail-closed).
+4. Viết lại `apply_payment_to_balance()` trong cùng migration (chuyển
+   đổi nguyên tử, không có cửa sổ double-count): nhánh đảo xử lý
+   trước (tạo dòng gương âm + trừ `amount_paid` + tính lại trạng thái);
+   nhánh thường giữ nguyên logic 0019 (guard trả thừa + thứ tự dòng DS
+   + thông báo lỗi) và thêm INSERT phân bổ sau mỗi lần cập nhật số dư.
+5. RPC `reverse_payment(p_payment_id, p_reason)` — ACCOUNTING-only, lý
+   do bắt buộc, khóa `FOR UPDATE`, kiểm tra đã đảo / phiếu đảo, tạo
+   phiếu đảo (chiều ngược, cùng quỹ/phương thức/tham chiếu), đánh dấu
+   hủy dòng tiền gốc.
+6. Viết lại `cancel_cash_movement_reversal` (E7): dòng tiền gắn phiếu
+   thanh toán → TỪ CHỐI (chỉ đảo ở phiếu); dòng đảo không copy
+   `payment_id` (luôn NULL, liên kết qua `reversal_of_id`); bỏ bước 4
+   cũ (trừ trực tiếp công nợ) — nay thuộc về `reverse_payment`.
+7. Viết lại `apply_payment_to_cash_fund`: dòng tiền của phiếu đảo loại
+   `REVERSAL`, số âm, `reversal_of_id` trỏ dòng tiền gốc.
+8. RPC `record_operating_cash_movement()` — OWNER-only, kiểm tra quỹ +
+   khoản mục, ký dấu tiền theo loại, ghi diễn giải mặc định. Đây là
+   đường ghi OPERATING duy nhất sau khi bỏ policy ghi trực tiếp.
+9. Cứng hoá quỹ tiền (§12.6, BL-022): DROP policy INSERT/UPDATE trực
+   tiếp trên `cash_movements` (mọi role) + trigger
+   `trg_cash_movements_no_direct_mutation` (DELETE luôn chặn; UPDATE
+   chỉ cho đổi các cột hủy/liên kết).
+10. Trigger bất biến `trg_payments_no_mutation` trên `payments`
+    (UPDATE/DELETE luôn chặn — sửa sai chỉ bằng phiếu đảo).
+11. Backfill `tvk_backfill_payment_allocations()` — tái hiện thuật toán
+    0019 theo `(created_at, doc_code, id)`, có bảng tạm `paid_so_far`;
+    post-check `SUM(alloc) = amount_paid` mọi khoản, lệch là RAISE.
+    Trên live `payments = 0` nên backfill là no-op.
+
+## P3.3. Quyết định thiết kế (theo prompt §18.6 — được phép từ chối HOẶC tách)
+
+- **Chặn đảo khi đã xuất hoá đơn / đã thu tiền (§12.5): TÁCH.** Hiện
+  mới chặn "đã đảo" và "phiếu đảo". Chặn đảo khi phiếu gốc đã gắn dòng
+  hoá đơn GTGT đang hoạt động chưa kiểm tra được vì P4 chưa có cột
+  ngành trên hoá đơn và chưa có liên kết phiếu ↔ hoá đơn — cần bổ sung
+  ở P4 (BL-015). Ghi rõ trong `PAYMENT-REVERSAL.md` §6 thay vì giả vờ
+  đã làm.
+- **Khoản công nợ hỗn hợp (chứng từ gốc 2 ngành): fail-closed.** Không
+  tách phân bổ theo tỷ lệ giá trị (đó là quy tắc quy chiếu mới, không
+  có trong prompt) — resolver RAISE, người vận hành phân loại chứng từ
+  gốc trước. Kiểm chứng âm ở mục O.
+- **Đảo từng dòng DS riêng lẻ: KHÔNG làm.** Đảo toàn bộ phiếu; muốn đảo
+  một phần thì đảo cả phiếu rồi ghi lại phần đúng. Đơn giản hơn và giữ
+  được bất biến "một phiếu đảo = một phiếu gốc".
+- **Tiền thừa: giữ hành vi 0019 (chặn).** Không tạo chứng từ tạm ứng /
+  đặt cọc trong P3 (ngoài phạm vi V2.0, fix E6).
+
+## P3.4. Kết quả kiểm chứng
+
+### Database scratch (PostgreSQL 16 local — KHÔNG phải live/staging)
+
+Chuỗi: DB trống → auth stub → 0001–0024 → p1 seed → 0025 → p2 seed →
+0026 → p3 seed → 0027 → file kiểm chứng P3. Kết quả `ALL DONE`,
+**PASS A–O (15/15)**:
+
+| Mục | Nội dung | Kết quả |
+|---|---|---|
+| A | Backfill PT-SEED-0001 → 1 phân bổ 100.000 AUTO_PARTS | ✅ |
+| B | Thu trực tiếp 50.000 → 1 phân bổ + R-PART2 PARTIAL + quỹ +50.000 | ✅ |
+| C | Thu DS 250.000 → 2 phân bổ theo thứ tự dòng (200.000 + 50.000) | ✅ |
+| D (BL-023) | Trả thừa trực tiếp + DS đều bị chặn, số dư không đổi | ✅ |
+| E (BL-021) | Đảo thu DS 250.000 — khôi phục đúng 2 khoản, gương âm, quỹ về lại | ✅ |
+| F | Đảo thu trực tiếp — R-PART2 về 0 UNPAID | ✅ |
+| G | Đảo trùng + đảo phiếu đảo bị chặn | ✅ |
+| H (E7) | Dòng tiền đảo có payment_id riêng, không copy gốc | ✅ |
+| I (BL-022) | OWNER ghi/sửa/xóa trực tiếp cash_movements đều bị chặn (42501) | ✅ |
+| J | payments bất biến (UPDATE/DELETE bị chặn, mọi role) | ✅ |
+| K | Cancel redesign: gắn phiếu thì từ chối; OPERATING + chuyển quỹ hủy đúng, không copy payment_id | ✅ |
+| L | Đảo DS xuyên ngành — mỗi khoản khôi phục đúng ngành của mình | ✅ |
+| M | Đảo phiếu đầu sau khi có phiếu sau — chỉ trừ đúng phiếu bị đảo | ✅ |
+| N | SUM(alloc) = amount_paid mọi khoản; số dư quỹ khớp; mọi phiếu có phân bổ | ✅ |
+| O | Khoản hỗn hợp → fail-closed (resolver + phiếu chi đều RAISE) | ✅ |
+
+Tổng kết cuối chuỗi: 11 phiếu (4 phiếu đảo), 15 dòng phân bổ, 7 dòng
+tiền đảo, 16 dòng tiền. **Concurrency (2 phiên, ngoài file A–O):**
+phiên B đảo cùng phiếu bị khóa đợi, sau khi phiên A commit thì B fail
+"đã được đảo trước đó" — không đảo trùng.
+
+### Gate build (repo local, nhánh feature)
+
+- `npx tsc --noEmit`: exit 0.
+- `npx next lint`: exit 0 (sau 1 vòng sửa biến thừa `verbNoun`).
+- `npx next build`: exit 0.
+- `npm run test:e2e`: **67/67** (Tier 1: 42 + Tier 2: 8 + Tier 3: 5 +
+  Tier 5: 12 — gồm 4 test P3 mới; Tier 4 SKIPPED như trước vì thiếu
+  file `user-accounting-sample.csv`).
+
+## P3.5. P3 Exit Gate — ĐẠT (với 3 lưu ý)
+
+| Điều kiện (§20) | Trạng thái |
+|---|---|
+| No double-posting | ✅ Chuyển đổi nguyên tử trong 0027 + unique index chống ghi trùng; bất biến N (SUM = amount_paid) |
+| No overpayment | ✅ BL-023 (mục D): trực tiếp + DS đều chặn, số dư không đổi |
+| Correct DS allocation | ✅ Mục C + L: phân bổ theo thứ tự dòng, đúng ngành từng dòng, kể cả xuyên ngành |
+| Correct reversal | ✅ BL-021 (mục E/F/L/M): gương âm, khôi phục đúng từng khoản, quỹ về lại |
+| Concurrency tests pass | ✅ 2 phiên: phiên sau bị khóa đợi rồi fail "đã được đảo" |
+| Financial baselines reconcile | ✅ Mục N + post-check backfill trong 0027; số dư quỹ khớp |
+
+**Lưu ý 1 — Migration 0025 + 0026 + 0027 CHƯA chạy trên database thật
+nào ngoài local scratch.** Theo prompt §21.5/§21.6, trước khi chạy lên
+live phải chạy trên **staging** (bản sao dữ liệu live) và đối chiếu bất
+biến tài chính. Không tự chạy lên live trong P3.
+
+**Lưu ý 2 — Tier 4 E2E vẫn SKIPPED** (cần file
+`user-accounting-sample.csv` từ máy Windows của chủ cửa hàng).
+
+**Lưu ý 3 — Chặn đảo khi đã xuất hoá đơn chưa kiểm tra được** (xem
+P3.3/P3.6) — cần bổ sung ở P4 (BL-015) trước khi chạy live.
+
+## P3.6. Hạn chế đã biết (P3)
+
+- Chặn đảo khi phiếu gốc đã gắn dòng hoá đơn GTGT đang hoạt động chưa
+  có (chờ P4, BL-015).
+- Đảo DS chỉ đảo toàn bộ phiếu, không đảo từng dòng riêng lẻ.
+- Phiếu không có tham chiếu công nợ/DS (phiếu lịch sử cũ) không đảo
+  được (không có phân bổ để gương).
+- Tổng phải thu/phải trả trên dashboard + trang công nợ vẫn hợp nhất
+  (phân bổ theo ngành là P4); chỉ lịch sử thanh toán đã hiện phân bổ
+  theo ngành.
+- Trang điều hành (`/executive`), dòng tiền (`/cashflow`), đối soát
+  (`/reconciliation`), báo cáo (`/reports`), hoá đơn GTGT (`/invoices`)
+  vẫn hợp nhất — thuộc P4/P5.
+
+## P3.7. Quyết định cần chủ cửa hàng (CẦN XÁC NHẬN)
+
+1. **Đảo bút toán chỉ Kế toán mới được làm — Chủ cửa hàng có đồng ý
+   giữ quy định này không?** (Quy định kế toán 28/10/2026; nếu chủ
+   cửa hàng muốn tự đảo được thì phải quyết lại trước P4, vì RPC đang
+   chặn OWNER.)
+2. (Từ P1/P2) Có gán mặc định AUTO_PARTS cho tài khoản mới tạo sau này
+   không, hay OWNER gán tay từng người?
+3. (Từ P1) File `user-accounting-sample.csv` để chạy Tier 4 đầy đủ.
+4. Thời điểm chạy 0025 + 0026 + 0027 trên staging (bản sao live) để
+   đối chiếu trước khi lên live — cần chủ cửa hàng gật đầu và cung cấp
+   cách tạo staging (hoặc để Muse tạo từ backup live).
+
+## P3.8. Production readiness (P3)
+
+**Chưa sẵn sàng deploy production.** P3 xong trên nhánh feature:
+migration 0027 đã kiểm chứng trên scratch (A–O + concurrency) + app
+code đã qua gate + E2E 67/67. Cần trước khi merge/deploy: chạy 0025 +
+0026 + 0027 trên staging (bản sao live) + đối chiếu tài chính + smoke
+test app trên staging theo role thật (đặc biệt: Kế toán đảo thử một
+phiếu, Chủ cửa hàng xác nhận không đảo được). Không merge vào main
+trong P3 (theo §0.2).
