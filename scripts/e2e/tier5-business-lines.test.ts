@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   compareLotOrder,
   isExpiredBatch,
@@ -30,8 +31,8 @@ import {
 } from "../../src/lib/reporting";
 
 /**
- * TIER 5 — TVK V2.0 P2 + P3 + P4: tách ngành hàng + phân bổ / đảo thanh
- * toán + VAT tách ngành.
+ * TIER 5 — TVK V2.0 P2 + P3 + P4 + P5 + P6: tách ngành hàng + phân bổ /
+ * đảo thanh toán + VAT tách ngành + báo cáo theo ngành + cứng hoá.
  * Chỉ kiểm tra các hàm thuần (không chạm DB thật, không chạm Supabase):
  *  - splitByBusinessLine: tách checkout / file import theo ngành.
  *  - isOilLineCode / isExpiredBatch: phân loại FEFO theo ngành chuẩn.
@@ -46,10 +47,14 @@ import {
  *  - sumSalesByLine / sumDebtByLine / buildLineComparison /
  *    mergeGroupPerformance / checkLineTotals / businessLineLabel:
  *    cộng số theo ngành + kiểm tra BL-020 + bảng so sánh ngành (P5).
+ *  - P6: kiểm tra tĩnh — 3 hàm tiền đã cứng hoá không còn gọi
+ *    `.limit()` thật (kéo toàn bộ bằng fetchAllPages/chunkIds).
  * Ràng buộc DB (trigger, view, RLS) được kiểm chứng riêng bằng file
  * docs/tests/p2_operational_local.sql (P2),
- * docs/tests/p3_payment_allocations_local.sql (P3, BL-021/022/023) và
- * docs/tests/p4_finance_vat_local.sql (P4, VAT/BL-015/REV)
+ * docs/tests/p3_payment_allocations_local.sql (P3, BL-021/022/023),
+ * docs/tests/p4_finance_vat_local.sql (P4, VAT/BL-015/REV),
+ * docs/tests/p5_reporting_local.sql (P5, BL-020) và
+ * docs/tests/p6_hardening_local.sql (P6, hồi quy toàn chuỗi)
  * trên PostgreSQL scratch.
  */
 export async function runTier5Tests(): Promise<{ passed: number; total: number }> {
@@ -532,6 +537,43 @@ export async function runTier5Tests(): Promise<{ passed: number; total: number }
     assert.equal(comparison[2].revenue, 0);
     assert.equal(mergeGroupPerformance([]).length, 0);
     assert.equal(checkLineTotals([], 0).matches, true);
+  });
+
+  // P6 — hardening: 3 hàm tiền còn sót `.limit()` ở P5
+  // (getSalesDocumentCosts, getPartnerRemainingEstimates,
+  // getMonthlyCashflowSummary) phải kéo toàn bộ bằng fetchAllPages /
+  // chunk 200 id, không còn gọi `.limit()` thật trong thân hàm.
+  // Đây là kiểm tra tĩnh trên source (các hàm này chạm Supabase nên
+  // không test được bằng hàm thuần trong bộ nhớ). Chỉ đếm `.limit(`
+  // ngoài comment.
+  test("P6: 3 hàm tiền đã cứng hoá không còn gọi .limit() thật", () => {
+    const src = readFileSync(
+      new URL("../../src/lib/queries.ts", import.meta.url),
+      "utf-8",
+    );
+    for (const fn of [
+      "getSalesDocumentCosts",
+      "getPartnerRemainingEstimates",
+      "getMonthlyCashflowSummary",
+    ]) {
+      const start = src.indexOf(`export async function ${fn}`);
+      assert.ok(start >= 0, `${fn} phải tồn tại trong queries.ts`);
+      // Thân hàm: từ đầu hàm tới `export ` tiếp theo.
+      const nextExport = src.indexOf("\nexport ", start + 10);
+      const body = src.slice(start, nextExport === -1 ? undefined : nextExport);
+      const codeLines = body
+        .split("\n")
+        .filter((line) => !line.trimStart().startsWith("//"));
+      const code = codeLines.join("\n");
+      assert.ok(
+        !code.includes(".limit("),
+        `${fn} vẫn còn gọi .limit() — phải dùng fetchAllPages/chunkIds (P6)`,
+      );
+      assert.ok(
+        code.includes("fetchAllPages"),
+        `${fn} phải kéo toàn bộ bằng fetchAllPages (P6)`,
+      );
+    }
   });
 
   return { passed, total };

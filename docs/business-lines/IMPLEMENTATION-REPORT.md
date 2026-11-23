@@ -963,3 +963,165 @@ live) + đối chiếu tài chính + smoke test app trên staging theo role
 thật (đặc biệt: dashboard/báo cáo theo ngành + tổng hợp đối chiếu đúng
 số live; OWNER xem bảng so sánh theo ngành; SALES không thấy số tiền).
 Không merge vào main trong P5 (theo §0.2).
+
+# TVK V2.0 P6 — Implementation Report (Báo cáo triển khai P6)
+
+## P6.1. Thay đổi đã làm
+
+### Không có migration mới
+
+P6 không tạo migration mới (không thay đổi schema). Toàn bộ
+0025–0030 giữ nguyên như P1–P5.
+
+### Code app sửa (`src/lib/queries.ts`)
+
+Cứng hoá 3 hàm tiền còn sót `.limit()` cố định sau P5 (REPORTING.md
+§7) — chuyển sang kéo toàn bộ bằng `fetchAllPages` (phân trang
+range, thứ tự ổn định, ném lỗi khi DB báo lỗi — quy ước P5/E8) +
+`chunkIds` tối đa 200 id cho `.in()`:
+
+| Hàm | Trước | Sau |
+|---|---|---|
+| `getSalesDocumentCosts` (Giá vốn/Lãi gộp trang Bán hàng) | `.limit(20000)` trên `sales_document_lines`; `.in()` phân bổ/lô không chunk (PostgREST mặc định cắt 1000 dòng) | `fetchAllPages` theo từng chunk 200 chứng từ (thứ tự document_id, id); `.in()` phân bổ/lô chunk 200 id |
+| `getPartnerRemainingEstimates` (ước tính hàng còn giữ tại đối tác) | `.limit(2000)` tồn kho đối tác, `.limit(500)` phiếu GK, `.limit(5000)` dòng GK; truy vấn sản phẩm không giới hạn (PostgREST mặc định cắt 1000 dòng) | Cả 4 truy vấn đều `fetchAllPages` (thứ tự ổn định); dòng GK theo từng chunk 200 phiếu |
+| `getMonthlyCashflowSummary` (dòng tiền theo tháng) | `.limit(5000)` dòng tiền, `.limit(3000)` chứng từ, `.limit(20000)` dòng chứng từ, `.limit(5000)` phân bổ/lô | Dòng tiền + chứng từ `fetchAllPages`; dòng chứng từ theo từng chunk 200 chứng từ; phân bổ/lô chunk 200 id |
+
+Hình dạng object trả về của cả 3 hàm giữ nguyên — các trang đang
+dùng không vỡ. Hành vi khi DB lỗi đổi từ "trả rỗng/lặng lẽ thiếu số"
+sang "ném lỗi" (số tiền sai còn tệ hơn trang lỗi — quy ước P5).
+
+### Test mới (`scripts/e2e/tier5-business-lines.test.ts`)
+
+- 1 test P6: kiểm tra tĩnh trên source — 3 hàm trên không còn gọi
+  `.limit()` thật trong thân hàm (bỏ qua dòng comment) và đều dùng
+  `fetchAllPages`. Các hàm này chạm Supabase nên không test được
+  bằng hàm thuần trong bộ nhớ; test tĩnh là rào chắn hồi quy để
+  không ai vô tình đưa `.limit()` cố định trở lại.
+
+### Tài liệu mới (`docs/business-lines/`)
+
+- `STAGING-REHEARSAL.md` — runbook chạy 0025–0030 trên staging +
+  đối chiếu số liệu với live (thứ tự migration, truy vấn kiểm tra
+  trước/sau, điểm dừng/rollback, UAT tay theo role).
+- `RELEASE-CHECKLIST.md` — checklist phát hành lên production từng
+  bước (sao lưu + kiểm chứng sao lưu → cửa sổ bảo trì → chạy
+  migration live → đối chiếu → merge/deploy → theo dõi 24h), ghi rõ
+  bước nào cần chủ gật đầu.
+- `ROLLBACK-PLAN.md` — rollback = khôi phục toàn bộ database từ bản
+  sao lưu trước phát hành + đưa code về bản cũ (không có migration
+  down; 0030 chỉ tạo view nên gỡ lẻ được, 0025–0029 thì không).
+- `REPORTING.md` §7 cập nhật: 3 hàm trên đã cứng hoá xong ở P6;
+  hạn chế còn lại duy nhất là `listPartnerStats` (xem P6.6).
+- `HUONG-DAN-VAN-HANH.md`: thêm 1 câu ở ghi chú V2.0 — các cột tiền
+  còn lại kéo đủ dữ liệu, không còn giới hạn số dòng.
+
+### Hướng dẫn vận hành
+
+Không đổi quy trình vận hành (P6 không thêm UI, không đổi hành vi
+người dùng thấy — chỉ làm số tiền đầy đủ hơn khi dữ liệu lớn lên).
+
+## P6.2. Kết quả kiểm chứng
+
+- **DB scratch PostgreSQL 16** (`docs/tests/p6_hardening_local.sql`,
+  chạy bằng `/tmp/tvk-p6-verify/run-all.sh` — chuỗi 0001–0030 + seed
+  P1–P5 + file kiểm chứng): **12/12 PASS** (R6-01→R6-12, hồi quy
+  toàn chuỗi):
+  - R6-01: đủ cấu trúc (2 ngành, 5/5 tài khoản live gán AUTO_PARTS,
+    `payment_allocations`, `payments.reversal_of_id`, 10 view báo cáo).
+  - R6-02: fail-closed đúng (chưa gán/ghost = 0, chỉ-dầu = chỉ OIL,
+    OWNER = tất cả).
+  - R6-03: INSERT phiếu NULL ngành bị chặn (trigger header P2).
+  - R6-04: hoá đơn trộn Dầu nhớt + Phụ tùng bị chặn.
+  - R6-05: đảo khi chứng từ đã có hoá đơn HD-P6-0001 bị chặn
+    (BL-015), số dư nguyên vẹn (phải thu vẫn đã nhận 50.000, không
+    tạo phiếu đảo).
+  - R6-06: OWNER ghi/sửa/xoá trực tiếp `cash_movements` đều bị chặn
+    (BL-022).
+  - R6-07: sổ kho bất biến (UPDATE/DELETE `stock_movements` bị chặn).
+  - R6-08: `payments` bất biến (UPDATE/DELETE bị chặn).
+  - R6-09 (BL-020): tổng theo ngành = tổng hợp, đối chiếu động
+    (doanh thu 1.750.000đ, giá vốn 400.000đ, 9 đơn; công nợ
+    4.790.000đ).
+  - R6-10: đủ 10 view báo cáo, `security_invoker=true`, SELECT cho
+    authenticated.
+  - R6-11: `next_doc_code` cấp mã liên tục không trùng
+    (ZZ-2611-0001 / ZZ-2611-0002; đã dọn dãy thử ZZ).
+  - R6-12: bất biến tài chính sau toàn chuỗi (chỉ cộng đúng các
+    phiếu R6-05/R6-06 tự tạo trong file kiểm chứng).
+  - Hai lỗi gặp trong lúc kiểm chứng (đã sửa, không phải lỗi app):
+    (1) R6-10 dùng `pg_views.reloptions` (cột không tồn tại) — sửa
+    theo mẫu P5 (`pg_class.reloptions`); (2) R6-11 fail vì Postgres
+    scratch thiếu múi giờ `Asia/Saigon` (tzdata của VM không có link
+    `Asia/Saigon` → `Ho_Chi_Minh`) — đã tạo symlink
+    `/usr/share/zoneinfo/Asia/Saigon -> Ho_Chi_Minh` trên VM (môi
+    trường scratch; Supabase live có đủ tzdata nên không ảnh hưởng
+    live). File kiểm chứng P6 tạo dữ liệu nên **không chạy lại được
+    trên cùng database** — luôn rebuild từ đầu bằng run-all.sh.
+- **Gate** (`npx tsc --noEmit` / `npx next lint` / `npx next build`,
+  log + `$?` tường minh): exit 0 / 0 / 0.
+- **E2E**: `npm run test:e2e` **88/88 pass** (Tier 1–3: 55 + Tier 5:
+  33/33, gồm 1 test P6 mới); Tier 4 vẫn SKIP (không có
+  `user-accounting-sample.csv`).
+
+## P6.3. P6 Exit Gate — ĐẠT (với 3 lưu ý)
+
+- Tất cả test pass (88/88 E2E + 12/12 kiểm chứng DB hồi quy).
+- 3 hàm tiền còn sót đã cứng hoá xong, có test hồi quy giữ.
+- Runbook staging + release checklist + rollback plan đã viết xong,
+  sẵn sàng chạy khi chủ gật đầu.
+- **Lưu ý 1**: staging **chưa tạo, chưa chạy rehearsal** — cần chủ
+  quyết phương pháp tạo staging (§1 runbook) và chuẩn bị mật khẩu
+  database live + bản sao lưu. Đây là việc còn lại lớn nhất trước
+  khi lên live.
+- **Lưu ý 2**: số liệu dashboard/báo cáo trên DB thật có 0030 vẫn
+  **chưa kiểm chứng** — chỉ kiểm được bằng rehearsal staging (§1).
+- **Lưu ý 3**: P6 Exit Gate ở đây là gate "chuẩn bị xong", không
+  phải "đã phát hành" — production vẫn chưa đụng tới (theo §0.2 và
+  chỉ đạo của parent: release lên live cần chủ gật đầu riêng).
+
+## P6.4. Hạn chế đã biết (P6)
+
+- `listPartnerStats` (cửa sổ thống kê nhanh từng đối tác ở dashboard)
+  vẫn dùng `.limit(500/2000)` — chỉ là số thống kê nhanh, không phải
+  số tiền báo cáo chính thức; ứng viên cho đợt cứng hoá sau, không
+  chặn phát hành.
+- Biểu đồ "Doanh thu theo cấp nhớt / theo thương hiệu" (§17.3/17.4,
+  E10) chưa làm: `sae_viscosity`/`brand` là text tự do, cần quy tắc
+  chuẩn hoá trước khi vẽ — chưa có quy tắc này.
+- BL-014 (workflow phê duyệt tách tỷ lệ cho khoản chưa phân loại)
+  vẫn chỉ có view hàng đợi (từ P4) — không đổi trong P6.
+- File kiểm chứng P6 tạo dữ liệu (hoá đơn HD-P6-0001, phải thu +
+  2 phiếu thu) nên không chạy lại được trên cùng database scratch —
+  luôn rebuild bằng `/tmp/tvk-p6-verify/run-all.sh`.
+
+## P6.5. Quyết định cần chủ cửa hàng (CẦN XÁC NHẬN)
+
+1. (Từ P1/P2, vẫn mở) Có gán mặc định AUTO_PARTS cho tài khoản mới
+   tạo sau này không, hay OWNER gán tay từng người? (Mặc định hiện
+   tại: chưa gán = không thấy gì.)
+2. (Từ P1, vẫn mở) File `user-accounting-sample.csv` để chạy Tier 4
+   đầy đủ.
+3. (Từ P4, vẫn mở) Mô hình quỹ: chung két (Model A) hay riêng két
+   theo ngành (Model B) — P4 hỗ trợ cả hai, chưa có UI gán quỹ.
+4. (Từ P4, vẫn mở) Luồng phê duyệt BL-014 (tách tỷ lệ khoản hỗn hợp)
+   — xây như thế nào, ai duyệt?
+5. **(P6, quyết mới) Phương pháp tạo staging**: project Supabase mới
+   từ bản sao lưu live (khuyên dùng), Supabase CLI local + pg_dump,
+   hay nâng cấp gói để dùng Branching — xem runbook §1. Cần cả mật
+   khẩu database live + bản sao lưu mới nhất.
+6. **(P6, quyết mới) Thời điểm chạy rehearsal staging + thời điểm
+   phát hành lên live** (kèm cửa sổ bảo trì giờ thấp điểm).
+7. **(P6, quyết mới) Import bổ sung T10+T11 trước hay sau phát
+   hành?** Hiện đang chờ (hold từ 23/11). Nếu import trước thì phải
+   import rồi đối chiếu lại baseline trước khi chạy rehearsal.
+
+## P6.6. Production readiness (P6)
+
+**Chưa sẵn sàng deploy production — nhưng đã chuẩn bị xong để
+rehearsal.** P6 xong trên nhánh feature: 3 hàm tiền cứng hoá + E2E
+88/88 + hồi quy DB toàn chuỗi 12/12 + runbook staging + release
+checklist + rollback plan. **Chưa làm:** tạo staging, chạy rehearsal,
+đối chiếu số liệu với live, UAT theo role thật, sao lưu + kiểm chứng
+sao lưu, merge/deploy. Tất cả các việc đó cần chủ gật đầu từng bước
+theo `RELEASE-CHECKLIST.md`. Không merge vào `main`, không chạy
+migration lên live trong P6 (theo §0.2 và chỉ đạo của parent).

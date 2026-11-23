@@ -143,21 +143,39 @@ hàng `v_sales_by_line` / `v_debt_by_line` / `v_inventory_value_by_line`.
 - **Gate**: `tsc --noEmit` 0, `next lint` 0, `next build` 0 (chạy độc
   lập 2 lần: subagent P5 + lead kiểm tra lại).
 
-## 7. Hạn chế đã biết (P5)
+## 7. Hạn chế đã biết (P5 — đã xử lý ở P6)
 
-- Chưa chạy thử với DB thật có 0030 (chỉ biên dịch + build + DB
+- ~~Chưa chạy thử với DB thật có 0030 (chỉ biên dịch + build + DB
   scratch): số liệu dashboard/báo cáo trên DB thật cần kiểm tra ở
-  P6 rehearsal (chạy 0030 trên staging rồi đối chiếu số).
-- `getSalesDocumentCosts` (cột Giá vốn/Lãi gộp trang Bán hàng) vẫn
+  P6 rehearsal (chạy 0030 trên staging rồi đối chiếu số).~~ → **P6:
+  đã chuẩn bị runbook rehearsal đầy đủ**
+  (`docs/business-lines/STAGING-REHEARSAL.md` + `RELEASE-CHECKLIST.md`
+  + `ROLLBACK-PLAN.md`); **chưa chạy** — việc tạo staging + chạy
+  rehearsal cần chủ quyết phương pháp và gật đầu.
+- ~~`getSalesDocumentCosts` (cột Giá vốn/Lãi gộp trang Bán hàng) vẫn
   dùng `.limit(20000)` trên `sales_document_lines` theo từng đợt
   chứng từ của trang — không nằm trong danh sách E8 nêu tên
   (getDashboard / listLedgerMovements / getGroupPerformance) nên giữ
-  nguyên; ứng viên cho P6 hardening.
-- `getPartnerRemainingEstimates` vẫn giữ `.limit(500/5000)` cũ
-  (phiếu GK, dòng GK) — ngoài phạm vi P5.
-- `getMonthlyCashflowSummary` (báo cáo dòng tiền theo tháng, code
+  nguyên; ứng viên cho P6 hardening.~~ → **P6 ĐÃ XONG:** kéo toàn bộ
+  dòng bằng `fetchAllPages` theo từng chunk 200 chứng từ (thứ tự
+  document_id, id); `.in()` phân bổ/lô cũng chunk 200 id. Lỗi DB ném
+  ra theo quy ước P5/E8.
+- ~~`getPartnerRemainingEstimates` vẫn giữ `.limit(500/5000)` cũ
+  (phiếu GK, dòng GK) — ngoài phạm vi P5.~~ → **P6 ĐÃ XONG:** tồn kho
+  tại đối tác + phiếu GK + dòng GK + sản phẩm đều kéo bằng
+  `fetchAllPages` (thứ tự ổn định); dòng GK theo từng chunk 200 phiếu.
+  (Kèm theo: truy vấn sản phẩm trong hàm này trước đây không đặt
+  giới hạn — PostgREST mặc định chỉ trả 1000 dòng — nay cũng kéo đủ.)
+- ~~`getMonthlyCashflowSummary` (báo cáo dòng tiền theo tháng, code
   gốc) vẫn đọc `sales_documents.total_amount` với `.limit(3000)` —
-  ngoài phạm vi P5; ứng viên cho P6.
+  ngoài phạm vi P5; ứng viên cho P6.~~ → **P6 ĐÃ XONG:** dòng tiền +
+  chứng từ kéo bằng `fetchAllPages`; dòng chứng từ theo từng chunk
+  200 chứng từ; phân bổ/lô chunk 200 id.
+- Hạn chế **còn lại sau P6** (không thuộc 3 hàm trên): `listPartnerStats`
+  (cửa sổ thống kê nhanh từng đối tác ở dashboard) vẫn dùng
+  `.limit(500/2000)` — chỉ là số thống kê nhanh, không phải số tiền
+  báo cáo chính thức; ứng viên cho đợt cứng hoá sau, không chặn
+  phát hành.
 - Biểu đồ "Doanh thu theo cấp nhớt / theo thương hiệu" (§17.3/17.4,
   E10) chưa làm: `sae_viscosity`/`brand` là text tự do, cần quy tắc
   chuẩn hoá trước khi vẽ — chưa có quy tắc này.

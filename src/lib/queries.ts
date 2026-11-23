@@ -252,27 +252,60 @@ export async function getPartnerRemainingEstimates(lineId?: string | null): Prom
   const out = new Map<string, number>();
   if (!supabase) return out;
   if (lineId === null) return out;
-  const stockQuery = supabase
-    .from("v_batch_stock")
-    .select("batch_id, product_id, partner_id, qty")
-    .eq("location_kind", "PARTNER_VIRTUAL");
-  if (lineId !== undefined) stockQuery.eq("business_line_id", lineId);
-  const [stock, slips, products] = await Promise.all([
-    stockQuery.limit(2000),
-    supabase.from("consignment_out_slips").select("id, created_at").eq("status", "CONFIRMED").limit(500),
-    supabase.from("products").select("id, retail_price, wholesale_price"),
+  // P6 — không .limit() cố định (2000 phiếu GK / 500 phiếu / 5000
+  // dòng GK) và không để truy vấn sản phẩm không giới hạn (PostgREST
+  // mặc định chỉ trả 1000 dòng): kéo toàn bộ bằng fetchAllPages
+  // (thứ tự ổn định), dòng GK theo từng chunk 200 phiếu. Lỗi DB ném
+  // ra theo quy ước P5/E8.
+  const [stockRows, slipRows, productRows] = await Promise.all([
+    fetchAllPages(async (from, to) => {
+      let q = supabase
+        .from("v_batch_stock")
+        .select("batch_id, product_id, partner_id, qty")
+        .eq("location_kind", "PARTNER_VIRTUAL");
+      if (lineId !== undefined) q = q.eq("business_line_id", lineId);
+      const { data, error } = await q.order("batch_id", { ascending: true }).range(from, to);
+      return { data: (data ?? []) as AnyRow[], error };
+    }),
+    fetchAllPages(async (from, to) => {
+      const { data, error } = await supabase
+        .from("consignment_out_slips")
+        .select("id, created_at")
+        .eq("status", "CONFIRMED")
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to);
+      return { data: (data ?? []) as AnyRow[], error };
+    }),
+    fetchAllPages(async (from, to) => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, retail_price, wholesale_price")
+        .order("id", { ascending: true })
+        .range(from, to);
+      return { data: (data ?? []) as AnyRow[], error };
+    }),
   ]);
   const slipCreated = new Map(
-    ((slips.data ?? []) as AnyRow[]).map((s) => [String(s.id), String(s.created_at)])
+    slipRows.map((s) => [String(s.id), String(s.created_at)])
   );
   const latestTransfer = new Map<string, number>();
-  if ((slips.data ?? []).length) {
-    const { data: items } = await supabase
-      .from("consignment_out_items")
-      .select("slip_id, batch_id, transfer_price")
-      .in("slip_id", (slips.data ?? []).map((s) => s.id))
-      .limit(5000);
-    const sorted = ((items ?? []) as AnyRow[]).sort((a, b) =>
+  if (slipRows.length) {
+    const gkItems: AnyRow[] = [];
+    for (const chunk of chunkIds(slipRows.map((s) => String(s.id)))) {
+      const rows = await fetchAllPages(async (from, to) => {
+        const { data, error } = await supabase
+          .from("consignment_out_items")
+          .select("slip_id, batch_id, transfer_price")
+          .in("slip_id", chunk)
+          .order("slip_id", { ascending: true })
+          .order("batch_id", { ascending: true })
+          .range(from, to);
+        return { data: (data ?? []) as AnyRow[], error };
+      });
+      gkItems.push(...rows);
+    }
+    const sorted = gkItems.sort((a, b) =>
       String(slipCreated.get(String(b.slip_id)) ?? "").localeCompare(
         String(slipCreated.get(String(a.slip_id)) ?? "")
       )
@@ -283,12 +316,12 @@ export async function getPartnerRemainingEstimates(lineId?: string | null): Prom
     }
   }
   const sellPrice = new Map(
-    ((products.data ?? []) as AnyRow[]).map((p) => [
+    productRows.map((p) => [
       String(p.id),
       Number(p.retail_price ?? 0) > 0 ? Number(p.retail_price) : Number(p.wholesale_price ?? 0),
     ])
   );
-  for (const r of (stock.data ?? []) as AnyRow[]) {
+  for (const r of stockRows) {
     const qty = Number(r.qty ?? 0);
     if (!qty || !r.partner_id) continue;
     const tp = latestTransfer.get(String(r.batch_id));
@@ -467,35 +500,58 @@ export async function getSalesDocumentCosts(
     ((docs ?? []) as AnyRow[]).filter((d) => d.status === "CONFIRMED").map((d) => String(d.id))
   );
   if (confirmed.size === 0) return empty;
-  const { data: lines } = await supabase
-    .from("sales_document_lines")
-    .select("document_id, qty, line_total, batch_id, allocation_line_id")
-    .in("document_id", Array.from(confirmed))
-    .limit(20000);
-  const allLines = (lines ?? []) as AnyRow[];
-  const allocIds = Array.from(new Set(allLines.map((l) => l.allocation_line_id).filter(Boolean)));
-  let allocBatch = new Map<string, string>();
+  // P6 — không .limit(20000) cố định trên sales_document_lines: kéo
+  // toàn bộ dòng theo từng chunk chứng từ (tối đa 200 id/chunk) +
+  // phân trang range, thứ tự ổn định. Lỗi DB ném ra (số tiền sai còn
+  // tệ hơn trang lỗi — quy ước P5/E8).
+  const allLines: AnyRow[] = [];
+  for (const chunk of chunkIds(Array.from(confirmed))) {
+    const rows = await fetchAllPages(async (from, to) => {
+      const { data, error } = await supabase
+        .from("sales_document_lines")
+        .select("document_id, qty, line_total, batch_id, allocation_line_id")
+        .in("document_id", chunk)
+        .order("document_id", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to);
+      return { data: (data ?? []) as AnyRow[], error };
+    });
+    allLines.push(...rows);
+  }
+  const lines = allLines;
+  const allocIds = Array.from(new Set(lines.map((l) => l.allocation_line_id).filter(Boolean)));
+  const allocBatch = new Map<string, string>();
   if (allocIds.length) {
-    const { data: allocs } = await supabase
-      .from("allocation_lines")
-      .select("id, batch_id")
-      .in("id", allocIds);
-    allocBatch = new Map(((allocs ?? []) as AnyRow[]).map((a) => [String(a.id), String(a.batch_id)]));
+    // P6 — chunk .in() tối đa 200 id (không .limit(): PostgREST mặc
+    // định chỉ trả tối đa 1000 dòng, chunk 200 id -> tối đa 200 dòng).
+    for (const chunk of chunkIds(allocIds)) {
+      const { data: allocs } = await supabase
+        .from("allocation_lines")
+        .select("id, batch_id")
+        .in("id", chunk);
+      for (const a of ((allocs ?? []) as AnyRow[])) {
+        allocBatch.set(String(a.id), String(a.batch_id));
+      }
+    }
   }
   const batchIds = Array.from(
     new Set(
-      allLines
+      lines
         .map((l) => (l.batch_id ? String(l.batch_id) : allocBatch.get(String(l.allocation_line_id))))
         .filter((v): v is string => Boolean(v))
     )
   );
-  let batchCost = new Map<string, number>();
+  const batchCost = new Map<string, number>();
   if (batchIds.length) {
-    const { data: batches } = await supabase
-      .from("stock_batches")
-      .select("id, unit_cost")
-      .in("id", batchIds);
-    batchCost = new Map(((batches ?? []) as AnyRow[]).map((b) => [String(b.id), Number(b.unit_cost ?? 0)]));
+    for (const chunk of chunkIds(batchIds)) {
+      const { data: batches } = await supabase
+        .from("stock_batches")
+        .select("id, unit_cost")
+        .in("id", chunk);
+      for (const b of ((batches ?? []) as AnyRow[])) {
+        batchCost.set(String(b.id), Number(b.unit_cost ?? 0));
+      }
+    }
   }
   const map = new Map<string, { qty: number; total: number; cost: number }>();
   for (const l of allLines) {
@@ -3136,14 +3192,21 @@ export async function getMonthlyCashflowSummary(): Promise<MonthlyCashflowSummar
   const toISO = today;
 
   // 1. Biến động dòng tiền thực tế từ cash_movements
-  const { data: movements } = await supabase
-    .from("cash_movements")
-    .select("movement_date, amount, movement_kind, is_cancelled")
-    .gte("movement_date", fromISO)
-    .lte("movement_date", toISO)
-    .limit(5000);
+  // P6 — không .limit(5000) cố định: kéo toàn bộ 6 tháng bằng
+  // fetchAllPages (thứ tự ổn định). Lỗi DB ném ra theo quy ước P5/E8.
+  const movements = await fetchAllPages(async (from, to) => {
+    const { data, error } = await supabase
+      .from("cash_movements")
+      .select("movement_date, amount, movement_kind, is_cancelled")
+      .gte("movement_date", fromISO)
+      .lte("movement_date", toISO)
+      .order("movement_date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    return { data: (data ?? []) as AnyRow[], error };
+  });
 
-  for (const m of (movements ?? []) as AnyRow[]) {
+  for (const m of movements) {
     if (m.is_cancelled) continue;
     const kind = String(m.movement_kind ?? "DEBT_PAYMENT");
     if (kind === "INTERNAL_TRANSFER" || kind === "REVERSAL") continue;
@@ -3168,24 +3231,41 @@ export async function getMonthlyCashflowSummary(): Promise<MonthlyCashflowSummar
   }
 
   // 2. Doanh thu & giá vốn từ đơn bán hàng CONFIRMED
-  const { data: docs } = await supabase
-    .from("sales_documents")
-    .select("id, doc_date, total_amount")
-    .eq("status", "CONFIRMED")
-    .gte("doc_date", fromISO)
-    .lte("doc_date", toISO)
-    .limit(3000);
+  // P6 — không .limit(3000) cố định: kéo toàn bộ chứng từ 6 tháng
+  // bằng fetchAllPages (thứ tự ổn định). Lỗi DB ném ra theo quy ước P5/E8.
+  const docs = await fetchAllPages(async (from, to) => {
+    const { data, error } = await supabase
+      .from("sales_documents")
+      .select("id, doc_date, total_amount")
+      .eq("status", "CONFIRMED")
+      .gte("doc_date", fromISO)
+      .lte("doc_date", toISO)
+      .order("doc_date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+    return { data: (data ?? []) as AnyRow[], error };
+  });
 
-  const docRows = (docs ?? []) as AnyRow[];
+  const docRows = docs;
   if (docRows.length > 0) {
     const docIds = docRows.map((d) => String(d.id));
-    const { data: lines } = await supabase
-      .from("sales_document_lines")
-      .select("document_id, qty, batch_id, allocation_line_id")
-      .in("document_id", docIds)
-      .limit(20000);
+    // P6 — không .limit(20000) cố định: dòng theo từng chunk 200
+    // chứng từ + phân trang range, thứ tự ổn định.
+    const lineRows: AnyRow[] = [];
+    for (const chunk of chunkIds(docIds)) {
+      const rows = await fetchAllPages(async (from, to) => {
+        const { data, error } = await supabase
+          .from("sales_document_lines")
+          .select("document_id, qty, batch_id, allocation_line_id")
+          .in("document_id", chunk)
+          .order("document_id", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to);
+        return { data: (data ?? []) as AnyRow[], error };
+      });
+      lineRows.push(...rows);
+    }
 
-    const lineRows = (lines ?? []) as AnyRow[];
     const allocIds = Array.from(
       new Set(lineRows.map((l) => String(l.allocation_line_id ?? "")).filter(Boolean))
     );
@@ -3195,13 +3275,15 @@ export async function getMonthlyCashflowSummary(): Promise<MonthlyCashflowSummar
 
     const allocBatch = new Map<string, string>();
     if (allocIds.length) {
-      const { data: allocs } = await supabase
-        .from("allocation_lines")
-        .select("id, batch_id")
-        .in("id", allocIds)
-        .limit(5000);
-      for (const a of (allocs ?? []) as AnyRow[]) {
-        allocBatch.set(String(a.id), String(a.batch_id));
+      // P6 — chunk .in() tối đa 200 id, không .limit(5000).
+      for (const chunk of chunkIds(allocIds)) {
+        const { data: allocs } = await supabase
+          .from("allocation_lines")
+          .select("id, batch_id")
+          .in("id", chunk);
+        for (const a of ((allocs ?? []) as AnyRow[])) {
+          allocBatch.set(String(a.id), String(a.batch_id));
+        }
       }
     }
 
@@ -3213,13 +3295,15 @@ export async function getMonthlyCashflowSummary(): Promise<MonthlyCashflowSummar
 
     const batchCost = new Map<string, number>();
     if (batchIds.length) {
-      const { data: batches } = await supabase
-        .from("stock_batches")
-        .select("id, unit_cost")
-        .in("id", Array.from(new Set(batchIds)))
-        .limit(5000);
-      for (const b of (batches ?? []) as AnyRow[]) {
-        batchCost.set(String(b.id), Number(b.unit_cost ?? 0));
+      // P6 — chunk .in() tối đa 200 id, không .limit(5000).
+      for (const chunk of chunkIds(Array.from(new Set(batchIds)))) {
+        const { data: batches } = await supabase
+          .from("stock_batches")
+          .select("id, unit_cost")
+          .in("id", chunk);
+        for (const b of (batches ?? []) as AnyRow[]) {
+          batchCost.set(String(b.id), Number(b.unit_cost ?? 0));
+        }
       }
     }
 
