@@ -1,11 +1,16 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import AgingTable from "@/components/AgingTable";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
+import PaymentHistory from "@/components/PaymentHistory";
 import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordPayablePaymentAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
+import { listPaymentsWithAllocations } from "@/lib/payment-allocations";
 import { getCurrentProfile, listCashFunds, listPayables, listPurchaseReceipts, listSalesDocuments, listSettlements, listSuppliers } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
-import { isReadOnlyRole } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, isReadOnlyRole } from "@/lib/types";
+import type { BusinessLineCode } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +19,19 @@ export default async function PayablesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [payables, settlements, suppliers, salesDocs, purchaseReceipts, funds, profile] = await Promise.all([
-    listPayables(),
+  // P2: phải trả lọc theo ngành qua chứng từ gốc (hàng không quy chiếu
+  // được vẫn hiện — không giấu tiền).
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
+  const [payables, settlements, suppliers, salesDocs, purchaseReceipts, funds, profile, payments] = await Promise.all([
+    listPayables(lineFilter),
     listSettlements(),
     listSuppliers(),
-    listSalesDocuments(),
-    listPurchaseReceipts(),
+    listSalesDocuments(lineFilter),
+    listPurchaseReceipts(lineFilter),
     listCashFunds(),
     getCurrentProfile(),
+    listPaymentsWithAllocations("OUT", lineFilter),
   ]);
   const configured = payables.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
@@ -38,14 +48,36 @@ export default async function PayablesPage({
       : (salesDocCode.get(p.source_document_id) ?? "—");
   const open = payables.data.filter((p) => p.status === "UNPAID" || p.status === "PARTIAL");
   const totalOutstanding = open.reduce((a, p) => a + Number(p.amount) - Number(p.amount_paid), 0);
+  // P4b: dư nợ còn phải trả tách theo ngành (khoản chưa phân loại gom riêng).
+  const lineLabelById = new Map(ctx.lines.map((l) => [l.id, BUSINESS_LINE_LABELS[l.code as BusinessLineCode] ?? l.code]));
+  const lineLabel = (lineId: string | null | undefined) =>
+    lineId ? (lineLabelById.get(lineId) ?? "Ngành khác") : "Chưa phân loại";
+  const outstandingByLine = new Map<string | null, number>();
+  for (const p of open) {
+    const k = (p.business_line_id as string | null) ?? null;
+    outstandingByLine.set(k, (outstandingByLine.get(k) ?? 0) + Number(p.amount) - Number(p.amount_paid));
+  }
   const supplierSettlements = settlements.data.filter((s) => s.party_kind === "SUPPLIER");
 
   return (
     <>
       <PageHeader title="Phải trả nhà cung cấp" description="Khoản phải trả được tạo tự động theo 2 cách: khi một lô ký gửi bán được (theo đúng giá ký gửi đã thoả thuận của lô đó), và khi xác nhận phiếu nhập mua hàng (bằng tổng tiền phiếu, hạn trả theo số ngày trả của nhà cung cấp đó). Giảm giá cho khách hàng không bao giờ thay đổi các số tiền này." />
       {!configured && <NotConfigured />}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode === "NONE" ? null : (
+      <>
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <p className="mb-4 text-sm text-slate-600">Tổng còn nợ: <strong>{formatVND(totalOutstanding)}</strong></p>
+      {outstandingByLine.size > 1 && (
+        <p className="mb-4 text-sm text-slate-600">
+          Theo ngành:{" "}
+          {Array.from(outstandingByLine.entries()).map(([lineId, amount], i) => (
+            <span key={lineId ?? "unclassified"}>
+              {i > 0 ? " • " : ""}{lineLabel(lineId)} <strong>{formatVND(amount)}</strong>
+            </span>
+          ))}
+        </p>
+      )}
 
       {open.length > 0 && (
         <div className="mb-4">
@@ -62,12 +94,13 @@ export default async function PayablesPage({
 
       {payables.data.length === 0 ? <EmptyState message="Chưa có khoản phải trả. Xác nhận một phiếu nhập mua hàng hoặc bán một lô ký gửi để tạo khoản phải trả." /> : (
         <TableWrap>
-          <thead><tr><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Chứng từ</th><th className={`${thCls} text-right`}>Số lượng</th><th className={`${thCls} text-right`}>Giá ký gửi</th><th className={`${thCls} text-right`}>Số tiền</th><th className={`${thCls} text-right`}>Đã trả</th><th className={`${thCls} text-right`}>Còn nợ</th><th className={thCls}>Hạn trả</th><th className={thCls}>Trạng thái</th></tr></thead>
+          <thead><tr><th className={thCls}>Nhà cung cấp</th><th className={thCls}>Chứng từ</th><th className={thCls}>Ngành</th><th className={`${thCls} text-right`}>Số lượng</th><th className={`${thCls} text-right`}>Giá ký gửi</th><th className={`${thCls} text-right`}>Số tiền</th><th className={`${thCls} text-right`}>Đã trả</th><th className={`${thCls} text-right`}>Còn nợ</th><th className={thCls}>Hạn trả</th><th className={thCls}>Trạng thái</th></tr></thead>
           <tbody>
             {payables.data.map((p) => (
               <tr key={p.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                 <td className={tdCls}>{supplierName.get(p.supplier_id) ?? "—"}</td>
                 <td className={`${tdCls} font-mono text-xs`}>{sourceLabel(p)}</td>
+                <td className={tdCls}>{lineLabel(p.business_line_id)}</td>
                 <td className={`${tdCls} text-right font-mono`}>{p.qty == null ? "—" : formatNumber(p.qty)}</td>
                 <td className={`${tdCls} text-right font-mono`}>{p.unit_price == null ? "—" : formatVND(p.unit_price)}</td>
                 <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(p.amount)}</td>
@@ -158,6 +191,19 @@ export default async function PayablesPage({
             </tbody>
           </TableWrap>
         </div>
+      )}
+
+      {/* P3: lịch sử chi tiền + phân bổ theo ngành, chi tiền đợt chốt sổ, đảo bút toán. */}
+      <PaymentHistory
+        kind="OUT"
+        partyKind="SUPPLIER"
+        payments={payments.data}
+        settlements={supplierSettlements}
+        funds={activeFunds}
+        role={profile.data?.role}
+        returnTo="/payables"
+      />
+      </>
       )}
     </>
   );

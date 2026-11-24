@@ -13,7 +13,7 @@ export default function DrillDownDrawer({ entry, onClose }: DrillDownDrawerProps
   if (!entry) return null;
 
   const drilldown = entry.drilldown_data || {};
-  const { type, vouchers, transactions, items } = drilldown;
+  const { type, vouchers, transactions, items, by_line } = drilldown;
 
   const fmt = (n?: number) => (n ?? 0).toLocaleString("vi-VN");
 
@@ -129,6 +129,22 @@ export default function DrillDownDrawer({ entry, onClose }: DrillDownDrawerProps
             {/* RECEIVABLE / PAYABLE DRILLDOWN */}
             {(type === "RECEIVABLE" || type === "PAYABLE") && (
               <div className="space-y-4">
+                {/* P4b: dư nợ tách theo ngành (tổng các dòng = dư nợ của mục). */}
+                {by_line && by_line.length > 0 && (
+                  <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+                    <h3 className="font-semibold text-sm text-stone-800 mb-2">
+                      Dư nợ theo ngành:
+                    </h3>
+                    <div className="space-y-1">
+                      {by_line.map((b: any) => (
+                        <div key={b.business_line_id ?? "unclassified"} className="flex items-center justify-between text-xs">
+                          <span className="text-stone-600">{b.label || "Chưa phân loại"}</span>
+                          <span className="font-bold text-stone-800">{fmt(b.remaining)} đ</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <h3 className="font-semibold text-sm text-stone-800">
                   Chứng từ công nợ chi tiết ({vouchers?.length || 0} chứng từ):
                 </h3>

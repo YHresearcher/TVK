@@ -194,6 +194,37 @@ export const REF_DOC_TYPE_LABELS: Record<string, string> = {
 export { SEMANTIC_COLORS } from "@/lib/tokens";
 export type { SemanticColorToken } from "@/lib/tokens";
 
+/** TVK V2.0 P1 — Ngành hàng (business_lines). Mã dùng trong code, tên hiển thị tiếng Việt. */
+export type BusinessLineCode = "OIL" | "AUTO_PARTS";
+
+export interface BusinessLine {
+  id: string;
+  code: BusinessLineCode;
+  name: string;
+  is_active: boolean;
+}
+
+export const BUSINESS_LINE_LABELS: Record<BusinessLineCode, string> = {
+  OIL: "Dầu nhớt",
+  AUTO_PARTS: "Phụ tùng",
+};
+
+/**
+ * P2 fail-closed (khớp hàm DB user_can_access_business_line sau 0026):
+ * OWNER/CEO xem mọi ngành; sản phẩm/chứng từ chưa phân loại (NULL) cho
+ * qua để xử lý ở hàng đợi; user chưa được gán ngành nào KHÔNG thấy gì.
+ */
+export function userHasBusinessLineAccess(
+  role: string | null | undefined,
+  assignedLineIds: string[],
+  businessLineId: string | null | undefined,
+): boolean {
+  if (!businessLineId) return true; // Chưa phân loại -> hành vi cũ.
+  if (role === "OWNER" || role === "CEO") return true;
+  if (assignedLineIds.length === 0) return false; // P2: chưa gán -> không thấy gì.
+  return assignedLineIds.includes(businessLineId);
+}
+
 // Management Accounting & Reconciliation Types
 export * from "@/types";
 

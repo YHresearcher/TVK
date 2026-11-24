@@ -2,11 +2,13 @@ import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, bt
 import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ImportConsignmentOut from "@/components/ImportConsignmentOut";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import { confirmConsignmentOutAction, createConsignmentOutAction, importConsignmentOutAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { buildProductCodeMap, getCurrentProfile, listBatchesForSales, listConsignmentOutSlips, listPartners, listProductCodes, listProductFitments, listProducts, listSuppliers } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
-import { compareLotOrder, isOilGroup } from "@/lib/product-match";
-import { OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow, type PosProduct } from "@/lib/types";
+import { compareLotOrder, isOilLineCode } from "@/lib/product-match";
+import { BUSINESS_LINE_LABELS, OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow, type PosProduct } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,16 +17,20 @@ export default async function ConsignmentOutPage({
 }: {
   searchParams: { ok?: string };
 }) {
+  // P2: phiếu + sản phẩm lọc theo ngành đang làm việc.
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
   const [slips, partners, batchStock, suppliers, products, productCodes, fitments, profile] = await Promise.all([
-    listConsignmentOutSlips(),
+    listConsignmentOutSlips(lineFilter),
     listPartners(),
     listBatchesForSales(),
     listSuppliers(),
-    listProducts(),
+    listProducts(lineFilter),
     listProductCodes(),
     listProductFitments(),
     getCurrentProfile(),
   ]);
+  const lineLabelById = new Map(ctx.lines.map((l) => [l.id, BUSINESS_LINE_LABELS[l.code]]));
   const configured = slips.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   const partnerName = new Map(partners.data.map((p) => [p.id, p.name]));
@@ -83,9 +89,10 @@ export default async function ConsignmentOutPage({
     if (Number(r.qty) > prev) mainOwnQtyByBatch.set(r.batch_id, Number(r.qty));
   }
   const gkFifoBatches: Record<string, { batch_id: string; batch_code: string; ownership: string; mainOwnQty: number }[]> = {};
-  const groupByProduct = new Map(products.data.map((p) => [p.id, p.product_group]));
+  // P2: FEFO theo ngành chuẩn business_line_code của lô (không theo tên
+  // nhóm hàng).
   for (const r of [...ownBatches].sort((a, b) =>
-    compareLotOrder(a, b, isOilGroup(groupByProduct.get(a.product_id)))
+    compareLotOrder(a, b, isOilLineCode((a as AnyRow).business_line_code))
   )) {
     const q = mainOwnQtyByBatch.get(r.batch_id) ?? 0;
     if (q <= 0) continue;
@@ -105,7 +112,9 @@ export default async function ConsignmentOutPage({
         description="Gửi hàng cho đối tác chỉ thay đổi nơi giữ hàng — hàng vẫn là của TVK, chưa ghi doanh thu và chưa ghi phải thu cho tới khi đối tác báo đã bán. Gửi tiếp hàng ký gửi của nhà cung cấp cho đối tác khác bị chặn, trừ khi nhà cung cấp đó cho phép."
       />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode !== "NONE" && searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {ctx.mode === "NONE" ? null : (
       <div className="space-y-6">
         <GkDraftsCard rows={draftSlips} partnerName={partnerName} readOnly={readOnly} />
         {!readOnly && (
@@ -119,6 +128,19 @@ export default async function ConsignmentOutPage({
               <div><label className={labelCls}>Hạn trả hàng</label><input name="settlement_due_date" type="date" className={inputCls} /></div>
               <div><label className={labelCls}>Hạn trả</label><input name="return_by_date" type="date" className={inputCls} /></div>
             </div>
+            {/* P2: phiếu GK thuộc ngành đang làm việc; ALL thì chọn rõ. */}
+            {ctx.mode === "LINE" ? (
+              <input type="hidden" name="business_line" value={ctx.code ?? ""} />
+            ) : (
+              <div>
+                <label className={labelCls}>Ngành hàng *</label>
+                <select name="business_line" required className={inputCls} defaultValue={ctx.lines[0]?.code ?? ""}>
+                  {ctx.lines.map((l) => (
+                    <option key={l.id} value={l.code}>{BUSINESS_LINE_LABELS[l.code]}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <ItemsRows fields={[
               { name: "batch_id", label: "Lô (tại Kho TVK)", type: "select", options: batchOptions },
               { name: "qty", label: "Số lượng", type: "number" },
@@ -138,7 +160,7 @@ export default async function ConsignmentOutPage({
           </form>
         </Card>
         <Card title="Nhập từ Excel (GK)">
-          <ImportConsignmentOut partners={partners.data} products={posProducts} codeMap={gkCodeMap} fifoBatches={gkFifoBatches} action={importConsignmentOutAction} />
+          <ImportConsignmentOut partners={partners.data} products={posProducts} codeMap={gkCodeMap} fifoBatches={gkFifoBatches} action={importConsignmentOutAction} lineContext={ctx} />
         </Card>
         </>
         )}
@@ -147,12 +169,13 @@ export default async function ConsignmentOutPage({
           draftSlips.length === 0 && <EmptyState message="Chưa có phiếu gửi." />
         ) : (
           <TableWrap>
-            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Hạn trả hàng</th><th className={thCls}>Trạng thái</th></tr></thead>
+            <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngành</th><th className={thCls}>Ngày</th><th className={thCls}>Hạn trả hàng</th><th className={thCls}>Trạng thái</th></tr></thead>
             <tbody>
               {confirmedSlips.map((s) => (
                 <tr key={s.id} className="border-t border-slate-100">
                   <td className={`${tdCls} font-mono text-xs`}>{s.doc_code}</td>
                   <td className={tdCls}>{partnerName.get(s.partner_id) ?? "—"}</td>
+                  <td className={tdCls}>{lineLabelById.get(s.business_line_id) ?? "—"}</td>
                   <td className={tdCls}>{formatDate(s.slip_date)}</td>
                   <td className={tdCls}>{formatDate(s.settlement_due_date)}</td>
                   <td className={tdCls}><StatusBadge status={s.status} /></td>
@@ -162,6 +185,7 @@ export default async function ConsignmentOutPage({
           </TableWrap>
         )}
       </div>
+      )}
     </>
   );
 }

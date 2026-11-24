@@ -9,7 +9,14 @@ import { MOBILE_NAV_TOGGLE_EVENT } from "@/components/Sidebar";
  * thay bằng ngăn kéo trượt — nút hamburger phát sự kiện để Sidebar
  * (component client khác) mở/đóng ngăn kéo.
  */
-export default function MobileTopBar({ role }: { role: string }) {
+export default function MobileTopBar({
+  role,
+  lineLabel,
+}: {
+  role: string;
+  /** Nhãn ngành đang làm việc (§18.5): hiển thị rõ trên màn hình nhỏ. */
+  lineLabel?: string | null;
+}) {
   return (
     <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-900 bg-slate-900 px-4 py-2.5 lg:hidden">
       <div className="flex items-center gap-3">
@@ -38,6 +45,11 @@ export default function MobileTopBar({ role }: { role: string }) {
           <p className="text-[11px] leading-tight text-slate-400">
             Tân Vạn Khang · Quản lý kho phụ tùng
           </p>
+          {lineLabel ? (
+            <p className="mt-0.5 text-[11px] font-medium leading-tight text-sky-300">
+              Ngành: {lineLabel}
+            </p>
+          ) : null}
         </div>
       </div>
       <HelpButton role={role} />

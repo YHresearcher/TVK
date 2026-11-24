@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import BusinessLineSwitcher, {
+  type BusinessLineSwitcherContext,
+} from "@/components/BusinessLineSwitcher";
 import { signOutAction } from "@/lib/actions";
 import SubmitButton from "@/components/SubmitButton";
 
@@ -106,10 +109,13 @@ export default function Sidebar({
   userName,
   role,
   rawRole,
+  context,
 }: {
   userName: string;
   role: string;
   rawRole?: string;
+  /** Ngữ cảnh ngành hàng (P2) — layout tải một lần rồi truyền xuống. */
+  context?: BusinessLineSwitcherContext;
 }) {
   const pathname = usePathname();
   const currentGroup = activeGroupId(pathname);
@@ -207,6 +213,8 @@ export default function Sidebar({
         <p className="text-lg font-bold tracking-wide text-white">TVK</p>
         <p className="text-xs text-slate-400">Quản lý kho phụ tùng</p>
       </div>
+      {/* P2 §18.2: bộ chuyển ngành hàng ngay đầu sidebar. */}
+      {context ? <BusinessLineSwitcher context={context} /> : null}
       <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
         <div>
           <Link

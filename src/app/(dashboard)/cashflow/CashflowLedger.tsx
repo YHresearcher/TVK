@@ -340,13 +340,25 @@ export default function CashflowLedger({
                     {/* Thao tác */}
                     <td className="px-3.5 py-3 text-center whitespace-nowrap">
                       {isOwner && !item.is_cancelled && !isReversal ? (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenCancel(item)}
-                          className="rounded px-2 py-1 text-[11px] font-semibold text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors"
-                        >
-                          Huỷ phiếu
-                        </button>
+                        item.payment_id ? (
+                          // P3: dòng tiền gắn phiếu thu/chi thì KHÔNG hủy ở đây
+                          // (RPC cũng từ chối) — đảo bút toán ở trang
+                          // Phải thu / Phải trả.
+                          <span
+                            className="text-[11px] text-slate-400"
+                            title="Dòng tiền này gắn với phiếu thu/chi — đảo bút toán ở trang Phải thu / Phải trả (chỉ Kế toán)."
+                          >
+                            Đảo ở phiếu thanh toán
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCancel(item)}
+                            className="rounded px-2 py-1 text-[11px] font-semibold text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors"
+                          >
+                            Huỷ phiếu
+                          </button>
+                        )
                       ) : (
                         <span className="text-slate-300 text-xs">—</span>
                       )}

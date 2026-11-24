@@ -2,6 +2,7 @@ import { BackLink, Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCl
 import SubmitButton from "@/components/SubmitButton";
 import PriceEditForm from "@/components/PriceEditForm";
 import { createFitmentAction, createProductCodeAction, updateProductInfoAction, updateProductPricesAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { getCurrentProfile, getProductDetail, listProductGroups } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
 import { CODE_KINDS, CODE_KIND_LABELS, OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
@@ -13,6 +14,12 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
   if (!detail.configured) return (<><PageHeader title="Sản phẩm" /><NotConfigured /></>);
   if (!detail.product) return (<><BackLink href="/products" label="Quay lại danh sách sản phẩm" /><EmptyState message="Không tìm thấy sản phẩm." /></>);
   const p = detail.product;
+  // P2 (BL-001): sản phẩm ngành khác (kể cả chưa phân loại) thì không mở
+  // được bằng đường dẫn trực tiếp.
+  const ctx = await getBusinessLineContext();
+  if (ctx.mode === "NONE" || (ctx.mode === "LINE" && p.business_line_id !== ctx.lineId)) {
+    return (<><BackLink href="/products" label="Quay lại danh sách sản phẩm" /><EmptyState message="Sản phẩm này không thuộc ngành hàng bạn được làm việc." /></>);
+  }
   const readOnly = isReadOnlyRole(profile.data?.role);
   const addCode = createProductCodeAction.bind(null, p.id);
   const addFitment = createFitmentAction.bind(null, p.id);

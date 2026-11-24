@@ -3,7 +3,6 @@
 
 import React, { useState } from "react";
 import type { ReconciliationSnapshot, ReconciliationEntry } from "@/types";
-import { deleteReconciliationSnapshotAction } from "@/lib/reconciliation-actions";
 
 interface SnapshotHistoryModalProps {
   snapshots: ReconciliationSnapshot[];
@@ -17,16 +16,12 @@ interface SnapshotHistoryModalProps {
 export default function SnapshotHistoryModal({
   snapshots,
   currentEntries,
-  userRole,
   isOpen,
   onClose,
-  onSnapshotDeleted,
 }: SnapshotHistoryModalProps) {
   const [selectedSnapshot, setSelectedSnapshot] = useState<ReconciliationSnapshot | null>(
     snapshots[0] || null
   );
-  const [deleting, setDeleting] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -36,25 +31,6 @@ export default function SnapshotHistoryModal({
   for (const e of currentEntries) {
     currentMap.set(`${e.data_group}__${e.item_key}`, Number(e.tvk_amount || 0));
   }
-
-  const handleDelete = async (id: string) => {
-    setDeleting(true);
-    try {
-      const res = await deleteReconciliationSnapshotAction(id);
-      if (res.success) {
-        setDeleteConfirmId(null);
-        if (selectedSnapshot?.id === id) {
-          const remaining = snapshots.filter((s) => s.id !== id);
-          setSelectedSnapshot(remaining[0] || null);
-        }
-        onSnapshotDeleted();
-      } else {
-        alert(res.error || "Lỗi khi xoá snapshot");
-      }
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   const snapshotItems = (selectedSnapshot?.snapshot_items as any[]) || [];
 
@@ -161,34 +137,12 @@ export default function SnapshotHistoryModal({
                     )}
                   </div>
 
-                  {userRole === "OWNER" && (
-                    <div>
-                      {deleteConfirmId === selectedSnapshot.id ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            disabled={deleting}
-                            onClick={() => handleDelete(selectedSnapshot.id)}
-                            className="px-2.5 py-1 bg-rose-600 text-white text-xs font-medium rounded hover:bg-rose-700"
-                          >
-                            Xác nhận xoá
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirmId(null)}
-                            className="px-2 py-1 bg-stone-200 text-stone-700 text-xs rounded hover:bg-stone-300"
-                          >
-                            Huỷ
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setDeleteConfirmId(selectedSnapshot.id)}
-                          className="text-stone-400 hover:text-rose-600 text-xs px-2 py-1 rounded border border-stone-200 hover:border-rose-300 transition"
-                        >
-                          Xoá bản này
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  {/* P4b (BL-017): bản chụp đã chốt là bất biến — không sửa,
+                      không xoá. Muốn sửa số liệu thì tạo bản chụp hiệu
+                      chỉnh mới. */}
+                  <p className="text-[11px] text-stone-400">
+                    Bản chụp đã chốt — không sửa hay xoá được.
+                  </p>
                 </div>
 
                 {/* KPI summary of snapshot */}

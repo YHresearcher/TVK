@@ -1,11 +1,22 @@
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import { createStockAdjustmentAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { getCurrentProfile, listBatchStock, listBatchesForSales, listLocations } from "@/lib/queries";
 import { formatDate, formatNumber, formatVND } from "@/lib/format";
-import { OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, OWNERSHIP_LABELS, isReadOnlyRole, type AnyRow, type BusinessLineCode } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+/** Phân loại hạn dùng theo §7.3 (chỉ có ý nghĩa với lô dầu nhớt). */
+function expiryStatus(expiry: string | null | undefined, todayIso: string, in30Iso: string) {
+  const e = expiry ? String(expiry).slice(0, 10) : null;
+  if (!e) return { kind: "none" as const, date: null };
+  if (e < todayIso) return { kind: "expired" as const, date: e };
+  if (e <= in30Iso) return { kind: "soon" as const, date: e };
+  return { kind: "valid" as const, date: e };
+}
 
 export default async function InventoryPage({
   searchParams,
@@ -14,6 +25,10 @@ export default async function InventoryPage({
 }) {
   const profile = await getCurrentProfile();
   const isSales = profile.data?.role === "SALES";
+  // P2: tồn kho đã lọc theo ngành qua view (v_batch_stock /
+  // v_batches_for_sales) — trang chỉ hiển thị thêm nhãn ngành + cảnh
+  // báo hạn dùng.
+  const ctx = await getBusinessLineContext();
   const [stock, locations] = await Promise.all([isSales ? listBatchesForSales() : listBatchStock(), listLocations()]);
   const configured = stock.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
@@ -22,6 +37,10 @@ export default async function InventoryPage({
   if (searchParams.location_kind) rows = rows.filter((r) => r.location_kind === searchParams.location_kind);
   const totalQty = rows.reduce((a, r) => a + Number(r.qty), 0);
   const totalValue = rows.reduce((a, r) => a + Number(r.qty) * Number(r.unit_cost), 0);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const in30Iso = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  const expiredCount = rows.filter((r) => expiryStatus((r as AnyRow).expiry_date, todayIso, in30Iso).kind === "expired").length;
+  const soonCount = rows.filter((r) => expiryStatus((r as AnyRow).expiry_date, todayIso, in30Iso).kind === "soon").length;
 
   const batchOptions = Array.from(new Map(stock.data.map((r) => [r.batch_id, r])).values()).map((r) => ({
     value: r.batch_id,
@@ -33,7 +52,20 @@ export default async function InventoryPage({
     <>
       <PageHeader title="Tồn kho theo lô" description="Số tồn kho không sửa tay được — muốn đổi số thì làm phiếu nhập/xuất, hệ thống tự ghi lại. Kiểm kho bên dưới cũng được ghi lại." />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode !== "NONE" && searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {ctx.mode === "NONE" ? null : (
+      <>
+      {(expiredCount > 0 || soonCount > 0) && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {expiredCount > 0 && (
+            <p>Có {formatNumber(expiredCount)} lô đã hết hạn — không được bán, cần xử lý trước khi bán.</p>
+          )}
+          {soonCount > 0 && (
+            <p>Có {formatNumber(soonCount)} lô sắp hết hạn trong 30 ngày — ưu tiên bán trước (hạn gần nhất trước).</p>
+          )}
+        </div>
+      )}
       <form method="get" className="mb-4 flex flex-wrap gap-2">
         <select name="ownership" defaultValue={searchParams.ownership ?? ""} className={`${inputCls} w-auto`}>
           <option value="">Tất cả sở hữu</option>
@@ -55,19 +87,28 @@ export default async function InventoryPage({
 
       {rows.length === 0 ? <EmptyState message="Không có dòng tồn kho nào khớp." /> : (
         <TableWrap>
-          <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Sở hữu</th><th className={thCls}>Nhập từ</th><th className={thCls}>Vị trí</th><th className={thCls}>Số lượng</th>{!isSales && (<th className={thCls}>Giá vốn</th>)}<th className={thCls}>Ngày nhập</th><th className={thCls}>Hạn dùng</th><th className={thCls}>Trạng thái</th></tr></thead>
+          <thead><tr><th className={thCls}>Lô</th><th className={thCls}>Sản phẩm</th><th className={thCls}>Ngành</th><th className={thCls}>Sở hữu</th><th className={thCls}>Nhập từ</th><th className={thCls}>Vị trí</th><th className={thCls}>Số lượng</th>{!isSales && (<th className={thCls}>Giá vốn</th>)}<th className={thCls}>Ngày nhập</th><th className={thCls}>Hạn dùng</th><th className={thCls}>Trạng thái</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-100">
                 <td className={`${tdCls} font-mono text-xs`}>{r.batch_code}</td>
                 <td className={tdCls}>{r.product_name}</td>
+                <td className={tdCls}>{BUSINESS_LINE_LABELS[(r as AnyRow).business_line_code as BusinessLineCode] ?? "—"}</td>
                 <td className={tdCls}>{OWNERSHIP_LABELS[r.ownership] ?? r.ownership}</td>
                 <td className={tdCls}>{r.supplier_name ?? "—"}</td>
                 <td className={tdCls}>{r.location_name}</td>
                 <td className={`${tdCls} font-medium`}>{formatNumber(r.qty)}</td>
                 {!isSales && (<td className={tdCls}>{formatVND(r.unit_cost)}</td>)}
                 <td className={tdCls}>{formatDate(r.received_date)}</td>
-                <td className={tdCls}>{(r as AnyRow).expiry_date ? formatDate((r as AnyRow).expiry_date) : "—"}</td>
+                <td className={tdCls}>
+                  {(() => {
+                    const s = expiryStatus((r as AnyRow).expiry_date, todayIso, in30Iso);
+                    if (s.kind === "none") return "—";
+                    if (s.kind === "expired") return <span className="font-medium text-red-700">Hết hạn {formatDate(s.date)}</span>;
+                    if (s.kind === "soon") return <span className="font-medium text-amber-700">Sắp hết {formatDate(s.date)}</span>;
+                    return formatDate(s.date);
+                  })()}
+                </td>
                 <td className={tdCls}><StatusBadge status={r.status} /></td>
               </tr>
             ))}
@@ -105,6 +146,8 @@ export default async function InventoryPage({
           </form>
         </Card>
       </div>
+      )}
+      </>
       )}
     </>
   );

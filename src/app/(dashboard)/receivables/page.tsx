@@ -2,11 +2,16 @@ import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import AgingTable from "@/components/AgingTable";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
+import PaymentHistory from "@/components/PaymentHistory";
 import { buildAging } from "@/lib/aging";
 import { createSettlementAction, recordReceivablePaymentAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
+import { listPaymentsWithAllocations } from "@/lib/payment-allocations";
 import { getCurrentProfile, listCashFunds, listPartners, listReceivables, listSettlements } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
-import { isReadOnlyRole } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, isReadOnlyRole } from "@/lib/types";
+import type { BusinessLineCode } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +20,17 @@ export default async function ReceivablesPage({
 }: {
   searchParams: { ok?: string };
 }) {
-  const [receivables, settlements, partners, funds, profile] = await Promise.all([
-    listReceivables(),
+  // P2: phải thu lọc theo ngành qua chứng từ gốc (hàng không quy chiếu
+  // được vẫn hiện — không giấu tiền).
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
+  const [receivables, settlements, partners, funds, profile, payments] = await Promise.all([
+    listReceivables(lineFilter),
     listSettlements(),
     listPartners(),
     listCashFunds(),
     getCurrentProfile(),
+    listPaymentsWithAllocations("IN", lineFilter),
   ]);
   const configured = receivables.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
@@ -29,6 +39,15 @@ export default async function ReceivablesPage({
   const hasBankFund = activeFunds.some((f) => f.kind === "BANK");
   const open = receivables.data.filter((r) => r.status === "UNPAID" || r.status === "PARTIAL");
   const totalOutstanding = open.reduce((a, r) => a + Number(r.amount) - Number(r.amount_paid), 0);
+  // P4b: dư nợ còn phải thu tách theo ngành (khoản chưa phân loại gom riêng).
+  const lineLabelById = new Map(ctx.lines.map((l) => [l.id, BUSINESS_LINE_LABELS[l.code as BusinessLineCode] ?? l.code]));
+  const lineLabel = (lineId: string | null | undefined) =>
+    lineId ? (lineLabelById.get(lineId) ?? "Ngành khác") : "Chưa phân loại";
+  const outstandingByLine = new Map<string | null, number>();
+  for (const r of open) {
+    const k = (r.business_line_id as string | null) ?? null;
+    outstandingByLine.set(k, (outstandingByLine.get(k) ?? 0) + Number(r.amount) - Number(r.amount_paid));
+  }
   const partnerSettlements = settlements.data.filter((s) => s.party_kind === "PARTNER");
   const today = new Date().toISOString().slice(0, 10);
 
@@ -36,8 +55,21 @@ export default async function ReceivablesPage({
     <>
       <PageHeader title="Phải thu đối tác" description="Được tạo tự động khi xác nhận một giao dịch ghi nợ hoặc một đơn bán hàng hoặc hàng ký gửi đã bán (BH/KG). Số tiền BH là sau giảm giá; số tiền KG dùng giá chuyển giao đã thoả thuận." />
       {!configured && <NotConfigured />}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode === "NONE" ? null : (
+      <>
       {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
       <p className="mb-4 text-sm text-slate-600">Tổng còn phải thu: <strong>{formatVND(totalOutstanding)}</strong></p>
+      {outstandingByLine.size > 1 && (
+        <p className="mb-4 text-sm text-slate-600">
+          Theo ngành:{" "}
+          {Array.from(outstandingByLine.entries()).map(([lineId, amount], i) => (
+            <span key={lineId ?? "unclassified"}>
+              {i > 0 ? " • " : ""}{lineLabel(lineId)} <strong>{formatVND(amount)}</strong>
+            </span>
+          ))}
+        </p>
+      )}
 
       {open.length > 0 && (
         <div className="mb-4">
@@ -54,13 +86,14 @@ export default async function ReceivablesPage({
 
       {receivables.data.length === 0 ? <EmptyState message="Chưa có khoản phải thu." /> : (
         <TableWrap>
-          <thead><tr><th className={thCls}>Đối tác</th><th className={`${thCls} text-right`}>Số tiền</th><th className={`${thCls} text-right`}>Đã thu</th><th className={`${thCls} text-right`}>Còn phải thu</th><th className={thCls}>Hạn thu</th><th className={thCls}>Trạng thái</th></tr></thead>
+          <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Ngành</th><th className={`${thCls} text-right`}>Số tiền</th><th className={`${thCls} text-right`}>Đã thu</th><th className={`${thCls} text-right`}>Còn phải thu</th><th className={thCls}>Hạn thu</th><th className={thCls}>Trạng thái</th></tr></thead>
           <tbody>
             {receivables.data.map((r) => {
               const overdue = r.due_date && r.due_date < today && (r.status === "UNPAID" || r.status === "PARTIAL");
               return (
                 <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                   <td className={tdCls}><Link href={`/partners/${r.partner_id}`} className="font-medium text-blue-700 hover:underline">{partnerName.get(r.partner_id) ?? "—"}</Link></td>
+                  <td className={tdCls}>{lineLabel(r.business_line_id)}</td>
                   <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(r.amount)}</td>
                   <td className={`${tdCls} text-right font-mono text-emerald-700`}>{formatVND(r.amount_paid)}</td>
                   <td className={`${tdCls} text-right font-mono font-medium text-rose-700`}>{formatVND(Number(r.amount) - Number(r.amount_paid))}</td>
@@ -150,6 +183,19 @@ export default async function ReceivablesPage({
             </tbody>
           </TableWrap>
         </div>
+      )}
+
+      {/* P3: lịch sử thu tiền + phân bổ theo ngành, thu tiền đợt chốt sổ, đảo bút toán. */}
+      <PaymentHistory
+        kind="IN"
+        partyKind="PARTNER"
+        payments={payments.data}
+        settlements={partnerSettlements}
+        funds={activeFunds}
+        role={profile.data?.role}
+        returnTo="/receivables"
+      />
+      </>
       )}
     </>
   );

@@ -2,12 +2,13 @@ import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, btnCls, inputCls, labelCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import UserAdminPanel from "@/components/UserAdminPanel";
-import { createCashFundAction, createWarehouseAction, updateCashFundAction, updateWarehouseAction, updateVatModeAction } from "@/lib/actions";
+import { assignUserBusinessLineAction, createCashFundAction, createWarehouseAction, revokeUserBusinessLineAction, updateCashFundAction, updateProductBusinessLineAction, updateWarehouseAction, updateVatModeAction } from "@/lib/actions";
+import { listBusinessLines, listUnclassifiedProducts, listUserBusinessLines } from "@/lib/business-lines";
 import { getCashFundBalances, getCurrentProfile, listCashFunds, listLocations } from "@/lib/queries";
 import { formatVND } from "@/lib/format";
 import { isAdminConfigured } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { isReadOnlyRole, type AnyRow } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, ROLE_LABELS, isReadOnlyRole, type AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,17 @@ export default async function SettingsPage({
   }
   const warehouses = locations.data.filter((l) => l.location_kind === "OWN_WAREHOUSE");
   const partnerWarehouses = locations.data.filter((l) => l.location_kind === "PARTNER_VIRTUAL");
+  // P2 (chỉ OWNER): phân quyền ngành + hàng chờ phân loại.
+  const isOwner = me?.role === "OWNER";
+  const [lines, assignments, unclassified] = isOwner
+    ? await Promise.all([listBusinessLines(), listUserBusinessLines(), listUnclassifiedProducts()])
+    : [[], [], []] as [Awaited<ReturnType<typeof listBusinessLines>>, Awaited<ReturnType<typeof listUserBusinessLines>>, Awaited<ReturnType<typeof listUnclassifiedProducts>>];
+  const linesByUser = new Map<string, { lineId: string; lineCode: string }[]>();
+  for (const a of assignments) {
+    const list = linesByUser.get(a.userId) ?? [];
+    list.push({ lineId: a.lineId, lineCode: a.lineCode });
+    linesByUser.set(a.userId, list);
+  }
   // Sửa kho theo đúng quyền ghi của RLS bảng locations: Chủ cửa hàng + Thủ kho.
   const canEditWarehouse = ["OWNER", "WAREHOUSE"].includes(me?.role ?? "");
   const editingWarehouse = canEditWarehouse
@@ -208,6 +220,90 @@ export default async function SettingsPage({
               meId={me.id}
               adminReady={isAdminConfigured()}
             />
+          </Card>
+        )}
+
+        {/* P2: phân quyền ngành hàng + hàng chờ phân loại (chỉ OWNER). */}
+        {me?.role === "OWNER" && (
+          <Card title="Ngành hàng của tài khoản" className="lg:col-span-2">
+            <p className="mb-4 text-xs leading-relaxed text-slate-500">
+              Ai được làm việc với ngành nào. Tài khoản chưa gán ngành thì
+              không xem được dữ liệu (fail-closed); Chủ cửa hàng và CEO luôn
+              xem được toàn doanh nghiệp, kể cả khi chưa gán. Gán mặc định:
+              cả 5 tài khoản hiện có đều thấy Phụ tùng.
+            </p>
+            <ul className="space-y-3 text-sm">
+              {profiles.map((u) => {
+                const assigned = linesByUser.get(u.id) ?? [];
+                const assignedIds = new Set(assigned.map((a) => a.lineId));
+                const isAllSeeing = ["OWNER", "CEO"].includes(u.role);
+                return (
+                  <li key={u.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 px-3 py-2">
+                    <span className="min-w-0">
+                      <span className="font-medium">{u.full_name ?? u.username ?? "—"}</span>{" "}
+                      <span className="text-xs text-slate-500">({ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ?? u.role}{isAllSeeing ? " · xem toàn doanh nghiệp" : ""})</span>
+                    </span>
+                    <span className="ml-auto flex flex-wrap items-center gap-2">
+                      {assigned.map((a) => (
+                        <span key={a.lineId} className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">
+                          {BUSINESS_LINE_LABELS[a.lineCode as keyof typeof BUSINESS_LINE_LABELS] ?? a.lineCode}
+                          <form action={revokeUserBusinessLineAction.bind(null, u.id, a.lineId)}>
+                            <button type="submit" className="font-bold text-emerald-600 hover:text-red-600" aria-label={`Thu hồi ngành ${BUSINESS_LINE_LABELS[a.lineCode as keyof typeof BUSINESS_LINE_LABELS] ?? a.lineCode} của ${u.full_name ?? u.username}`}>
+                              ×
+                            </button>
+                          </form>
+                        </span>
+                      ))}
+                      {lines.filter((l) => !assignedIds.has(l.id)).map((l) => (
+                        <form key={l.id} action={assignUserBusinessLineAction.bind(null, u.id, l.id)}>
+                          <SubmitButton className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50">
+                            + Gán {BUSINESS_LINE_LABELS[l.code]}
+                          </SubmitButton>
+                        </form>
+                      ))}
+                      {assigned.length === 0 && !isAllSeeing && (
+                        <span className="text-xs font-medium text-amber-700">Chưa gán ngành — không xem được dữ liệu</span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        )}
+
+        {me?.role === "OWNER" && (
+          <Card title="Sản phẩm chưa phân loại ngành" className="lg:col-span-2">
+            <p className="mb-4 text-xs leading-relaxed text-slate-500">
+              Sản phẩm chưa xếp ngành thì chưa bán, chưa gửi ký gửi được —
+              chứng từ có ngành chỉ nhận dòng cùng ngành. Phân loại ở đây
+              trước khi tạo chứng từ cho chúng. Sản phẩm đã có giao dịch thì
+              không đổi được ngành (hệ thống chặn để sổ sách không lệch).
+            </p>
+            {unclassified.length === 0 ? (
+              <EmptyState message="Không còn sản phẩm chưa phân loại." />
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {unclassified.map((p) => (
+                  <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 px-3 py-2">
+                    <span className="min-w-0">
+                      <span className="font-mono text-xs">{p.sku}</span>{" "}
+                      <span className="font-medium">{p.name}</span>
+                      <span className="text-xs text-slate-500"> · {p.product_group ?? "chưa xếp nhóm"}</span>
+                    </span>
+                    <span className="ml-auto flex flex-wrap items-center gap-2">
+                      {lines.map((l) => (
+                        <form key={l.id} action={updateProductBusinessLineAction.bind(null, p.id, l.id)}>
+                          <SubmitButton className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50">
+                            Gán {BUSINESS_LINE_LABELS[l.code]}
+                          </SubmitButton>
+                        </form>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
         )}
       </div>

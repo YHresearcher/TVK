@@ -4,6 +4,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ItemsRows from "@/components/ItemsRows";
 import ImportAllocation from "@/components/ImportAllocation";
 import ImportConsumptionReport from "@/components/ImportConsumptionReport";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import {
   createAllocationAction,
   createConsumptionReportAction,
@@ -11,9 +12,10 @@ import {
   importConsumptionReportAction,
   setConsumptionReportStatusAction,
 } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { buildProductCodeMap, getCurrentProfile, listAllocations, listBatchesForSales, listConsumptionReports, listPartners, listProductCodes, listProducts } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
-import { isReadOnlyRole } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -22,15 +24,19 @@ export default async function PartnerConsumptionPage({
 }: {
   searchParams: { ok?: string };
 }) {
+  // P2: báo cáo + phiếu phân bổ + sản phẩm lọc theo ngành đang làm việc.
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
   const [reports, allocations, partners, products, batchStock, productCodes, profile] = await Promise.all([
-    listConsumptionReports(),
-    listAllocations(),
+    listConsumptionReports(lineFilter),
+    listAllocations(lineFilter),
     listPartners(),
-    listProducts(),
+    listProducts(lineFilter),
     listBatchesForSales(),
     listProductCodes(),
     getCurrentProfile(),
   ]);
+  const lineLabelById = new Map(ctx.lines.map((l) => [l.id, BUSINESS_LINE_LABELS[l.code]]));
   const readOnly = isReadOnlyRole(profile.data?.role);
   const codeMap = buildProductCodeMap(products.data, productCodes.data);
   const configured = reports.configured;
@@ -80,7 +86,9 @@ export default async function PartnerConsumptionPage({
         description="Quy trình: đối tác báo đã bán (BT) → chia số hàng đã bán cho từng lô, ghi rõ mua đứt hay ký gửi (PB) → phiếu bán hàng (BH/KG) → hoá đơn GTGT. Chia hàng phải làm TRƯỚC khi xuất hoá đơn, và mỗi số lượng chỉ xuất hoá đơn đúng một lần."
       />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode !== "NONE" && searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>}
+      {ctx.mode === "NONE" ? null : (
       <div className="space-y-8">
         <section className="space-y-4">
           {!readOnly && (
@@ -93,6 +101,19 @@ export default async function PartnerConsumptionPage({
                 <div><label className={labelCls}>Từ ngày *</label><input name="period_from" type="date" required className={inputCls} /></div>
                 <div><label className={labelCls}>Đến ngày *</label><input name="period_to" type="date" required className={inputCls} /></div>
               </div>
+              {/* P2: báo cáo thuộc ngành đang làm việc; ALL thì chọn rõ. */}
+              {ctx.mode === "LINE" ? (
+                <input type="hidden" name="business_line" value={ctx.code ?? ""} />
+              ) : (
+                <div>
+                  <label className={labelCls}>Ngành hàng *</label>
+                  <select name="business_line" required className={inputCls} defaultValue={ctx.lines[0]?.code ?? ""}>
+                    {ctx.lines.map((l) => (
+                      <option key={l.id} value={l.code}>{BUSINESS_LINE_LABELS[l.code]}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <ItemsRows codeMap={codeMap} fields={[
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty_consumed", label: "Số lượng đã tiêu thụ", type: "number" },
@@ -107,12 +128,13 @@ export default async function PartnerConsumptionPage({
           )}
           {reports.data.length === 0 ? <EmptyState message="Chưa có báo cáo tiêu thụ." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Kỳ</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
+              <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngành</th><th className={thCls}>Kỳ</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
               <tbody>
                 {reports.data.map((r) => (
                   <tr key={r.id} className="border-t border-slate-100">
                     <td className={`${tdCls} font-mono text-xs`}>{r.doc_code}</td>
                     <td className={tdCls}>{partnerName.get(r.partner_id) ?? "—"}</td>
+                    <td className={tdCls}>{lineLabelById.get(r.business_line_id) ?? "—"}</td>
                     <td className={tdCls}>{formatDate(r.period_from)} → {formatDate(r.period_to)}</td>
                     <td className={tdCls}><StatusBadge status={r.status} /></td>
                     <td className={tdCls}>
@@ -142,6 +164,19 @@ export default async function PartnerConsumptionPage({
                 <div><label className={labelCls}>Báo cáo tiêu thụ (không bắt buộc)</label>
                   <select name="report_id" className={inputCls}><option value="">— Không —</option>{reportOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
               </div>
+              {/* P2: phiếu phân bổ thuộc ngành đang làm việc; ALL thì chọn rõ. */}
+              {ctx.mode === "LINE" ? (
+                <input type="hidden" name="business_line" value={ctx.code ?? ""} />
+              ) : (
+                <div>
+                  <label className={labelCls}>Ngành hàng *</label>
+                  <select name="business_line" required className={inputCls} defaultValue={ctx.lines[0]?.code ?? ""}>
+                    {ctx.lines.map((l) => (
+                      <option key={l.id} value={l.code}>{BUSINESS_LINE_LABELS[l.code]}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <ItemsRows codeMap={codeMap} fields={[
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "batch_id", label: "Lô tại đối tác", type: "select", options: batchOptions },
@@ -163,12 +198,13 @@ export default async function PartnerConsumptionPage({
           )}
           {allocations.data.length === 0 ? <EmptyState message="Chưa có phiếu phân bổ." /> : (
             <TableWrap>
-              <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
+              <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Đối tác</th><th className={thCls}>Ngành</th><th className={thCls}>Ngày</th><th className={thCls}>Trạng thái</th><th className={thCls}></th></tr></thead>
               <tbody>
                 {allocations.data.map((a) => (
                   <tr key={a.id} className="border-t border-slate-100">
                     <td className={`${tdCls} font-mono text-xs`}>{a.doc_code}</td>
                     <td className={tdCls}>{partnerName.get(a.partner_id) ?? "—"}</td>
+                    <td className={tdCls}>{lineLabelById.get(a.business_line_id) ?? "—"}</td>
                     <td className={tdCls}>{formatDate(a.alloc_date)}</td>
                     <td className={tdCls}><StatusBadge status={a.status} /></td>
                     <td className={tdCls}>
@@ -181,6 +217,7 @@ export default async function PartnerConsumptionPage({
           )}
         </section>
       </div>
+      )}
     </>
   );
 }

@@ -2,11 +2,13 @@ import { Card, EmptyState, NotConfigured, PageHeader, StatusBadge, TableWrap, td
 import { type PosProduct } from "@/lib/types";
 import ImportDealerSale from "@/components/ImportDealerSale";
 import ExportExcelButton from "@/components/ExportExcelButton";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import { importDealerSaleAction } from "@/lib/actions";
+import { getBusinessLineContext } from "@/lib/business-lines";
 import { buildProductCodeMap, getCurrentProfile, getSalesDocumentCosts, listBatchesForSales, listPartners, listProductCodes, listProductFitments, listProducts, listSalesDocuments, listSalesOrders } from "@/lib/queries";
 import { formatDate, formatVND } from "@/lib/format";
-import { compareLotOrder, isOilGroup } from "@/lib/product-match";
-import { OWNERSHIP_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
+import { compareLotOrder, isOilLineCode } from "@/lib/product-match";
+import { BUSINESS_LINE_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, isReadOnlyRole } from "@/lib/types";
 import type { AnyRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -16,16 +18,27 @@ export default async function SalesPage({
 }: {
   searchParams: { ok?: string };
 }) {
+  // P2: chứng từ + sản phẩm lọc theo ngành đang làm việc.
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
   const [orders, documents, partners, batchStock, products, productCodes, fitments, profile] = await Promise.all([
     listSalesOrders(),
-    listSalesDocuments(),
+    listSalesDocuments(lineFilter),
     listPartners(),
     listBatchesForSales(),
-    listProducts(),
+    listProducts(lineFilter),
     listProductCodes(),
     listProductFitments(),
     getCurrentProfile(),
   ]);
+  const lineLabelById = new Map(ctx.lines.map((l) => [l.id, BUSINESS_LINE_LABELS[l.code]]));
+  // Đơn hàng (DH) là đơn cha chung của các chứng từ BH/KG — ở ngữ cảnh
+  // LINE thì chỉ hiện đơn có chứng từ thuộc ngành đó (kẻo lộ tổng tiền
+  // ngành khác qua đơn cha).
+  const visibleOrders =
+    ctx.mode === "LINE"
+      ? orders.data.filter((o) => documents.data.some((d) => d.sales_order_id === o.id))
+      : orders.data;
   const configured = orders.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
   // Giá vốn / lãi gộp chỉ Chủ cửa hàng và Kế toán được coi.
@@ -33,7 +46,7 @@ export default async function SalesPage({
   const docCosts = canSeeCost
     ? await getSalesDocumentCosts(documents.data.slice(0, 20).map((d) => String(d.id)))
     : new Map<string, { qty: number; total: number; cost: number }>();
-  const orderRows = orders.data.map((o) => ({
+  const orderRows = visibleOrders.map((o) => ({
     "Mã": o.doc_code,
     "Ngày": formatDate(o.order_date),
     "Tổng": Number(o.total_amount) || 0,
@@ -100,9 +113,10 @@ export default async function SalesPage({
     if (Number(r.qty) > prev) mainOwnQtyByBatch.set(r.batch_id, Number(r.qty));
   }
   const dealerFifoBatches: Record<string, { batch_id: string; batch_code: string; ownership: string; mainOwnQty: number }[]> = {};
-  const groupByProduct = new Map(products.data.map((p) => [p.id, p.product_group]));
+  // P2: FEFO theo ngành chuẩn business_line_code của lô (không theo tên
+  // nhóm hàng) — lô dầu hết hạn đã bị loại ở server, đây chỉ sắp thứ tự.
   for (const r of [...ownBatches].sort((a, b) =>
-    compareLotOrder(a, b, isOilGroup(groupByProduct.get(a.product_id)))
+    compareLotOrder(a, b, isOilLineCode((a as AnyRow).business_line_code))
   )) {
     const q = mainOwnQtyByBatch.get(r.batch_id) ?? 0;
     if (q <= 0) continue;
@@ -121,7 +135,9 @@ export default async function SalesPage({
         description="Ghi nhận đơn bán qua file Excel và xem lại đơn hàng, chứng từ BH/KG. Bán lẻ tại quầy đang tạm dừng — việc bán hàng diễn ra ở hệ thống khác, TVK chỉ lưu trữ thông tin để đối chiếu."
       />
       {!configured && <NotConfigured />}
-      {searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã ghi nhận đơn bán xong — chứng từ đã xác nhận, tồn kho và công nợ đã cập nhật.</p>}
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode !== "NONE" && searchParams.ok && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã ghi nhận đơn bán xong — chứng từ đã xác nhận, tồn kho và công nợ đã cập nhật.</p>}
+      {ctx.mode === "NONE" ? null : (
       <div className="space-y-6">
         {!readOnly && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -129,7 +145,7 @@ export default async function SalesPage({
             <p className="mt-1 leading-relaxed">
               Quầy bán trực tiếp (chọn hàng, quét mã, bấm bán) đã tắt tạm thời theo quyết định ngày 30/10/2026.
               Muốn ghi nhận một đơn bán, dùng thẻ “Nhập từ Excel (Bán hàng)” bên dưới — một file là một đơn, hệ thống
-              tự chia theo lô và tách phiếu bán BH/KG như trước. Mở lại quầy: chỉ cần gắn lại form bán tại quầy,
+              tự chia theo lô và tách phiếu bán BH/KG theo ngành. Mở lại quầy: chỉ cần gắn lại form bán tại quầy,
               không cần viết lại — code quầy vẫn giữ nguyên trong hệ thống.
             </p>
           </div>
@@ -159,13 +175,13 @@ export default async function SalesPage({
           <div>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-800">Đơn hàng gần đây</h2>
-              {orders.data.length > 0 && <ExportExcelButton filename="don-hang.xlsx" rows={orderRows} />}
+              {visibleOrders.length > 0 && <ExportExcelButton filename="don-hang.xlsx" rows={orderRows} />}
             </div>
-            {orders.data.length === 0 ? <EmptyState message="Chưa có đơn hàng." /> : (
+            {visibleOrders.length === 0 ? <EmptyState message="Chưa có đơn hàng." /> : (
               <TableWrap>
                 <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Ngày</th><th className={`${thCls} text-right`}>Tổng</th><th className={thCls}>Trạng thái</th></tr></thead>
                 <tbody>
-                  {orders.data.slice(0, 20).map((o) => (
+                  {visibleOrders.slice(0, 20).map((o) => (
                     <tr key={o.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                       <td className={`${tdCls} font-mono text-xs`}>{o.doc_code}</td>
                       <td className={tdCls}>{formatDate(o.order_date)}</td>
@@ -184,7 +200,7 @@ export default async function SalesPage({
             </div>
             {documents.data.length === 0 ? <EmptyState message="Chưa có chứng từ." /> : (
               <TableWrap>
-                <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Ngày</th><th className={`${thCls} text-right`}>Tổng</th>{canSeeCost && (<><th className={`${thCls} text-right`}>Giá vốn</th><th className={`${thCls} text-right`}>Lãi gộp</th></>)}<th className={thCls}>Trạng thái</th></tr></thead>
+                <thead><tr><th className={thCls}>Mã</th><th className={thCls}>Loại</th><th className={thCls}>Ngành</th><th className={thCls}>Ngày</th><th className={`${thCls} text-right`}>Tổng</th>{canSeeCost && (<><th className={`${thCls} text-right`}>Giá vốn</th><th className={`${thCls} text-right`}>Lãi gộp</th></>)}<th className={thCls}>Trạng thái</th></tr></thead>
                 <tbody>
                   {documents.data.slice(0, 20).map((d) => {
                     const c = docCosts.get(String(d.id));
@@ -193,6 +209,7 @@ export default async function SalesPage({
                       <tr key={d.id} className="border-t border-slate-100 hover:bg-slate-50/60 transition-colors">
                         <td className={`${tdCls} font-mono text-xs`}>{d.doc_code}</td>
                         <td className={tdCls}>{d.doc_kind}</td>
+                        <td className={tdCls}>{lineLabelById.get(d.business_line_id) ?? "—"}</td>
                         <td className={tdCls}>{formatDate(d.doc_date)}</td>
                         <td className={`${tdCls} text-right font-mono font-medium text-slate-900`}>{formatVND(d.total_amount)}</td>
                         {canSeeCost && (
@@ -214,6 +231,7 @@ export default async function SalesPage({
           </div>
         </div>
       </div>
+      )}
     </>
   );
 }

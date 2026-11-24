@@ -2,8 +2,37 @@ import fs from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 
+/**
+ * Đường dẫn mặc định CŨ: đường dẫn tuyệt đối trên máy Windows cá nhân của chủ cửa hàng.
+ * Giữ lại chỉ để tương thích ngược khi chạy trên đúng máy đó. Trên mọi máy khác,
+ * dùng biến môi trường (xem resolveSampleCsvPath) thay vì sửa hằng này.
+ * @deprecated Dùng TVK_E2E_SAMPLE_CSV hoặc TVK_E2E_FIXTURES_DIR.
+ */
 export const DEFAULT_SAMPLE_CSV_PATH =
   "C:\\Users\\pntha\\.gemini\\antigravity\\brain\\3b71abe4-1e21-481a-a798-df50914371d0\\scratch\\user-accounting-sample.csv";
+
+/** Tên file mẫu Tier 4 khi chỉ cho thư mục qua TVK_E2E_FIXTURES_DIR. */
+export const SAMPLE_CSV_FILE_NAME = "user-accounting-sample.csv";
+
+/**
+ * Đường dẫn file mẫu Tier 4, theo thứ tự ưu tiên:
+ * 1. TVK_E2E_SAMPLE_CSV — đường dẫn đầy đủ tới file mẫu.
+ * 2. TVK_E2E_FIXTURES_DIR — thư mục chứa file mẫu (tên file: user-accounting-sample.csv).
+ * 3. DEFAULT_SAMPLE_CSV_PATH — đường dẫn legacy trên máy Windows của chủ cửa hàng.
+ * File mẫu KHÔNG có trong repo (dữ liệu kế toán thật của cửa hàng) — nếu không
+ * tồn tại ở cả 3 vị trí, Tier 4 sẽ SKIP thay vì fail cả suite (xem tier4-real-sample.test.ts).
+ */
+export function resolveSampleCsvPath(): string {
+  const fromFile = process.env.TVK_E2E_SAMPLE_CSV?.trim();
+  if (fromFile) return fromFile;
+  const dir = process.env.TVK_E2E_FIXTURES_DIR?.trim();
+  if (dir) return path.join(dir, SAMPLE_CSV_FILE_NAME);
+  return DEFAULT_SAMPLE_CSV_PATH;
+}
+
+export function sampleCsvExists(csvPath = resolveSampleCsvPath()): boolean {
+  return fs.existsSync(csvPath);
+}
 
 export interface MasterCatalogItem {
   stt: number;
@@ -99,7 +128,7 @@ export interface EnterpriseAccountingData {
   };
 }
 
-export function parseEnterpriseSample(csvPath = DEFAULT_SAMPLE_CSV_PATH): EnterpriseAccountingData {
+export function parseEnterpriseSample(csvPath = resolveSampleCsvPath()): EnterpriseAccountingData {
   if (!fs.existsSync(csvPath)) {
     throw new Error(`Enterprise sample CSV file not found at: ${csvPath}`);
   }

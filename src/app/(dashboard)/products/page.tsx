@@ -2,10 +2,12 @@ import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, btnCls, inputCls, labelCls, tdCls, thCls } from "@/components/ui";
 import SubmitButton from "@/components/SubmitButton";
 import LabelPrintButton from "@/components/LabelPrintButton";
+import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import { createProductAction } from "@/lib/actions";
+import { getBusinessLineContext, listGroupLineMappings } from "@/lib/business-lines";
 import { getCurrentProfile, listProductGroups, listProductStock, listProducts } from "@/lib/queries";
 import { formatNumber, formatVND } from "@/lib/format";
-import { isReadOnlyRole } from "@/lib/types";
+import { BUSINESS_LINE_LABELS, isReadOnlyRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +16,31 @@ export default async function ProductsPage({
 }: {
   searchParams: { q?: string; ok?: string; noRetail?: string; group?: string };
 }) {
-  const [products, stock, profile, groups] = await Promise.all([listProducts(), listProductStock(), getCurrentProfile(), listProductGroups()]);
+  // P2: danh sách sản phẩm lọc theo ngành đang làm việc.
+  const ctx = await getBusinessLineContext();
+  const lineFilter = ctx.mode === "LINE" ? ctx.lineId : ctx.mode === "NONE" ? null : undefined;
+  const [products, stock, profile, groups, mappings] = await Promise.all([
+    listProducts(lineFilter),
+    listProductStock(),
+    getCurrentProfile(),
+    listProductGroups(),
+    listGroupLineMappings(),
+  ]);
   const configured = products.configured;
   const readOnly = isReadOnlyRole(profile.data?.role);
+  // Nhóm hàng gợi ý trên form tạo mới: ngữ cảnh LINE thì chỉ nhóm đã
+  // mapping sang ngành đó (nhóm khác bị server từ chối, gợi ý trước
+  // cho đỡ mất công).
+  const groupOptions =
+    ctx.mode === "LINE"
+      ? groups.filter((g) => mappings.some((m) => m.group === g && m.lineId === ctx.lineId))
+      : groups;
+  // Nhãn ngành theo id (đủ cho cả ngữ cảnh LINE lẫn ALL).
+  const lineLabelById = new Map<string, string>();
+  for (const l of ctx.lines) lineLabelById.set(l.id, BUSINESS_LINE_LABELS[l.code]);
+  for (const m of mappings) {
+    if (!lineLabelById.has(m.lineId)) lineLabelById.set(m.lineId, BUSINESS_LINE_LABELS[m.lineCode]);
+  }
   const stockMap = new Map(stock.data.map((s) => [s.product_id, s]));
   const q = (searchParams.q ?? "").toLowerCase();
   const onlyNoRetail = searchParams.noRetail === "1";
@@ -37,9 +61,11 @@ export default async function ProductsPage({
         description="Danh mục kèm mã OEM / mã tương đương và xe tương thích. Tồn kho tách biệt: của mình và ký gửi."
       />
       {!configured && <NotConfigured />}
-      {searchParams.ok && (
+      {ctx.mode === "NONE" && <NoBusinessLineNotice />}
+      {ctx.mode !== "NONE" && searchParams.ok && (
         <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Đã lưu thành công.</p>
       )}
+      {ctx.mode === "NONE" ? null : (
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="min-w-0 lg:col-span-2">
           <form method="get" className="mb-4 flex flex-wrap items-center gap-2">
@@ -74,7 +100,7 @@ export default async function ProductsPage({
             <TableWrap>
               <thead>
                 <tr>
-                  <th className={`${thCls} text-right`}>STT</th><th className={thCls}>SKU</th><th className={thCls}>Tên</th><th className={thCls}>Thương hiệu</th><th className={thCls}>Nhóm</th>
+                  <th className={`${thCls} text-right`}>STT</th><th className={thCls}>SKU</th><th className={thCls}>Tên</th><th className={thCls}>Thương hiệu</th><th className={thCls}>Nhóm</th><th className={thCls}>Ngành</th>
                   <th className={`${thCls} text-right`}>Giá lẻ</th><th className={`${thCls} text-right`}>Giá đại lý</th><th className={thCls}>Của mình</th><th className={thCls}>Ký gửi</th>
                   <th className={thCls}>Tại đối tác</th><th className={thCls}>Tổng</th>
                 </tr>
@@ -92,6 +118,11 @@ export default async function ProductsPage({
                       <td className={tdCls}>{p.name}</td>
                       <td className={tdCls}>{p.brand ?? "—"}</td>
                       <td className={tdCls}>{p.product_group ?? "—"}</td>
+                      <td className={tdCls}>
+                        {p.business_line_id
+                          ? (lineLabelById.get(p.business_line_id) ?? "—")
+                          : <span className="font-medium text-amber-700">Chưa phân loại</span>}
+                      </td>
                       <td className={`${tdCls} text-right`}>
                         {!Number(p.retail_price ?? 0) ? (
                           <span className="font-semibold text-amber-700">Chưa có giá</span>
@@ -123,11 +154,24 @@ export default async function ProductsPage({
               <label className={labelCls}>Nhóm hàng</label>
               <input name="product_group" list="tvk-product-groups" placeholder="VD: Linh kiện ô tô tải" className={inputCls} />
               <datalist id="tvk-product-groups">
-                {groups.map((g) => (
+                {groupOptions.map((g) => (
                   <option key={g} value={g} />
                 ))}
               </datalist>
             </div>
+            {/* P2: sản phẩm mới thuộc ngành đang làm việc; ngữ cảnh ALL thì chọn rõ. */}
+            {ctx.mode === "LINE" ? (
+              <input type="hidden" name="business_line" value={ctx.code ?? ""} />
+            ) : (
+              <div>
+                <label className={labelCls}>Ngành hàng *</label>
+                <select name="business_line" required className={inputCls} defaultValue={ctx.lines[0]?.code ?? ""}>
+                  {ctx.lines.map((l) => (
+                    <option key={l.id} value={l.code}>{BUSINESS_LINE_LABELS[l.code]}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <div><label className={labelCls}>Độ nhớt SAE (nhớt)</label><input name="sae_viscosity" placeholder="VD: 15W-40" className={inputCls} /></div>
               <div><label className={labelCls}>Chuẩn API/ACEA (nhớt)</label><input name="api_standard" placeholder="VD: CI-4" className={inputCls} /></div>
@@ -150,6 +194,7 @@ export default async function ProductsPage({
         </Card>
         )}
       </div>
+      )}
     </>
   );
 }

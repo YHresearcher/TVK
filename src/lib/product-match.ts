@@ -19,6 +19,46 @@ export function isOilGroup(group: unknown): boolean {
   return n.includes("nhot");
 }
 
+/**
+ * P2 — phân biệt nhớt/phụ tùng theo NGÀNH chuẩn (business_line_code),
+ * không theo tên nhóm (xem §5.2 E4: "Lọc dầu"/"Lọc nhớt" là phụ tùng).
+ * Mọi chỗ chọn FEFO/FIFO hay chặn bán hết hạn phải dùng hàm này với
+ * business_line_code từ DB, không dùng isOilGroup.
+ */
+export function isOilLineCode(code: unknown): boolean {
+  return String(code ?? "").toUpperCase() === "OIL";
+}
+
+/** Lô dầu đã hết hạn chưa (so với ngày làm việc YYYY-MM-DD)? Lô không
+ * có hạn dùng thì không tính là hết hạn (xếp sau cùng khi FEFO, §7.2). */
+export function isExpiredBatch(
+  expiryDate: string | null | undefined,
+  todayIso: string,
+): boolean {
+  if (!expiryDate) return false;
+  return String(expiryDate).slice(0, 10) < todayIso;
+}
+
+/**
+ * Tách một danh sách dòng theo ngành (checkout chung -> tối đa 4 chứng
+ * từ: 2 ngành × BH/KG, §9.3/E11). Trả về Map<lineId, dòng[]>; dòng chưa
+ * phân loại (lineId null) gom dưới khóa "" để phía gọi từ chối rõ ràng
+ * thay vì lặng lẽ bỏ. Thứ tự dòng trong mỗi nhóm giữ nguyên thứ tự gốc.
+ */
+export function splitByBusinessLine<T>(
+  items: T[],
+  lineOf: (item: T) => string | null | undefined,
+): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = lineOf(item) ?? "";
+    const list = groups.get(key) ?? [];
+    list.push(item);
+    groups.set(key, list);
+  }
+  return groups;
+}
+
 export interface LotOrder {
   expiry_date?: string | null;
   received_date?: string | null;

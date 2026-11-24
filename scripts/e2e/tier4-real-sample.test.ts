@@ -1,11 +1,34 @@
 import assert from "node:assert/strict";
-import { parseEnterpriseSample, DEFAULT_SAMPLE_CSV_PATH } from "./harness/csv-parser";
+import {
+  parseEnterpriseSample,
+  resolveSampleCsvPath,
+  sampleCsvExists,
+} from "./harness/csv-parser";
 
-export async function runTier4Tests(): Promise<{ passed: number; total: number }> {
+export interface Tier4Result {
+  passed: number;
+  total: number;
+  skipped?: boolean;
+  skipReason?: string;
+}
+
+export async function runTier4Tests(): Promise<Tier4Result> {
   let passed = 0;
   console.log("  ▶ Tier 4: Real Enterprise Sample Data (376-row HOWO dataset replay)");
 
-  const data = parseEnterpriseSample(DEFAULT_SAMPLE_CSV_PATH);
+  const samplePath = resolveSampleCsvPath();
+  if (!sampleCsvExists(samplePath)) {
+    // File mẫu là dữ liệu kế toán thật của cửa hàng, KHÔNG có trong repo.
+    // Không bịa dữ liệu, không fail cả suite — SKIP Tier 4 và báo rõ cách chạy lại.
+    const skipReason =
+      `Enterprise sample CSV not found at: ${samplePath}. ` +
+      `Set TVK_E2E_SAMPLE_CSV to the full file path, or TVK_E2E_FIXTURES_DIR to the ` +
+      `folder containing user-accounting-sample.csv, then re-run npm run test:e2e.`;
+    console.log(`    ⊘ SKIPPED — ${skipReason}`);
+    return { passed: 0, total: 0, skipped: true, skipReason };
+  }
+
+  const data = parseEnterpriseSample(samplePath);
 
   function test(name: string, fn: () => void) {
     try {
@@ -198,7 +221,11 @@ export async function runTier4Tests(): Promise<{ passed: number; total: number }
 if (process.argv[1]?.endsWith("tier4-real-sample.test.ts")) {
   runTier4Tests()
     .then((r) => {
-      console.log(`\nAll ${r.passed}/${r.total} Tier 4 tests passed!`);
+      if (r.skipped) {
+        console.log(`\nTier 4 SKIPPED: ${r.skipReason}`);
+      } else {
+        console.log(`\nAll ${r.passed}/${r.total} Tier 4 tests passed!`);
+      }
     })
     .catch((err) => {
       console.error(err);
