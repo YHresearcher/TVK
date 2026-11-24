@@ -1176,8 +1176,8 @@ QUA staging rehearsal** (lệnh 10:19). Diễn biến:
   (3.621.000.201 kho mình + 101.967.269 ở đối tác), thay vì theo
   giá bán/chuyển giao 5.373.234.100 như trước. Đây là thiết kế P5
   (`v_inventory_value_by_line` theo giá vốn lô; nhãn trang ghi
-  "Theo giá vốn lô"), không phải mất số liệu. Chủ chưa chốt giữ
-  hay đổi lại theo giá bán.
+  "Theo giá vốn lô"), không phải mất số liệu. Chủ CHỐT 24/11 15:50:
+  giữ theo giá vốn.
 - **Lưu ý 2 — phiếu nháp test PN-2611-0001 chưa xoá được:** nút
   Xoá dùng `window.confirm()` gốc, trình duyệt tự động không bấm
   được hộp thoại đó (giới hạn automation, không phải lỗi bản mới).
