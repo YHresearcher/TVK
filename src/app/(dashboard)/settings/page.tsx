@@ -186,7 +186,7 @@ export default async function SettingsPage({
                     <option value="BANK">Ngân hàng</option>
                   </select></div>
               )}
-              <div><label className={labelCls}>Số dư đầu kỳ *</label><input name="opening_balance" type="number" step="1000" required defaultValue={editingFund?.opening_balance ?? 0} className={inputCls} /></div>
+              <div><label className={labelCls}>Số dư đầu kỳ *</label><input name="opening_balance" type="number" step="1" required defaultValue={editingFund?.opening_balance ?? 0} className={inputCls} /></div>
             </div>
             {editingFund && (
               <label className="flex items-center gap-2 text-sm text-slate-700">
