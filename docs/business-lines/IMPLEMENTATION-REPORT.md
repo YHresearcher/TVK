@@ -1125,3 +1125,71 @@ checklist + rollback plan. **Chưa làm:** tạo staging, chạy rehearsal,
 sao lưu, merge/deploy. Tất cả các việc đó cần chủ gật đầu từng bước
 theo `RELEASE-CHECKLIST.md`. Không merge vào `main`, không chạy
 migration lên live trong P6 (theo §0.2 và chỉ đạo của parent).
+
+## P6.7. Phát hành production 2026-11-24 — ĐÃ XONG (bổ sung sau P6)
+
+Ngày 24/11/2026 chủ cửa hàng chốt **push thẳng lên production, BỎ
+QUA staging rehearsal** (lệnh 10:19). Diễn biến:
+
+- **Sao lưu phát hành** (JSON toàn bộ 42 bảng, 592 dòng) + **kiểm
+  chứng restore lên PostgreSQL 16 local 11:33: 592/592 dòng khớp**,
+  số tiền + tồn kho khớp baseline. Sao lưu duy nhất có thể dùng để
+  rollback (Supabase Free không có sao lưu project). File:
+  `~/workspace/goals/tvk-auto-parts-inventory-system/hidden_files/backup-2026-11-24/`
+  (bản restore đã chứng minh: `restore-2026-11-24-WORKING.sql`).
+- **0025 live ~11:13** (đã chạy trước khi chủ dừng lại 11:18 để kiểm
+  tra đối chiếu linh kiện — hệ thống vẫn chạy bình thường, chỉ có
+  0025 là additive).
+- **0026–0030 live xong 11:44**, theo thứ tự, mỗi file kiểm tra
+  riêng: 0026 — 5 tài khoản → AUTO_PARTS, fail-closed đúng (zero
+  UUID = false, thanhphan = true), không lỗi `P2 SEED THIẾU`; 0027 —
+  payment_allocations = 0, cột `reversal_of_id` có; 0028/0029 — số
+  đếm + tiền khớp baseline; 0030 — 10 view đủ, BL-020 khớp
+  (v_sales_by_line = v_sales_doc_totals: doanh thu 342.755.000,
+  giá vốn 253.859.665, 1 đơn). Đối chiếu cuối khớp baseline 100%
+  (46/46/114/1/1/0/0/1, phải thu 342.755.000, phải trả 0).
+- **Sự cố lúc chạy 0030 (đã xử lý, không ảnh hưởng DB):** lần paste
+  đầu sai một dòng ở `v_product_sales_30d` (`revenue_all` mang nhầm
+  FILTER 30 ngày), đã paste lại toàn bộ file đã sửa + kiểm tra bằng
+  Find rồi mới chạy; một lần bấm nhầm "Run selected" chỉ chạy chữ
+  `revenue_all` → lỗi cú pháp 42601, không chạm DB. Kiểm tra lại
+  sau: `v_product_sales_30d` trên live đúng (qty_all 445,
+  rev_all 342.755.000, qty_30d 0, rev_30d 0).
+- **Merge + deploy:** merge `--no-ff` nhánh
+  `feature/tvk-v2-business-lines` vào `main`, commit **f854051**
+  (81 files, +16.164/−1.138), push 11:44; Vercel deploy xong ~11:50.
+  Dashboard gọn c64942b đi kèm trong cùng đợt.
+- **Smoke test production ~11:46–11:52 (OWNER): ĐẠT.** Bản mới lên
+  sau 1 lần tải lại (lúc 11:46–11:48 vẫn thấy bản cũ — deploy chưa
+  xong, đúng như đã biết). 2 bảng theo ngành hiện đủ; 4 mục
+  (Thống kê đối tác, Phân tích đơn hàng, Top 5, Hoạt động kho)
+  thu lại mặc định, bấm mở được. Doanh thu 342.755.000, lãi gộp
+  88.895.335, phải thu 342.755.000, phải trả 0. Bán hàng / Phải thu /
+  Hoá đơn GTGT tải đúng, không lỗi. Tạo phiếu nháp PN-2611-0001
+  thành công (form có Ngành hàng, mặc định Phụ tùng, chưa xác nhận).
+- **Kiểm tra NULL-line sau phát hành (11:55): 0** —
+  `sales_documents WHERE business_line_id IS NULL AND
+  status='CONFIRMED'` = 0. Không có chứng từ đã xác nhận nào chưa
+  phân loại.
+- **Lưu ý 1 — cơ sở tính "Giá trị hàng sở hữu" đổi ở P5:** hero
+  dashboard giờ hiện **theo giá vốn 3.722.967.470**
+  (3.621.000.201 kho mình + 101.967.269 ở đối tác), thay vì theo
+  giá bán/chuyển giao 5.373.234.100 như trước. Đây là thiết kế P5
+  (`v_inventory_value_by_line` theo giá vốn lô; nhãn trang ghi
+  "Theo giá vốn lô"), không phải mất số liệu. Chủ chưa chốt giữ
+  hay đổi lại theo giá bán.
+- **Lưu ý 2 — phiếu nháp test PN-2611-0001 chưa xoá được:** nút
+  Xoá dùng `window.confirm()` gốc, trình duyệt tự động không bấm
+  được hộp thoại đó (giới hạn automation, không phải lỗi bản mới).
+  Phiếu nháp chưa xác nhận nên không ảnh hưởng kho/tiền — chủ tự
+  xoá tay. Phiếu nháp cũ PN-2610-0004 vẫn còn.
+- **Lưu ý 3 — chưa kiểm tra đăng nhập nhân viên trực tiếp** (không
+  có mật khẩu nhân viên); trong Cài đặt đã thấy 3 tài khoản nhân
+  viên chỉ gán Phụ tùng, CEO + OWNER thấy toàn bộ — đúng cấu hình
+  đã chốt.
+- **Cửa sổ bảo trì đã hết:** nhân viên nhập liệu lại được từ sau
+  deploy ~11:50.
+- **Còn mở sau phát hành:** E2E Tier 4 (chờ file
+  `user-accounting-sample.csv`); BL-014 chỉ có view hàng đợi; quỹ
+  chung hay riêng két chưa chốt; import bổ sung T10+T11 vẫn HOLD
+  (chờ chủ quyết riêng, sau phát hành).
