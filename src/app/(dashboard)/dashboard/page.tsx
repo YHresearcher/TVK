@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, NotConfigured, PageHeader, TableWrap, tdCls, thCls } from "@/components/ui";
+import CollapsibleCard from "@/components/CollapsibleCard";
 import NoBusinessLineNotice from "@/components/NoBusinessLineNotice";
 import { getBusinessLineContext } from "@/lib/business-lines";
 import { ComposedChart, formatCompactVND, GroupedBarChart, HBarList, StackedBarList } from "@/components/Charts";
@@ -57,13 +58,40 @@ function StatCard({ label, value, sub, tone }: { label: string; value: string; s
   );
 }
 
-function LayerHeading({ n, title, desc }: { n: number; title: string; desc: string }) {
+function LayerHeading({ title, desc, accent }: { title: string; desc: string; accent?: string }) {
   return (
-    <div className="mb-4">
-      <h2 className="text-base font-semibold text-slate-900">
-        {n} · {title}
-      </h2>
+    <div className={`mb-4 border-l-4 pl-3 ${accent ?? "border-slate-300"}`}>
+      <h2 className="text-lg font-bold text-slate-900">{title}</h2>
       <p className="text-sm text-slate-500">{desc}</p>
+    </div>
+  );
+}
+
+// Thẻ KPI nổi bật ở đầu Tổng quan: nền màu theo ý nghĩa (xanh lá = tốt,
+// cam = cần chú ý, đỏ = rủi ro, xanh dương = tiền, tím = hàng hoá), số
+// lớn, nhãn kỳ rõ. Chỉ trình bày — mọi số đều lấy từ getDashboard.
+function HeroKpi({
+  label,
+  value,
+  sub,
+  box,
+  num,
+  big = false,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  box: string;
+  num: string;
+  big?: boolean;
+}) {
+  return (
+    <div className={`min-w-0 rounded-xl border p-4 shadow-sm sm:p-5 ${box}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className={`mt-1 font-bold leading-tight ${big ? "text-[32px] sm:text-4xl" : "text-[26px] sm:text-[32px]"} ${num}`}>
+        {value}
+      </p>
+      {sub && <p className="mt-1 text-xs opacity-80">{sub}</p>}
     </div>
   );
 }
@@ -176,9 +204,12 @@ export default async function DashboardPage({
       </>
     );
   }
-  const ownedRealValue = d.ownedValue + d.atPartnersValue;
-
   const role = profile.data?.role ?? "";
+
+  // Mức độ phải thu quá hạn cho thẻ hero (chỉ tô đỏ khi thực sự nghiêm
+  // trọng: quá hạn chiếm từ một nửa số phải thu còn nợ trở lên).
+  const overdueRatio = d.receivablesOutstanding > 0 ? d.overdueReceivables / d.receivablesOutstanding : 0;
+  const overdueSev = d.overdueReceivables === 0 ? "ok" : overdueRatio >= 0.5 ? "bad" : "watch";
 
   // P5 — số liệu cho 2 bảng theo ngành ở tầng 1 (chỉ chế độ ALL; khi đã
   // chọn một ngành thì mọi số trên trang đã là của ngành đó).
@@ -216,22 +247,53 @@ export default async function DashboardPage({
     { label: "Toàn doanh nghiệp", recv: debtAll.recv, pay: debtAll.pay, bold: true },
   ];
 
+  // Khối Executive Control: Cảnh báo đỏ & Dòng tiền 14-30 ngày cho CEO / Shadow Controller.
+  // Nằm trong tầng 1, ngay sau dãy KPI hero để CEO thấy vấn đề sớm.
+  const executiveSection =
+    !canSeeMoney || !cashflow || !alertsResult ? null : (
+      <ExecutiveControlSection cashflow={cashflow} alertsResult={alertsResult} />
+    );
+
   // Tầng 1 — Tổng quan điều hành: 5 giây nắm tình hình. Tiền tổng chỉ
   // Chủ cửa hàng, Kế toán và CEO thấy (canSeeMoney); Bán hàng và Thủ kho
   // không thấy tầng này. Lợi nhuận gộp chặn thêm một lớp (canSeeCost).
+  // Dãy KPI hero: 5 số theo thứ tự Doanh thu → Lãi gộp → Tiền mặt &
+  // ngân hàng → Phải thu quá hạn → Giá trị hàng sở hữu (giá vốn). Phải
+  // trả không vào dãy hero — xem ở bảng Công nợ theo ngành bên dưới.
   const layer1 = !canSeeMoney ? null : (
     <section>
-      <LayerHeading n={1} title="Tổng quan điều hành" desc="Doanh thu, lợi nhuận, công nợ và giá trị hàng sở hữu." />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="Doanh thu từ trước tới nay" value={formatVND(d.revenueAll)} sub={`${formatNumber(d.orderCountAll)} đơn đã xác nhận`} tone="blue" />
-        {canSeeCost && (
-          <StatCard label="Lợi nhuận gộp (lũy kế)" value={formatVND(d.grossProfitAll)} sub={`Lãi ${grossMargin}% trên doanh thu · Lãi ${roiAll}% trên giá vốn`} tone="emerald" />
-        )}
-        <StatCard label="Phải thu còn nợ" value={formatVND(d.receivablesOutstanding)} sub="Đối tác đang nợ TVK" tone="violet" />
-        <StatCard label="Phải trả còn nợ" value={formatVND(d.payablesOutstanding)} sub="Nợ nhà cung cấp (hàng ký gửi đã bán + hàng mua chưa trả)" tone="rose" />
-        <StatCard label="Giá trị hàng sở hữu" value={formatVND(ownedRealValue)} sub="Theo giá bán / giá chuyển giao" tone="sky" />
+      <LayerHeading title="Tổng quan điều hành" desc="Doanh thu, lãi gộp, tiền mặt, phải thu quá hạn và giá trị hàng sở hữu." accent="border-blue-600" />
+      <div className="grid gap-4">
+        <HeroKpi label="Doanh thu" value={formatVND(d.revenueAll)} sub={`Từ trước tới nay · ${formatNumber(d.orderCountAll)} đơn đã xác nhận`} box="border-slate-900 bg-slate-900 text-white" num="text-white" big />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {canSeeCost && (
+            <HeroKpi label="Lãi gộp" value={formatVND(d.grossProfitAll)} sub={`Lũy kế · Lãi ${grossMargin}% trên doanh thu`} box="border-emerald-200 bg-emerald-50 text-emerald-900" num="text-emerald-700" />
+          )}
+          <HeroKpi label="Tiền mặt & ngân hàng" value={cashBalances.length > 0 ? formatVND(totalCash) : "Chưa thiết lập"} sub={cashBalances.length > 0 ? "Số dư hiện tại" : "Thêm quỹ ở Cài đặt → Quỹ tiền"} box="border-sky-200 bg-sky-50 text-sky-900" num="text-sky-800" />
+          <HeroKpi
+            label="Phải thu quá hạn"
+            value={formatVND(d.overdueReceivables)}
+            sub={
+              overdueSev === "ok"
+                ? "Không có khoản quá hạn"
+                : overdueSev === "bad"
+                  ? "Quá hạn nghiêm trọng — cần đôn đốc ngay"
+                  : "Đã quá hạn — cần đôn đốc thu hồi"
+            }
+            box={
+              overdueSev === "ok"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : overdueSev === "bad"
+                  ? "border-rose-200 bg-rose-50 text-rose-900"
+                  : "border-amber-200 bg-amber-50 text-amber-900"
+            }
+            num={overdueSev === "ok" ? "text-emerald-700" : overdueSev === "bad" ? "text-rose-700" : "text-amber-700"}
+          />
+          <HeroKpi label="Giá trị hàng sở hữu" value={formatVND(d.bookInventoryValue)} sub="Theo giá vốn lô" box="border-violet-200 bg-violet-50 text-violet-900" num="text-violet-800" />
+        </div>
       </div>
       <p className="mt-2 text-xs text-slate-500">Chưa tách thuế GTGT.</p>
+      {executiveSection}
       {isAll && lineComparison.length > 0 && (
         <div className="mt-4">
           <Card title="So sánh theo ngành" tone="blue">
@@ -307,23 +369,17 @@ export default async function DashboardPage({
     </section>
   );
 
-  // Khối Executive Control: Cảnh báo đỏ & Dòng tiền 14-30 ngày cho CEO / Shadow Controller
-  const executiveSection =
-    !canSeeMoney || !cashflow || !alertsResult ? null : (
-      <ExecutiveControlSection cashflow={cashflow} alertsResult={alertsResult} />
-    );
-
-  // Tầng 2 — Hàng hoá và sở hữu: của TVK, được ký gửi, gửi đối tác.
+  // Tầng 2 — Tài sản và hàng hóa: của TVK, được ký gửi, gửi đối tác.
   const layer2 = (
-    <section className="mt-10">
-      <LayerHeading n={2} title="Hàng hoá và sở hữu" desc="Hàng hoá của TVK, hàng được ký gửi và hàng đang gửi ở đối tác — tách biệt theo từng lô." />
+    <section className="mt-8">
+      <LayerHeading title="Tài sản và hàng hóa" desc="Hàng hoá của TVK, hàng được ký gửi và hàng đang gửi ở đối tác — tách biệt theo từng lô." accent="border-sky-500" />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <StatCard label="Tồn kho (số lượng)" value={`${formatNumber(d.ownedQty)} đơn vị`} sub={`${formatVND(d.ownedValue)} theo giá bán · ${formatNumber(d.ownedLotCount)} lô`} tone="emerald" />
         <StatCard label="Hàng nhận ký gửi (số lượng)" value={`${formatNumber(d.consignedQty)} đơn vị`} sub={`${formatVND(d.consignedValue)} được nhà cung cấp ký gửi · ${formatNumber(d.consignedLotCount)} lô`} tone="amber" />
         <StatCard label="Hàng TVK tại đối tác" value={`${formatNumber(d.atPartnersQty)} đơn vị`} sub={`${formatVND(d.atPartnersValue)} theo giá chuyển giao · ${formatNumber(d.atPartnersLotCount)} lô`} tone="sky" />
       </div>
       {canSeeCost && (
-        <div className="mt-6">
+        <div className="mt-4">
           <Card title="Tính theo giá vốn (tiền nhập hàng)" tone="slate">
             <p className="mb-3 text-sm leading-relaxed text-slate-600">
               Theo giá vốn; hàng được ký gửi không phải tài sản, không gộp vào tổng.
@@ -337,7 +393,7 @@ export default async function DashboardPage({
           </Card>
         </div>
       )}
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <StockCompositionCard
           rings={d.rings}
           tierValues={d.warehouseTierValues}
@@ -385,7 +441,7 @@ export default async function DashboardPage({
         )}
       </div>
       {canSeeMoney && (
-        <div className="mt-6">
+        <div className="mt-4">
           <Card title="Đối tác đã bán được bao nhiêu hàng ký gửi" tone="amber">
             <StackedBarList
               rows={consBars.map((r) => ({
@@ -407,19 +463,19 @@ export default async function DashboardPage({
           </Card>
         </div>
       )}
-      <div className="mt-6">
-        <Card title="Thống kê đối tác" tone="sky">
+      <div className="mt-4">
+        <CollapsibleCard title="Thống kê đối tác" tone="sky" hint="Bấm để xem 5 số liệu từng đối tác">
           <PartnerStatsDialog partners={partnerStats} />
-        </Card>
+        </CollapsibleCard>
       </div>
     </section>
   );
 
-  // Tầng 3 — Hiệu quả kinh doanh: doanh thu, lợi nhuận, nhóm hàng.
+  // Tầng 3 — Phân tích kinh doanh: doanh thu, lợi nhuận, nhóm hàng.
   const layer3 = (
-    <section className="mt-10">
-      <LayerHeading n={3} title="Hiệu quả kinh doanh" desc="Doanh thu, lợi nhuận và sức bán theo nhóm hàng." />
-      <div className="grid gap-6 lg:grid-cols-3">
+    <section className="mt-8">
+      <LayerHeading title="Phân tích kinh doanh" desc="Doanh thu, lợi nhuận và sức bán theo nhóm hàng." accent="border-emerald-500" />
+      <div className="grid gap-4 lg:grid-cols-3">
         {canSeeCost && (
           <Card title="Doanh thu – Giá vốn – Lãi" className="lg:col-span-2" tone="blue">
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -481,8 +537,8 @@ export default async function DashboardPage({
         )}
       </div>
       {canSeeCost && (
-        <div className="mt-6">
-          <Card title="Phân tích đơn hàng" tone="emerald">
+        <div className="mt-4">
+          <CollapsibleCard title="Phân tích đơn hàng" tone="emerald" hint="Bấm để xem tóm tắt và biểu đồ từng đơn">
             <p className="mb-2 text-base leading-relaxed text-slate-600">
               Doanh thu thuần <strong className="text-slate-900">{formatVND(d.revenueAll)}</strong>
               {" · "}Giá vốn <strong className="text-slate-900">{formatVND(cogsAll)}</strong>
@@ -500,10 +556,10 @@ export default async function DashboardPage({
                 labelB="Giá vốn"
               />
             )}
-          </Card>
+          </CollapsibleCard>
         </div>
       )}
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-4">
         <Card title="Doanh thu theo nhóm hàng" tone="emerald">
           {groupPerf.length === 0 ? (
             <EmptyState message="Chưa có doanh thu theo nhóm hàng." />
@@ -518,7 +574,9 @@ export default async function DashboardPage({
             />
           )}
         </Card>
-        <Card title="Top 5 sản phẩm bán chạy (30 ngày)" tone="emerald">
+      </div>
+      <div className="mt-4">
+        <CollapsibleCard title="Top 5 sản phẩm bán chạy (30 ngày)" tone="emerald" hint="Bấm để xem top 5">
           {d.topProducts.length === 0 ? (
             <EmptyState message="Chưa có sản phẩm nào được bán trong 30 ngày qua." />
           ) : (
@@ -531,16 +589,16 @@ export default async function DashboardPage({
               format={(v) => formatNumber(v)}
             />
           )}
-        </Card>
+        </CollapsibleCard>
       </div>
     </section>
   );
 
-  // Tầng 4 — Cảnh báo vận hành: tồn thấp, chậm luân chuyển, quá hạn.
+  // Tầng 4 — Rủi ro và tồn đọng: tồn thấp, chậm luân chuyển, quá hạn.
   const layer4 = (
-    <section className="mt-10">
-      <LayerHeading n={4} title="Những việc cần xem" desc="Hàng sắp hết, hàng để lâu không bán được, tiền nợ quá hạn, và hàng gửi đối tác bị lệch số." />
-      <div className="grid gap-6 lg:grid-cols-2">
+    <section className="mt-8">
+      <LayerHeading title="Rủi ro và tồn đọng" desc="Hàng sắp hết, hàng để lâu không bán được, tiền nợ quá hạn, và hàng gửi đối tác bị lệch số." accent="border-rose-500" />
+      <div className="grid gap-4 lg:grid-cols-2">
         {canSeeMoney && (
           <Card title="Tiền nợ theo tình hình trả" tone="rose">
             <HBarList
@@ -592,7 +650,7 @@ export default async function DashboardPage({
           </p>
         </Card>
       </div>
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card title="Hàng sắp hết (bằng hoặc dưới mức tối thiểu)" tone="amber">
           {d.lowStock.length === 0 ? (
             <EmptyState message="Chưa có sản phẩm sắp hết." />
@@ -634,7 +692,7 @@ export default async function DashboardPage({
         </Card>
       </div>
       {d.discrepancies.length > 0 && (
-        <div className="mt-6">
+        <div className="mt-4">
           <Card title="Hàng gửi đối tác bị lệch số (số đã gửi không khớp với số đã bán + đã trả lại + còn giữ)" tone="rose">
             <TableWrap>
               <thead><tr><th className={thCls}>Đối tác</th><th className={thCls}>Đã gửi</th><th className={thCls}>Đã bán</th><th className={thCls}>Đã trả</th><th className={thCls}>Còn giữ</th></tr></thead>
@@ -656,11 +714,14 @@ export default async function DashboardPage({
     </section>
   );
 
-  // Tầng 5 — Hoạt động gần đây: 8 bút toán kho mới nhất, xem đủ ở sổ cái.
+  // Tầng 5 — Hoạt động kho gần đây: 8 bút toán kho mới nhất, xem đủ ở sổ cái.
+  // Thu gọn mặc định — CEO ít cần xem ngay, cần thì bấm mở.
   const layer5 = (
-    <section className="mt-10">
-      <LayerHeading n={5} title="Hoạt động gần đây" desc="Nhập, xuất, bán hàng, gửi ký gửi và điều chỉnh mới nhất trong lịch sử kho." />
-      <Card>
+    <section className="mt-8">
+      <CollapsibleCard
+        title="Hoạt động kho gần đây"
+        hint={recent.data.length > 0 ? `${recent.data.length} hoạt động mới nhất · Bấm để xem` : "Bấm để xem"}
+      >
         {recent.data.length === 0 ? (
           <EmptyState message="Chưa có hoạt động nào." />
         ) : (
@@ -688,14 +749,16 @@ export default async function DashboardPage({
             Xem lịch sử kho đầy đủ →
           </Link>
         </p>
-      </Card>
+      </CollapsibleCard>
     </section>
   );
 
-  // Một trang duy nhất, thứ tự các TẦNG xếp theo vai trò: chủ/kế toán/CEO
-  // thấy điều hành trước; bán hàng thấy hiệu quả trước; thủ kho thấy hàng
-  // hoá và cảnh báo trước. Từng phần tự khóa theo quyền nên vai trò nào
-  // cũng chỉ thấy phần mình được coi.
+  // Một trang duy nhất, thứ tự các TẦNG xếp theo vai trò. Mặc định
+  // (Chủ/Kế toán/CEO): KPI + cảnh báo trước, rồi Rủi ro, Phân tích,
+  // Tài sản, Hoạt động — CEO thấy vấn đề sớm. Bán hàng thấy hiệu quả
+  // trước, thủ kho thấy hàng hoá và cảnh báo trước (giữ nguyên như cũ).
+  // Khối cảnh báo nằm trong tầng 1 nên không render riêng nữa. Từng phần
+  // tự khóa theo quyền nên vai trò nào cũng chỉ thấy phần mình được coi.
   return (
     <>
       <PageHeader
@@ -704,11 +767,11 @@ export default async function DashboardPage({
       />
       <QuickShortcuts role={role} />
       {role === "SALES" ? (
-        <>{layer1}{executiveSection}{layer3}{layer2}{layer4}{layer5}</>
+        <>{layer1}{layer3}{layer2}{layer4}{layer5}</>
       ) : role === "WAREHOUSE" ? (
-        <>{layer2}{layer4}{layer1}{executiveSection}{layer3}{layer5}</>
+        <>{layer2}{layer4}{layer1}{layer3}{layer5}</>
       ) : (
-        <>{layer1}{executiveSection}{layer2}{layer3}{layer4}{layer5}</>
+        <>{layer1}{layer4}{layer3}{layer2}{layer5}</>
       )}
     </>
   );
