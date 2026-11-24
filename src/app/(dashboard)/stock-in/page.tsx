@@ -148,9 +148,10 @@ export default async function StockInPage({
               <ItemsRows codeMap={codeMap} fields={[
                 { name: "product_id", label: "Sản phẩm", type: "select", options: productOptions },
                 { name: "qty", label: "Số lượng", type: "number" },
-                { name: "unit_cost", label: "Đơn giá vốn (₫)", type: "number", step: "1000" },
+                { name: "unit_cost", label: "Đơn giá vốn (₫)", type: "number", step: "1" },
                 { name: "expiry_date", label: "Hạn dùng (chỉ nhớt)", type: "date" },
               ]} />
+              <div><label className={labelCls}>Ghi chú</label><input name="note" placeholder="vd: gồm 3 lô nhập 13/10/25, 22/01/26, 16/06/26" className={inputCls} /></div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input type="checkbox" name="confirm_now" />
