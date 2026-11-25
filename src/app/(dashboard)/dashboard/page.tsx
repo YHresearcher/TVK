@@ -264,7 +264,7 @@ export default async function DashboardPage({
     <section>
       <LayerHeading title="Tổng quan điều hành" desc="Doanh thu, lãi gộp, tiền mặt, phải thu quá hạn và giá trị hàng sở hữu." accent="border-blue-600" />
       <div className="grid gap-4">
-        <HeroKpi label="Doanh thu" value={formatVND(d.revenueAll)} sub={`Từ trước tới nay · ${formatNumber(d.orderCountAll)} đơn đã xác nhận`} box="border-slate-900 bg-slate-900 text-white" num="text-white" big />
+        <HeroKpi label="Doanh thu" value={formatVND(d.revenueAll)} sub={`Từ trước tới nay · ${formatNumber(d.orderCountAll)} đơn đã xác nhận`} box="border-slate-200 border-l-4 border-l-blue-700 bg-white text-slate-600" num="text-slate-900" big />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {canSeeCost && (
             <HeroKpi label="Lãi gộp" value={formatVND(d.grossProfitAll)} sub={`Lũy kế · Lãi ${grossMargin}% trên doanh thu`} box="border-emerald-200 bg-emerald-50 text-emerald-900" num="text-emerald-700" />

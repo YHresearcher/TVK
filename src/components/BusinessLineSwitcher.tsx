@@ -27,11 +27,11 @@ export default function BusinessLineSwitcher({
 }) {
   if (context.mode === "NONE") {
     return (
-      <div className="border-b border-white/10 px-5 py-3">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+      <div className="border-b border-slate-200 px-5 py-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
           Ngành hàng
         </p>
-        <p className="mt-1 rounded-md bg-amber-500/20 px-2 py-1.5 text-xs font-medium text-amber-300">
+        <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-800">
           Chưa được gán ngành — nhờ chủ cửa hàng gán ngành
         </p>
       </div>
@@ -42,11 +42,11 @@ export default function BusinessLineSwitcher({
     const label =
       context.code ? BUSINESS_LINE_LABELS[context.code] : "—";
     return (
-      <div className="border-b border-white/10 px-5 py-3">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+      <div className="border-b border-slate-200 px-5 py-3">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
           Ngành hàng
         </p>
-        <p className="mt-1 rounded-md bg-white/10 px-2 py-1.5 text-xs font-medium text-white">
+        <p className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-medium text-slate-900">
           {label}
         </p>
       </div>
@@ -54,10 +54,10 @@ export default function BusinessLineSwitcher({
   }
 
   return (
-    <div className="border-b border-white/10 px-5 py-3">
+    <div className="border-b border-slate-200 px-5 py-3">
       <label
         htmlFor="business-line-switcher"
-        className="text-[11px] font-bold uppercase tracking-wider text-slate-400"
+        className="text-[11px] font-bold uppercase tracking-wider text-slate-600"
       >
         Ngành hàng
       </label>
@@ -67,7 +67,7 @@ export default function BusinessLineSwitcher({
           name="business_line"
           defaultValue={context.mode === "ALL" ? "ALL" : context.code ?? "ALL"}
           onChange={(e) => e.currentTarget.form?.requestSubmit()}
-          className="w-full rounded-md border border-white/10 bg-slate-800 px-2 py-2 text-sm text-white"
+          className="w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-sm text-slate-900"
         >
           <option value="ALL">Toàn doanh nghiệp</option>
           {context.lines.map((line) => (

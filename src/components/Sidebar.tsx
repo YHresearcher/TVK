@@ -25,8 +25,8 @@ interface NavGroup {
 
 const TOP_ITEM: NavItem = { href: "/dashboard", label: "Tổng quan" };
 
-/** Mục đang chọn: xanh dương điện tử trên nền navy. */
-const NAV_ACTIVE = "bg-blue-600 text-white shadow";
+/** Mục đang chọn: xanh dương trên nền sáng. */
+const NAV_ACTIVE = "bg-blue-700 text-white shadow";
 
 const GROUPS: NavGroup[] = [
   {
@@ -185,13 +185,13 @@ export default function Sidebar({
     });
   }
 
-  // Navy tối giản: chữ xám nhạt trên nền navy, mục đang chọn tô đặc
-  // xanh dương điện tử — nhìn là biết đang ở đâu.
+  // Sáng tối giản: chữ xám đậm trên nền trắng, mục đang chọn tô đặc
+  // xanh dương — nhìn là biết đang ở đâu.
   const itemCls = (href: string) =>
     `block rounded-md px-3 py-2 text-sm ${
       isActive(pathname, href)
         ? `font-medium ${NAV_ACTIVE}`
-        : "text-slate-300 hover:bg-white/10 hover:text-white"
+        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
     }`;
 
   return (
@@ -205,13 +205,13 @@ export default function Sidebar({
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col border-r border-slate-900 bg-slate-900 text-slate-300 transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white text-slate-600 transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-      <div className="border-b border-white/10 px-5 py-4">
-        <p className="text-lg font-bold tracking-wide text-white">TVK</p>
-        <p className="text-xs text-slate-400">Quản lý kho phụ tùng</p>
+      <div className="border-b border-slate-200 px-5 py-4">
+        <p className="text-lg font-bold tracking-wide text-slate-900">TVK</p>
+        <p className="text-xs text-slate-600">Quản lý kho phụ tùng</p>
       </div>
       {/* P2 §18.2: bộ chuyển ngành hàng ngay đầu sidebar. */}
       {context ? <BusinessLineSwitcher context={context} /> : null}
@@ -262,8 +262,8 @@ export default function Sidebar({
                 aria-expanded={expanded}
                 className={`flex w-full items-center justify-between rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider ${
                   containsActive
-                    ? "text-white"
-                    : "text-slate-400 hover:text-white"
+                    ? "text-slate-900"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 <span className="flex items-center gap-2">
@@ -312,24 +312,24 @@ export default function Sidebar({
           </Link>
         </div>
       </nav>
-      <div className="border-t border-white/10 px-5 py-4">
+      <div className="border-t border-slate-200 px-5 py-4">
         <div className="flex items-center gap-2">
           <span aria-hidden="true" className="text-base leading-none">👤</span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-white">{userName}</p>
-            <p className="text-xs text-slate-400">{role}</p>
+            <p className="truncate text-sm font-medium text-slate-900">{userName}</p>
+            <p className="text-xs text-slate-600">{role}</p>
           </div>
         </div>
         <form action={signOutAction} className="mt-3">
           <SubmitButton
-            className="w-full rounded-md px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10"
+            className="w-full rounded-md px-3 py-1.5 text-left text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-900"
           >
             ↪ Đăng xuất
           </SubmitButton>
         </form>
-        <div className="mt-4 border-t border-white/10 pt-3 text-center">
-          <p className="text-[11px] text-slate-500">TVK Management System</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">v1.0</p>
+        <div className="mt-4 border-t border-slate-200 pt-3 text-center">
+          <p className="text-[11px] text-slate-600">TVK Management System</p>
+          <p className="mt-0.5 text-[11px] text-slate-600">v1.0</p>
         </div>
       </div>
       </aside>

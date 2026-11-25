@@ -18,13 +18,13 @@ export default function MobileTopBar({
   lineLabel?: string | null;
 }) {
   return (
-    <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-900 bg-slate-900 px-4 py-2.5 lg:hidden">
+    <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2.5 lg:hidden">
       <div className="flex items-center gap-3">
         <button
           type="button"
           aria-label="Mở menu điều hướng"
           onClick={() => window.dispatchEvent(new Event(MOBILE_NAV_TOGGLE_EVENT))}
-          className="rounded-md p-1.5 text-white hover:bg-white/10"
+          className="rounded-md p-1.5 text-slate-900 hover:bg-slate-50"
         >
           <svg
             className="h-6 w-6"
@@ -39,14 +39,14 @@ export default function MobileTopBar({
           </svg>
         </button>
         <div>
-          <p className="text-base font-bold leading-tight tracking-wide text-white">
+          <p className="text-base font-bold leading-tight tracking-wide text-slate-900">
             TVK
           </p>
-          <p className="text-[11px] leading-tight text-slate-400">
+          <p className="text-[11px] leading-tight text-slate-600">
             Tân Vạn Khang · Quản lý kho phụ tùng
           </p>
           {lineLabel ? (
-            <p className="mt-0.5 text-[11px] font-medium leading-tight text-sky-300">
+            <p className="mt-0.5 text-[11px] font-medium leading-tight text-blue-700">
               Ngành: {lineLabel}
             </p>
           ) : null}
